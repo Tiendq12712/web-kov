@@ -4,7 +4,7 @@ import { getSession, signIn, signOut } from './auth.js';
 import { loadAccounts, findAccount, canOpenSettings } from './directory.js';
 import { html, mount, raw } from './dom.js';
 import { monthLabel } from './format.js';
-import { overviewView } from './views/overview.js';
+import { overviewView, memberRowsView } from './views/overview.js';
 import { teamView, rowsView } from './views/team.js';
 import { detailView } from './views/detail.js';
 import { workView, workRowsView } from './views/work.js';
@@ -27,6 +27,8 @@ function readPref(key, fallback) {
 const state = {
   month: null, data: null,
   tab: 'overview',           // 'overview' | 'work' | 'report' | 'settings' | team id
+  osort: { key: 'kpi', dir: 'desc' },   // sắp xếp bảng nhân sự trang tổng quan
+  mstatus: 'all', mquery: '',   // lọc tình trạng + tìm kiếm ở bảng nhân sự trang tổng quan
   filter: 'all',             // bộ lọc team ở bảng nhân sự trang tổng quan
   heat: readPref('heat2', 'bars'),   // kiểu màu bảng: bars (thanh màu) | alert (ít màu) | full (nhiều màu)
   query: '',
@@ -213,6 +215,12 @@ document.addEventListener('click', (e) => {
     try { localStorage.setItem('kpi.heat2', state.heat); } catch {}
     return renderView();
   }
+  if (hit('[data-osort]')) {
+    const key = hit('[data-osort]').dataset.osort;
+    state.osort = { key, dir: state.osort.key === key && state.osort.dir === 'desc' ? 'asc' : 'desc' };
+    return renderView();
+  }
+  if (hit('[data-mstatus]')) { state.mstatus = hit('[data-mstatus]').dataset.mstatus; return renderView(); }
   if (hit('[data-filter]')) { state.filter = hit('[data-filter]').dataset.filter; return renderView(); }
   if (hit('[data-sort]')) {
     const key = hit('[data-sort]').dataset.sort;
@@ -233,6 +241,12 @@ document.addEventListener('input', (e) => {
   if (e.target.id === 'report-search') {
     state.report.query = e.target.value;
     return mount($('report-rows'), reportRowsView(state.report.data, state.report, kpiNames()));
+  }
+  if (e.target.id === 'member-search') {   // chỉ vẽ lại thân bảng để giữ con trỏ gõ
+    state.mquery = e.target.value;
+    mount($('member-rows'), memberRowsView(state.data, state, state.report.data));
+    $('member-count').textContent = `Hiển thị ${$('member-rows').querySelectorAll('tr.clickable').length}/${state.data.teams.reduce((n, t) => n + (state.filter === 'all' || t.id === state.filter ? t.members.length : 0), 0)} nhân sự · bấm tiêu đề cột để sắp xếp. Bấm một dòng để xem chi tiết.`;
+    return;
   }
   if (e.target.id === 'work-search') {
     state.work.query = e.target.value;

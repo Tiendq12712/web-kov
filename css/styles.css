@@ -418,3 +418,14 @@ body.is-booting .topbar, body.is-booting #view, body.is-booting .bottom-nav { vi
 .tour__actions { display: flex; justify-content: space-between; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .welcome, .welcome__icon, .welcome__confetti i, .tour__spot, .tour__tip { animation: none; transition: none; } .welcome__confetti { display: none; } }
 .task-note { max-width: 260px; white-space: normal; overflow-wrap: anywhere; }
+
+/* Top 3 KPI tổng: chỉ đánh dấu ô tên */
+td.top { background-image: linear-gradient(90deg, var(--medal), transparent 90%); box-shadow: inset 4px 0 0 var(--medal-line); }
+td.sticky-col.top { background-image: linear-gradient(90deg, var(--medal), var(--medal)); background-color: var(--surface); }
+.top--1 { --medal: color-mix(in srgb, #fbbf24 26%, transparent); --medal-line: #f59e0b; }
+.top--2 { --medal: color-mix(in srgb, #94a3b8 26%, transparent); --medal-line: #94a3b8; }
+.top--3 { --medal: color-mix(in srgb, #d97706 20%, transparent); --medal-line: #c2773a; }
+.medal { display: inline-block; }
+.top--1 .medal { animation: crown-bob 2.4s ease-in-out infinite; }
+@keyframes crown-bob { 50% { transform: translateY(-2px) rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) { .top--1 .medal { animation: none; } }

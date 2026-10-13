@@ -6,6 +6,7 @@ import { teamCompare, chartCard, lineChart } from './charts.js';
 import { contactDonut, sourceDonut, statusDonut } from './donuts.js';
 import { heatClass, alertClass, heatLegend, alertLegend, mean } from './heat.js';
 import { workdaysByCode } from '../report.js';
+import { findMember } from '../welcome.js';
 
 const sum = (list, pick) => list.reduce((a, m) => a + (pick(m) ?? 0), 0);
 const ratio = (a, b) => (b ? a / b : 0);
@@ -111,7 +112,10 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v ?? 0));
 const withBar = (inner, value, reference, { mark } = {}) => html`
   <div class="cell-bar">${inner}${bar(clamp01(value), { mark, tone: paceStatus(value, reference).key })}</div>`;
 
-function memberRow({ team, member: m }, workdays, mode) {
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+function memberRow({ team, member: m }, workdays, mode, podium) {
+  const rank = podium.indexOf(m.kpi);   // 0, 1, 2 = top 1, 2, 3; -1 = ngoài top
   const elapsed = elapsedRatio(team.asOf);
   const status = memberStatus(m, team);
   const paint = mode === 'full' ? heatClass : mode === 'alert' ? alertClass : () => '';
@@ -124,7 +128,7 @@ function memberRow({ team, member: m }, workdays, mode) {
   const badgeFor = () => (mode === 'alert' && status.key !== 'bad' ? badge('neutral', status.label) : statusBadge(status));
   return html`
     <tr class="clickable" data-member="${team.id}:${m.code}" tabindex="0">
-      <td class="sticky-col"><span class="person"><strong>${m.name}</strong><small>${m.code} · Level ${m.level ?? '—'}</small></span></td>
+      <td class="sticky-col ${rank >= 0 ? `top top--${rank + 1}` : ''}"><span class="person"><strong>${rank >= 0 ? html`<span class="medal" role="img" aria-label="Top ${rank + 1} KPI tổng" title="Top ${rank + 1} KPI tổng">${MEDALS[rank]}</span> ` : ''}${m.name}</strong><small>${m.code} · Level ${m.level ?? '—'}${rank >= 0 ? ` · Top ${rank + 1} KPI` : ''}</small></span></td>
       <td>${team.name.replace('Team ', '')}</td>
       ${cell(rateCell_(pct(m.kpi, 1), m.kpi), paint(m.kpi, elapsed))}
       <td>${badgeFor()}</td>
@@ -146,12 +150,64 @@ const barLegend = () => html`
     <li class="muted">Vạch đen = mức thời gian đã qua của tháng (talk time: chỉ tiêu)</li>
   </ul>`;
 
-function memberTable(data, { filter, heat }, report) {
-  const mode = HEAT_MODES.some(([id]) => id === heat) ? heat : 'bars';
-  const workdays = report ? workdaysByCode(report) : new Map();
-  const rows = data.teams.filter((t) => filter === 'all' || t.id === filter)
+/** Bộ lọc theo tình trạng của bảng nhân sự (chọn một). */
+export const MEMBER_FILTERS = [
+  ['all', 'Tất cả', () => true],
+  ['good', 'Đạt tiến độ', ({ team, member }) => memberStatus(member, team).key === 'good'],
+  ['warn', 'Cần đẩy', ({ team, member }) => memberStatus(member, team).key === 'warn'],
+  ['bad', 'Chậm', ({ team, member }) => memberStatus(member, team).key === 'bad'],
+  ['need', 'Chưa đạt ĐK cần', ({ member }) => member.need.pass === false],
+  ['talk', 'Chưa đạt talk time', ({ member }) => member.talk.pass === false],
+];
+const plainText = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
+
+/** Cột của bảng nhân sự: nhãn, cách lấy giá trị để sắp xếp (chuỗi hoặc số). */
+const MEMBER_COLUMNS = [
+  { key: 'name', label: 'Nhân sự', sticky: true, align: '', value: ({ member }) => member.name },
+  { key: 'team', label: 'Team', align: '', value: ({ team }) => team.name },
+  { key: 'kpi', label: 'KPI tổng', value: ({ member }) => member.kpi },
+  { key: 'status', label: 'Tiến độ', align: '', value: ({ team, member }) => ratio(member.kpi, elapsedRatio(team.asOf)) },
+  { key: 'need', label: 'Điều kiện cần', value: ({ member }) => member.need.rate },
+  { key: 'main', label: 'Điểm tổng', value: ({ member }) => member.main.rate },
+  { key: 'addon', label: 'Add-on', value: ({ member }) => member.addon.rate },
+  { key: 'act', label: 'Act đã làm', value: ({ member }) => ratio(member.extra.actDone, member.extra.assigned) },
+  { key: 'talk', label: 'Talk time', value: ({ member }) => ratio(member.talk.actual, member.talk.target) },
+  { key: 'workdays', label: 'Ngày công', value: ({ member }, workdays) => workdays.get(member.code) ?? member.extra.workdays },
+].map((c) => ({ align: 'right', ...c }));
+const sortValue = (v) => (v == null || Number.isNaN(v) ? -Infinity : v);
+
+/** Các dòng sau khi lọc theo team, tình trạng và ô tìm kiếm (tên/mã), rồi sắp theo cột đang chọn. */
+const filteredRows = (data, { filter, mstatus = 'all', mquery = '', osort = { key: 'kpi', dir: 'desc' } }, workdays = new Map()) => {
+  const byStatus = MEMBER_FILTERS.find(([id]) => id === mstatus)?.[2] ?? (() => true);
+  const q = plainText(mquery).trim();
+  return data.teams.filter((t) => filter === 'all' || t.id === filter)
     .flatMap((team) => team.members.map((member) => ({ team, member })))
-    .sort((a, b) => b.member.kpi - a.member.kpi);
+    .filter((row) => byStatus(row) && (!q || plainText(`${row.member.name} ${row.member.code}`).includes(q)))
+    .sort((a, b) => {
+      const col = MEMBER_COLUMNS.find((c) => c.key === osort.key) ?? MEMBER_COLUMNS[2];
+      const x = col.value(a, workdays), y = col.value(b, workdays);
+      const diff = typeof x === 'string' ? x.localeCompare(y, 'vi') : sortValue(x) - sortValue(y);
+      return osort.dir === 'asc' ? diff : -diff;
+    });
+};
+
+export function memberRowsView(data, ui, report) {
+  const mode = HEAT_MODES.some(([id]) => id === ui.heat) ? ui.heat : 'bars';
+  const workdays = report ? workdaysByCode(report) : new Map();
+  const rows = filteredRows(data, ui, workdays);
+  // Top 3 KPI tổng của toàn bộ Online (người bằng điểm cùng hạng), không đổi theo bộ lọc.
+  const podium = [...new Set(data.teams.flatMap((t) => t.members.map((m) => m.kpi ?? 0)).filter((k) => k > 0))].sort((a, b) => b - a).slice(0, 3);
+  return rows.length ? html`${rows.map((row) => memberRow(row, workdays, mode, podium))}`
+    : html`<tr class="static"><td colspan="10" class="muted">Không có nhân sự nào khớp bộ lọc.</td></tr>`;
+}
+
+function memberTable(data, ui, report) {
+  const { filter, heat, mstatus = 'all', mquery = '' } = ui;
+  const mode = HEAT_MODES.some(([id]) => id === heat) ? heat : 'bars';
+  const total = data.teams.filter((t) => filter === 'all' || t.id === filter).reduce((n, t) => n + t.members.length, 0);
+  const workdays = report ? workdaysByCode(report) : new Map();
+  const shown = filteredRows(data, ui, workdays).length;
+  const osort = ui.osort ?? { key: 'kpi', dir: 'desc' };
   const legend = { bars: barLegend, alert: () => alertLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)'), full: () => heatLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)') }[mode]();
   return html`
     <section class="card">
@@ -163,23 +219,58 @@ function memberTable(data, { filter, heat }, report) {
         </div>
       </div>
       <div class="toolbar">
-        <p class="muted">Sắp theo KPI tổng. Bấm một dòng để xem chi tiết.</p>
+        <input id="member-search" class="search" type="search" placeholder="Tìm tên hoặc mã nhân sự…" value="${mquery}" aria-label="Tìm nhân sự" autocomplete="off">
+        <div class="chips" role="group" aria-label="Lọc theo tình trạng">
+          ${MEMBER_FILTERS.map(([id, label]) => html`
+            <button class="chip" type="button" data-mstatus="${id}" aria-pressed="${id === mstatus}">${label}</button>`)}
+        </div>
+      </div>
+      <div class="toolbar">
+        <p class="muted" id="member-count">Hiển thị ${shown}/${total} nhân sự · bấm tiêu đề cột để sắp xếp. Bấm một dòng để xem chi tiết.</p>
         <div class="chips" role="group" aria-label="Kiểu tô màu">
           ${HEAT_MODES.map(([id, label]) => html`
             <button class="chip" type="button" data-heat="${id}" aria-pressed="${id === mode}">${label}</button>`)}
         </div>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th class="sticky-col">Nhân sự</th><th>Team</th><th class="right">KPI tổng</th><th>Tiến độ</th><th class="right">Điều kiện cần</th>
-          <th class="right">Điểm tổng</th><th class="right">Add-on</th><th class="right">Act đã làm</th><th class="right">Talk time</th><th class="right">Ngày công</th></tr></thead>
-        <tbody>${rows.map((row) => memberRow(row, workdays, mode))}</tbody>
+        <thead><tr>${MEMBER_COLUMNS.map((c) => html`
+          <th scope="col" class="${c.sticky ? 'sticky-col' : ''} ${c.align === 'right' ? 'right' : ''}" aria-sort="${osort.key === c.key ? (osort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">
+            <button type="button" data-osort="${c.key}">${c.label}</button>
+          </th>`)}</tr></thead>
+        <tbody id="member-rows">${memberRowsView(data, ui, report)}</tbody>
       </table></div>
       ${legend}
     </section>`;
 }
 
 /** Trang Tổng quan: toàn cảnh KPI, công việc và năng suất; chi tiết từng team nằm ở các tab riêng. */
+/** Thẻ KPI cá nhân của nhân sự đăng nhập (chỉ khi nhận ra được họ trong báo cáo). */
+function myCard({ team, member: m }) {
+  const status = memberStatus(m, team);
+  const elapsed = elapsedRatio(team.asOf);
+  return html`
+    <div class="card card--accent">
+      <div class="card__head"><h3 class="card__title">KPI của bạn · ${m.name}</h3>${statusBadge(status)}</div>
+      <p class="big num">${pct(m.kpi, 1)}</p>
+      ${bar(m.kpi, { mark: elapsed, tone: status.key })}
+      <dl class="kv">
+        <dt>Thời gian đã qua</dt><dd class="num">${pct(elapsed)}</dd>
+        <dt>Dự kiến cuối tháng</dt><dd class="num">${pct(projectedKpi(m.kpi, elapsed))}</dd>
+        <dt>Điểm tổng</dt><dd class="num">${rateCell(m.main)}</dd>
+        <dt>Add-on</dt><dd class="num">${rateCell(m.addon)}</dd>
+        <dt>Act đã làm</dt><dd class="num">${num(m.extra.actDone)}/${num(m.extra.assigned)}</dd>
+      </dl>
+    </div>`;
+}
+
+/** Nhân sự (quyền Thành viên) chỉ xem KPI cá nhân và bảng nhân sự; chỉ số tổng hợp và biểu đồ dành cho Quản trị/Admin. */
+function memberOverview(data, ui, report) {
+  const mine = findMember(ui.me.email, data.teams, ui.me.name);
+  return html`${mine ? html`<div class="grid">${myCard(mine)}</div>` : ''}${memberTable(data, ui, report)}`;
+}
+
 export function overviewView(data, ui, report) {
+  if (ui.me?.role === 'member') return memberOverview(data, ui, report);
   const all = combineTeams(data.teams);
   const summary = summarize(all);
   const stats = [...kpiStats(all, summary), ...workStats(data.work), ...reportStats(report)];
