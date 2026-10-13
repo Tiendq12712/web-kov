@@ -19,7 +19,23 @@
   </script>
   <script type="module" src="js/main.js"></script>
 </head>
-<body>
+<body class="is-booting">
+  <div id="boot" class="boot" role="status" aria-live="polite">
+    <div class="boot__card">
+      <div class="boot__logo" aria-hidden="true">
+        <svg class="boot__ring" viewBox="0 0 100 100"><circle class="boot__track" cx="50" cy="50" r="44"/><circle class="boot__arc" cx="50" cy="50" r="44"/></svg>
+        <svg class="boot__bars" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 20v-6M12 20V6M18 20v-10"/></svg>
+      </div>
+      <h2 class="boot__title">Tiến độ KPI</h2>
+      <p class="boot__text" id="boot-text">Đang khởi động…</p>
+      <ol class="boot__steps">
+        <li class="boot__step"><i></i>Xác thực</li>
+        <li class="boot__step"><i></i>Báo cáo KPI</li>
+        <li class="boot__step"><i></i>Năng suất</li>
+      </ol>
+      <div class="boot__bar" aria-hidden="true"><span></span></div>
+    </div>
+  </div>
   <header class="topbar">
     <div class="topbar__inner">
       <div class="brand-group">

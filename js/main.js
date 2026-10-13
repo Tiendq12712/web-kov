@@ -133,16 +133,23 @@ function renderView() {
   writeHash();
 }
 
-async function setMonth(ym) {
+async function setMonth(ym, { boot = false } = {}) {
   state.month = ym;
-  mount(els.view, html`<p class="muted" role="status">Đang tải dữ liệu từ Google Sheet…</p>`);
+  if (!boot) mount(els.view, html`<p class="muted" role="status">Đang tải dữ liệu từ Google Sheet…</p>`);
+  let report = null;
   try {
-    state.data = await loadMonth(ym);
+    // Lúc khởi động: tải song song KPI + năng suất để hiện đủ một lần, không nhảy số.
+    const [data, rep] = await Promise.all([
+      loadMonth(ym),
+      boot && hasReport(ym) ? (setBoot('Đang tải báo cáo năng suất…', 3), loadReport(ym).catch(() => null)) : null,
+    ]);
+    state.data = data;
+    report = rep;
   } catch (err) {
     return err.code === 'auth' ? showLogin(err.message) : showError(err.message);
   }
   els.month.value = ym;
-  Object.assign(state.report, { data: null, error: '', query: '' });
+  Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
   const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || (state.tab === 'report' && hasReport(ym)) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
@@ -295,6 +302,7 @@ const showError = (message) => {
 };
 
 function showLogin(message = '') {
+  setBoot();
   els.logout.hidden = true;
   $('user').hidden = true;
   $('settings-btn').hidden = true;
@@ -340,11 +348,33 @@ async function authorize() {
   return true;
 }
 
+/** Màn hình chờ toàn trang: che giao diện cho tới khi dữ liệu chính sẵn sàng. */
+const boot = $('boot');
+function setBoot(text, step) {
+  if (step === undefined) {   // tắt
+    document.body.classList.remove('is-booting');
+    boot.hidden = true;
+    return;
+  }
+  document.body.classList.add('is-booting');
+  boot.hidden = false;
+  $('boot-text').textContent = text;
+  boot.querySelectorAll('.boot__step').forEach((li, i) => {
+    li.classList.toggle('is-done', i + 1 < step);
+    li.classList.toggle('is-active', i + 1 === step);
+  });
+}
+
 async function start() {
-  syncLogout();
+  setBoot('Đang xác thực tài khoản…', 1);
+  try { await startApp(); } finally { setBoot(); }
+}
+
+async function startApp() {
   try {
     if (!(await authorize())) return;
     syncLogout();
+    setBoot('Đang tải danh sách báo cáo…', 2);
     const months = await loadMonths();
     fillMonths(months);
     if (!months.length) {
@@ -354,7 +384,7 @@ async function start() {
     }
     const { month } = readHash();
     state.tab = 'overview';   // luôn vào Tổng quan trước
-    await setMonth(months.some((m) => m.month === month) ? month : months[0].month);
+    await setMonth(months.some((m) => m.month === month) ? month : months[0].month, { boot: true });
   } catch (err) {
     if (err.code === 'auth') showLogin(err.message); else showError(err.message);
   }
