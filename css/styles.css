@@ -417,3 +417,4 @@ body.is-booting .topbar, body.is-booting #view, body.is-booting .bottom-nav { vi
 .tour__text { margin: 0 0 12px; font-size: 14px; line-height: 1.5; }
 .tour__actions { display: flex; justify-content: space-between; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .welcome, .welcome__icon, .welcome__confetti i, .tour__spot, .tour__tip { animation: none; transition: none; } .welcome__confetti { display: none; } }
+.task-note { max-width: 260px; white-space: normal; overflow-wrap: anywhere; }

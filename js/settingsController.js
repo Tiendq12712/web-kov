@@ -1,6 +1,8 @@
 import { CONFIG } from './config.js';
 import { html } from './dom.js';
 import { sheetId } from './sheet.js';
+import { getWriteToken } from './auth.js';
+import { recordSyncTime } from './syncTime.js';
 import { crmServer, callServer, loadTasks, mutateTasks, loadCallConfig, saveCallConfig, splitAgents, resolveRange } from './crm.js';
 import { loadAccounts, addAccount, updateAccount, removeAccount, loadLinks, addLink, updateLink, removeLink } from './directory.js';
 import { settingsView } from './views/settings.js';
@@ -14,7 +16,7 @@ const byId = (id) => document.getElementById(id);
  * Trang Thiết lập (Tài khoản, Cấu hình link, Đồng bộ CRM): trạng thái, thao tác và sự kiện.
  * `getMe()` trả về { email, role }; các callback giúp ứng dụng chính phản ứng khi dữ liệu đổi.
  */
-export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLinksChanged }) {
+export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLinksChanged, onSynced }) {
   const ui = {
     section: 'accounts', accounts: [], links: [], tasks: [], status: null, serverError: '',
     job: null, editing: null, error: '', busy: false, loaded: false, loading: false, me: null, months: [],
@@ -40,7 +42,11 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
         if (log) { log.textContent = ui.job.lines.join('\n'); log.scrollTop = log.scrollHeight; }
         const bar = byId('crm-progress');
         if (bar) bar.style.width = `${(data.total ? data.done / data.total : 0) * 100}%`;
-        if (data.finished) { await refreshStatus(); return rerender(); }
+        if (data.finished) {
+          await refreshStatus();
+          if (ui.job.kind === 'crm' && data.ok > 0) await stampSync();
+          return rerender();
+        }
       } catch (err) {
         ui.job.lines.push(`Mất kết nối máy chủ cục bộ: ${err.message}`);
         ui.job.finished = true;
@@ -51,8 +57,14 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     tick();
   }
 
-  function resumeJob(jobId) {
-    ui.job = { id: jobId, lines: [], next: 0, done: 0, total: 0, ok: 0, finished: false };
+  /** Ghi lại thời điểm đồng bộ xong để báo cáo hiển thị "cập nhật lúc" theo đó. */
+  async function stampSync() {
+    try { await recordSyncTime(); await onSynced(); ui.job.lines.push('Đã ghi thời gian cập nhật báo cáo.'); }
+    catch (err) { ui.job.lines.push(`Không ghi được thời gian cập nhật: ${err.message}`); }
+  }
+
+  function resumeJob(jobId, kind = '') {
+    ui.job = { kind, id: jobId, lines: [], next: 0, done: 0, total: 0, ok: 0, finished: false };
     startPolling(jobId);
   }
 
@@ -111,11 +123,13 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     account(form) {
       const email = form.elements.email.value.trim();
       const { role } = form.elements;
+      const name = form.elements.name.value.trim();
+      const gender = form.elements.gender.value;
       if (!emailOk(email)) return fail(`Chỉ nhận email @${CONFIG.allowedDomain}`);
       const original = form.dataset.key;
       const actor = getMe().role;
       return run(async () => {
-        ui.accounts = original ? await updateAccount(actor, original, email, role.value) : await addAccount(actor, email, role.value);
+        ui.accounts = original ? await updateAccount(actor, original, email, role.value, name, gender) : await addAccount(actor, email, role.value, name, gender);
       });
     },
 
@@ -130,7 +144,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     },
 
     task(form) {
-      const fields = Object.fromEntries(['crm_url', 'gsheet_url', 'tab_name'].map((k) => [k, form.elements[k].value.trim()]));
+      const fields = Object.fromEntries(['crm_url', 'gsheet_url', 'tab_name', 'description'].map((k) => [k, form.elements[k].value.trim()]));
       if (!CRM_LINK.test(fields.crm_url)) return fail('Link CRM phải bắt đầu bằng https://kvcrm.kiotviet.vn/');
       if (!SHEET_LINK.test(fields.gsheet_url)) return fail('Link Google Sheet không hợp lệ');
       const index = form.dataset.key;
@@ -172,8 +186,9 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     'call-dry-run': () => runCall(true),
     'cookie-clear': () => run(async () => { await crmServer.clearCookie(); await refreshStatus(); }),
     'crm-run': () => run(async () => {
+      await getWriteToken();   // xin quyền ghi ngay khi bấm, để cuối job ghi được thời gian cập nhật
       const { jobId } = await crmServer.run(ui.tasks.filter((t) => t.enabled));
-      resumeJob(jobId);
+      resumeJob(jobId, 'crm');
       await refreshStatus();
     }),
     'crm-stop': () => { if (ui.job) crmServer.stop(ui.job.id).catch((err) => fail(err.message)); },

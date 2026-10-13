@@ -1,6 +1,6 @@
 import { html } from '../dom.js';
 import { badge } from './components.js';
-import { ROLES, canManage } from '../directory.js';
+import { ROLES, GENDERS, canManage } from '../directory.js';
 import { monthLabel } from '../format.js';
 import { DATE_MODES, modeOf, resolveRange } from '../crm.js';
 
@@ -21,6 +21,8 @@ const roleOptions = (actor, selected) => Object.entries(ROLES)
 const accountForm = (ui, account) => html`
   <form class="task-form" data-sform="account" data-key="${account?.email ?? ''}">
     <input name="email" type="email" required placeholder="ten@kiotviet.com" value="${account?.email ?? ''}" aria-label="Email" autocomplete="off">
+    <input name="name" maxlength="80" placeholder="Tên / biệt danh nhân sự" value="${account?.name ?? ''}" aria-label="Tên hoặc biệt danh" autocomplete="off">
+    <select name="gender" class="select" aria-label="Giới tính"><option value="">Giới tính</option>${GENDERS.map((g) => html`<option value="${g}" ${g === account?.gender ? 'selected' : ''}>${g}</option>`)}</select>
     <select name="role" class="select" aria-label="Phân quyền">${roleOptions(ui.me.role, account?.role ?? 'member')}</select>
     <button class="btn" type="submit" ${ui.busy ? 'disabled' : ''}>${account ? 'Lưu' : 'Thêm'}</button>
     ${account ? html`<button class="btn btn--ghost" type="button" data-act="cancel">Hủy</button>` : ''}
@@ -28,11 +30,11 @@ const accountForm = (ui, account) => html`
 
 const accountRow = (a, i, ui) => {
   if (ui.editing?.kind === 'account' && ui.editing.key === a.email) {
-    return html`<tr><td colspan="5">${accountForm(ui, a)}</td></tr>`;
+    return html`<tr><td colspan="7">${accountForm(ui, a)}</td></tr>`;
   }
   const editable = canManage(ui.me.role, a.role);
   return html`<tr class="static">
-    <td class="num">${i + 1}</td><td>${a.email}</td>
+    <td class="num">${i + 1}</td><td>${a.email}</td><td>${a.name || html`<span class="muted">—</span>`}</td><td>${a.gender || html`<span class="muted">—</span>`}</td>
     <td>${badge(ROLE_TONE[a.role], ROLES[a.role].label)}</td>
     <td>${a.note || ROLES[a.role].note}</td>
     <td class="right">${editable
@@ -47,7 +49,7 @@ const accountsSection = (ui) => html`
     ${notice(ui)}
     ${accountForm(ui)}
     <div class="table-wrap"><table>
-      <thead><tr><th>STT</th><th>Email</th><th>Phân quyền</th><th>Mô tả quyền</th><th class="right">Thao tác</th></tr></thead>
+      <thead><tr><th>STT</th><th>Email</th><th>Tên/Biệt danh</th><th>Giới tính</th><th>Phân quyền</th><th>Mô tả quyền</th><th class="right">Thao tác</th></tr></thead>
       <tbody>${ui.accounts.map((a, i) => accountRow(a, i, ui))}</tbody></table></div>
   </section>`;
 
@@ -130,14 +132,16 @@ const CALL_COOKIE = {
 const taskFields = (t = {}) => html`
   <input name="crm_url" required placeholder="Link bộ lọc CRM (https://kvcrm.kiotviet.vn/…)" value="${t.crm_url ?? ''}" aria-label="Link CRM">
   <input name="gsheet_url" required placeholder="Link Google Sheet đích" value="${t.gsheet_url ?? ''}" aria-label="Link Google Sheet">
-  <input name="tab_name" placeholder="Tên tab đích (bỏ trống = tự động)" value="${t.tab_name ?? ''}" aria-label="Tab đích">`;
+  <input name="tab_name" placeholder="Tên tab đích (bỏ trống = tự động)" value="${t.tab_name ?? ''}" aria-label="Tab đích">
+  <input name="description" maxlength="200" placeholder="Mô tả (ghi chú link này đồng bộ gì)" value="${t.description ?? ''}" aria-label="Mô tả">`;
 
 const taskRow = (t, i, ui) => (ui.editing?.kind === 'task' && ui.editing.key === i
-  ? html`<tr><td colspan="5"><form class="task-form" data-sform="task" data-key="${i}">${taskFields(t)}
+  ? html`<tr><td colspan="6"><form class="task-form" data-sform="task" data-key="${i}">${taskFields(t)}
       <button class="btn" type="submit">Lưu</button><button class="btn btn--ghost" type="button" data-act="cancel">Hủy</button></form></td></tr>`
   : html`<tr class="static">
       <td><input type="checkbox" data-task-toggle="${i}" ${t.enabled ? 'checked' : ''} aria-label="Bật tác vụ ${t.tab_name}"></td>
       <td><strong>${t.tab_name || 'tự động'}</strong></td>
+      <td class="task-note" title="${t.description}">${t.description || html`<span class="muted">—</span>`}</td>
       <td title="${t.crm_url}">${short(t.crm_url)}</td><td title="${t.gsheet_url}">${short(t.gsheet_url)}</td>
       <td class="right">${link('task-edit', i, 'Sửa')}${link('task-delete', i, 'Xóa', true)}</td></tr>`);
 
@@ -147,7 +151,7 @@ const taskTable = (ui) => html`
     ${notice(ui)}
     <form class="task-form" data-sform="task" data-key="">${taskFields()}<button class="btn" type="submit" ${ui.busy ? 'disabled' : ''}>Thêm</button></form>
     ${ui.tasks.length ? html`<div class="table-wrap"><table>
-      <thead><tr><th>Bật</th><th>Tab đích</th><th>Link CRM</th><th>Link Google Sheet</th><th class="right">Thao tác</th></tr></thead>
+      <thead><tr><th>Bật</th><th>Tab đích</th><th>Mô tả</th><th>Link CRM</th><th>Link Google Sheet</th><th class="right">Thao tác</th></tr></thead>
       <tbody>${ui.tasks.map((t, i) => taskRow(t, i, ui))}</tbody></table></div>` : html`<p class="muted">Chưa có tác vụ nào.</p>`}
   </section>`;
 

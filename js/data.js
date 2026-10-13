@@ -3,6 +3,7 @@ import { fetchRows, parseKpi } from './sheet.js';
 import { parseReport } from './report.js';
 import { tryParseWork } from './work.js';
 import { loadLinks, resolveMonths } from './directory.js';
+import { loadSyncTime, applySyncTime } from './syncTime.js';
 
 const cache = new Map();
 let months = [];
@@ -31,7 +32,8 @@ function memo(key, load) {
 /** Tab tháng: bảng KPI Team Online, kèm các báo cáo theo dõi công việc nằm bên dưới (nếu có). */
 export const loadMonth = (ym) => memo(ym, () => {
   const { kpi } = entryOf(ym);
-  return fetchRows(kpi.id, getToken(), { tab: kpi.tab }).then((rows) => ({ ...parseKpi(rows, ym), work: tryParseWork(rows) }));
+  return Promise.all([fetchRows(kpi.id, getToken(), { tab: kpi.tab }), memo('sync', loadSyncTime)])
+    .then(([rows, synced]) => applySyncTime({ ...parseKpi(rows, ym), work: tryParseWork(rows) }, synced));
 });
 
 export const hasReport = (ym) => Boolean(months.find((m) => m.month === ym)?.productivity);

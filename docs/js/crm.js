@@ -2,14 +2,14 @@ import { CONFIG } from './config.js';
 import { readTable, writeTable } from './sheetTable.js';
 
 /* ---------- Tab "Cấu hình đồng bộ" trong Sheet cấu hình ---------- */
-const COLUMNS = ['crm_url', 'gsheet_url', 'tab_name', 'Bật/tắt'];
+const COLUMNS = ['crm_url', 'gsheet_url', 'tab_name', 'Bật/tắt', 'Mô tả'];
 const target = { url: CONFIG.configSheet, tab: CONFIG.tabs.sync, columns: COLUMNS };
 
 const ON = new Set(['bat', 'true', '1', 'x', 'co']);
 const plain = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
 
-const fromRow = ([crm, sheet, tab, on]) => ({ crm_url: crm.trim(), gsheet_url: sheet.trim(), tab_name: tab.trim(), enabled: ON.has(plain(on)) });
-const toRow = (t) => [t.crm_url, t.gsheet_url, t.tab_name, t.enabled ? 'Bật' : 'Tắt'];
+const fromRow = ([crm, sheet, tab, on, note]) => ({ crm_url: crm.trim(), gsheet_url: sheet.trim(), tab_name: tab.trim(), enabled: ON.has(plain(on)), description: note.trim() });
+const toRow = (t) => [t.crm_url, t.gsheet_url, t.tab_name, t.enabled ? 'Bật' : 'Tắt', t.description ?? ''];
 
 export const loadTasks = async () => (await readTable(target)).map(fromRow).filter((t) => t.crm_url);
 
@@ -86,7 +86,7 @@ export const crmServer = {
   status: () => api('GET', '/status'),
   setCookie: (cookie) => api('POST', '/cookie', { cookie }),
   clearCookie: () => api('DELETE', '/cookie'),
-  run: (tasks) => api('POST', '/run', { tasks }),
+  run: (tasks) => api('POST', '/run', { tasks: tasks.map(({ description, ...task }) => task) }),
   job: (id, since) => api('GET', `/jobs/${id}?since=${since}`),
   stop: (id) => api('POST', `/jobs/${id}/stop`, {}),
 };

@@ -106,7 +106,7 @@ function loadChatNow() {
     .catch((err) => { if (err.code === 'auth') showLogin(err.message); else c.error = err.message; })
     .finally(() => { c.loading = false; if (state.tab === 'chat') renderView(); });
 }
-const myName = () => findMember(state.me.email, state.data.teams)?.member.name ?? state.me.email;
+const myName = () => state.me.name || findMember(state.me.email, state.data.teams, state.me.name)?.member.name || state.me.email;
 
 const renderWork = () => workView(state.data.work, state.work, kpiPeople(), state.data.teams.map(({ id, name }) => ({ id, name })));
 
@@ -336,6 +336,7 @@ const settings = createSettings({
   rerender: () => { if (state.tab === 'settings' || !state.data) renderView(); },
   onAuthExpired: (message) => showLogin(message),
   onLinksChanged: refreshMonths,
+  onSynced: async () => { clearCache(); state.data = await loadMonth(state.month); },
 });
 
 /* ---------- Đăng nhập ---------- */
@@ -400,7 +401,7 @@ async function authorize() {
     showLogin('Email của bạn chưa được cấp quyền. Hãy liên hệ Admin để được thêm vào danh sách tài khoản.');
     return false;
   }
-  state.me = { email, role: account.role };
+  state.me = { email, role: account.role, name: account.name, gender: account.gender };
   return true;
 }
 
@@ -430,7 +431,7 @@ async function start() {
 /** Thẻ chào mừng theo tiến độ của chính người đăng nhập; chỉ hiện một lần cho mỗi lần đăng nhập. */
 function greet() {
   if (!state.data || !state.me || state.tab === 'settings') return;
-  showWelcome(els.welcome, { me: state.me, found: findMember(state.me.email, state.data.teams), data: state.data });
+  showWelcome(els.welcome, { me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name), data: state.data });
 }
 
 async function startApp() {
