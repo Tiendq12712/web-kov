@@ -104,7 +104,8 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 td.right, th.right { text-align: center; }   /* cột số căn giữa */
 .person { display: grid; line-height: 1.3; white-space: nowrap; }
 .person small { color: var(--muted); }
-.sticky-col { position: sticky; left: 0; background: inherit; }
+.sticky-col { position: sticky; left: 0; z-index: 2; background: inherit; }
+thead .sticky-col { z-index: 3; }
 tbody .sticky-col { background: var(--surface); }
 tbody tr:hover .sticky-col { background: var(--accent-soft); }
 
@@ -171,13 +172,13 @@ tbody tr.static { cursor: default; } tbody tr.static:hover { background: none; }
 .bottom-nav { display: none; }
 @media (max-width: 640px) {
   .tabs { display: none; }
-  body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  /* Thanh dưới dùng sticky (không dùng fixed): iOS co giãn thanh địa chỉ làm phần tử fixed lệch khỏi đáy màn hình. */
+  body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+  body > .container { flex: 1 0 auto; }
   .bottom-nav {
-    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    display: flex; position: sticky; bottom: 0; z-index: 20; margin-top: auto;
     background: var(--surface); border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom);
-    /* iOS Safari: giữ thanh dưới trên lớp riêng để không nhấp nháy/lệch khi thanh địa chỉ co giãn lúc cuộn. */
-    transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0); backface-visibility: hidden; will-change: transform;
   }
   .bottom-nav:empty { display: none; }
   .bottom-nav__item {
@@ -314,6 +315,13 @@ tbody tr:hover .sticky-col { background: var(--accent-soft); }
   .topbar__actions { flex-wrap: nowrap; gap: 6px; }
   .topbar__actions .select { max-width: 138px; padding-inline: 8px; }
 }
+/* Điện thoại: hàng 1 = tên + các nút, hàng 2 = chọn tháng (không để thanh trên rộng hơn màn hình) */
+@media (max-width: 640px) {
+  .topbar__inner { flex-wrap: wrap; gap: 8px 6px; padding-bottom: 8px; }
+  .brand-group { flex: 1 1 auto; min-width: 0; }
+  .topbar__actions { display: contents; }
+  .topbar__actions > .select { order: 3; flex: 1 1 100%; max-width: none; }
+}
 
 /* Kiểu "Thanh màu" trong bảng: con số + thanh mảnh */
 .cell-bar { display: grid; gap: 5px; justify-items: center; min-width: 88px; }
@@ -440,3 +448,10 @@ html, body { max-width: 100%; overflow-x: clip; }
 .grid { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
 .charts { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
 @media (max-width: 640px) { .charts { grid-template-columns: minmax(0, 1fr); } .search { min-width: 0; width: 100%; } }
+
+/* Điện thoại: cột tên cố định phải đủ hẹp để còn chỗ cho số liệu, và nằm trên các ô cuộn qua */
+@media (max-width: 640px) {
+  .table-wrap td.sticky-col, .table-wrap th.sticky-col { max-width: 148px; min-width: 110px; }
+  .sticky-col .person strong { white-space: normal; overflow-wrap: anywhere; }
+  .cell-bar { position: relative; z-index: 0; }
+}
