@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Lấy cookie call-report",
+  "version": "1.0.0",
+  "description": "Gửi nhanh cookie JSESSIONID của call-report.kiotviet.com vào web-kov chạy trên máy này (localhost). Chỉ đọc cookie của đúng trang này.",
+  "permissions": [
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://call-report.kiotviet.com/*",
+    "http://localhost:8080/*",
+    "http://127.0.0.1:8080/*"
+  ],
+  "action": {
+    "default_title": "Lấy cookie call-report",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsQqJmx8QUfWerFdaKMP5Jz462TBezUT3PQk9+WQA/YMJyreTKVBI1FsEIXGdIfkogJk81tIZXxYb6v26RC98v/2NMf7nT7Brevodcq6JZpz4p5+A40kkAp6YNGYBxStraO7Rg3A6TT7/m6XYbI6I4AECE14Z1lGq/G+8LAZz+vO/S+rDstg5OcBjHd5GMMhsfk4EBcDKCsw7k5XpbjBOO5ERhncxrAQDlMU1WNBbHl5Fqo+rZVZBciBBxxSAJlqXkd9w9nbst1yqaEVfupDKe55uHBpnQOvdKjb1nf4YFMzl0f6pS431ooT14m+MKdalSiTBvu+Rs6QLkGkCEru1OQIDAQAB"
+}

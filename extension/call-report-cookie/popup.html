@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Lấy cookie call-report</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    body { width: 320px; margin: 0; padding: 14px; font-size: 13px; line-height: 1.45; }
+    h1 { font-size: 15px; margin: 0 0 4px; }
+    p { margin: 4px 0 10px; opacity: .75; }
+    .box { padding: 8px 10px; border-radius: 8px; background: rgba(127,127,127,.14); word-break: break-all; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+    .ok { color: #0f9d77; font-weight: 600; } .bad { color: #d9455f; font-weight: 600; }
+    button { width: 100%; margin-top: 10px; padding: 9px; border: 0; border-radius: 8px; background: #4c8dff; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+    button.ghost { background: rgba(127,127,127,.2); color: inherit; }
+    button:disabled { opacity: .5; cursor: default; }
+    small { display: block; margin-top: 8px; opacity: .65; }
+  </style>
+</head>
+<body>
+  <h1>Cookie call-report</h1>
+  <p id="status" role="status">Đang kiểm tra…</p>
+  <div class="box" id="preview" hidden></div>
+  <button id="send" type="button" disabled>Gửi vào web-kov</button>
+  <button id="copy" type="button" class="ghost" disabled>Chỉ sao chép</button>
+  <small>Cần chạy server web-kov (localhost:8080). Cookie là phiên đăng nhập của bạn, đừng gửi cho người khác.</small>
+  <script src="popup.js"></script>
+</body>
+</html>

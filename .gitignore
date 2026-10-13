@@ -1,0 +1,8 @@
+*.pyc
+*.xlsx
+.DS_Store
+.claude/
+.tmp_test/
+.venv/
+__pycache__/
+tmp_test/
