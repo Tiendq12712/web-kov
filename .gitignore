@@ -5,4 +5,5 @@
 .tmp_test/
 .venv/
 __pycache__/
+dist/
 tmp_test/
