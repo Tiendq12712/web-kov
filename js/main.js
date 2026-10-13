@@ -306,6 +306,7 @@ function showLogin(message = '') {
       <p class="muted">Chỉ tài khoản Google <strong>@${CONFIG.allowedDomain}</strong> được truy cập. Dữ liệu được đọc trực tiếp từ Google Sheet bằng quyền của bạn.</p>
       ${message ? html`<p class="notice" role="alert">${message}</p>` : ''}
       <button class="btn" id="login" type="button">Đăng nhập bằng Google</button>
+      <p class="muted login__legal"><a href="privacy.html">Chính sách quyền riêng tư</a> · <a href="terms.html">Điều khoản dịch vụ</a></p>
     </section>`);
 }
 
