@@ -457,3 +457,27 @@ html, body { max-width: 100%; overflow-x: clip; }
   .sticky-col .person strong { white-space: normal; overflow-wrap: anywhere; }
   .cell-bar { position: relative; z-index: 0; }
 }
+
+/* ---------- Logo KiotViet ---------- */
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand__logo { width: 32px; height: 32px; flex: none; object-fit: contain; }
+.login__logo { display: block; width: 190px; height: auto; margin: 0 auto 16px; }
+:root[data-theme="dark"] .login__logo { background: #fff; padding: 8px 14px; border-radius: 12px; box-sizing: content-box; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .login__logo { background: #fff; padding: 8px 14px; border-radius: 12px; box-sizing: content-box; } }
+.boot__bars { width: 48px; height: 48px; object-fit: contain; }
+
+/* ---------- Điện thoại: thu gọn thanh khi cuộn, kéo để tải lại ---------- */
+@media (max-width: 640px) {
+  .topbar { transition: margin-top .25s ease; }
+  .bottom-nav { transition: margin-bottom .25s ease; }
+  body.is-compact .topbar { margin-top: calc(var(--topbar-h, 0px) * -1); }
+  body.is-compact .bottom-nav { margin-bottom: calc(var(--nav-h, 0px) * -1); }
+}
+.ptr { position: fixed; left: 50%; top: calc(var(--topbar-h, 56px) + 8px); z-index: 30; display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 8px 24px -10px var(--glow);
+  font-size: 13px; color: var(--muted); transform: translate(-50%, calc(var(--pull, 0px) - 40px)); pointer-events: none; }
+.ptr[hidden] { display: none; }
+.ptr__icon { display: inline-block; transition: transform .2s ease; font-weight: 700; }
+.ptr.is-ready { color: var(--accent); border-color: var(--accent); }
+.ptr.is-loading .ptr__icon { animation: boot-spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .topbar, .bottom-nav { transition: none; } .ptr.is-loading .ptr__icon { animation: none; } }

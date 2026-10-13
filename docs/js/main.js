@@ -15,6 +15,7 @@ import { loadMessages, sendMessage, replyMessage } from './chat.js';
 import { chatView } from './views/chat.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
 import { startTour, tourSeen } from './tour.js';
+import './mobileShell.js';
 
 const $ = (id) => document.getElementById(id);
 const els = { view: $('view'), tabs: $('tabs'), month: $('month'), detail: $('detail'), bottomNav: $('bottom-nav'), logout: $('logout'), welcome: $('welcome') };
@@ -383,6 +384,7 @@ function showLogin(message = '') {
   els.bottomNav.replaceChildren();
   mount(els.view, html`
     <section class="card login">
+      <img class="login__logo" src="icons/logo.png" width="190" height="57" alt="KiotViet">
       <h2 class="big">Đăng nhập để xem báo cáo</h2>
       <p class="muted">Chỉ tài khoản Google <strong>@${CONFIG.allowedDomain}</strong> được truy cập. Dữ liệu được đọc trực tiếp từ Google Sheet bằng quyền của bạn.</p>
       ${message ? html`<p class="notice" role="alert">${message}</p>` : ''}
