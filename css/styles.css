@@ -147,7 +147,7 @@ tbody tr:hover .sticky-col { background: var(--accent-soft); }
 .stack { display: flex; gap: 2px; height: 14px; border-radius: 99px; overflow: hidden; }
 .stack__seg { min-width: 2px; }
 .charts { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
-@media (max-width: 640px) { .charts { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .charts { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- Login ---------- */
 .login { max-width: 420px; margin: 12vh auto 0; text-align: center; }
@@ -432,3 +432,11 @@ td.sticky-col.top { background-image: linear-gradient(90deg, var(--medal), var(-
 .top--1 .medal { animation: crown-bob 2.4s ease-in-out infinite; }
 @keyframes crown-bob { 50% { transform: translateY(-2px) rotate(-8deg); } }
 @media (prefers-reduced-motion: reduce) { .top--1 .medal { animation: none; } }
+
+/* ---------- Không cho nội dung rộng hơn màn hình (iPhone sẽ thu nhỏ trang và làm thanh dưới lệch) ---------- */
+html, body { max-width: 100%; overflow-x: clip; }
+.container { width: 100%; }
+.container > *, .grid > *, .charts > *, .card > * { min-width: 0; }
+.grid { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+.charts { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
+@media (max-width: 640px) { .charts { grid-template-columns: minmax(0, 1fr); } .search { min-width: 0; width: 100%; } }
