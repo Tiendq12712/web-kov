@@ -385,7 +385,7 @@ function showLogin(message = '') {
   mount(els.view, html`
     <section class="card login">
       <h2 class="big">Đăng nhập để xem báo cáo</h2>
-      <p class="muted">Chỉ tài khoản Google <strong>@${CONFIG.allowedDomain}</strong> được truy cập. Dữ liệu được đọc trực tiếp từ Google Sheet bằng quyền của bạn.</p>
+      <p class="muted">Chỉ tài khoản <strong>@${CONFIG.allowedDomain}</strong> đã được cấp quyền mới truy cập được. Chưa có quyền? Hãy liên hệ Tiến (<a href="mailto:tien.dq@kiotviet.com">tien.dq@kiotviet.com</a>).</p>
       ${message ? html`<p class="notice" role="alert">${message}</p>` : ''}
       ${remembered
         ? html`<button class="btn" id="login" data-resume type="button">Tiếp tục với ${remembered.email}</button>
