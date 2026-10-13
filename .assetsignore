@@ -1,0 +1,14 @@
+# Lớp bảo vệ thứ hai: dù cấu hình sai thư mục, các tệp này không bao giờ được phát hành.
+.git
+.gitignore
+.claude
+.DS_Store
+server.py
+serve.py
+call_report.py
+certs
+extension
+scripts
+README.md
+wrangler.jsonc
+node_modules

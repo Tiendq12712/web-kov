@@ -1,0 +1,6 @@
+{
+  // Cloudflare (Workers Static Assets): chỉ phát hành thư mục dist do scripts/build-pages.sh tạo.
+  "name": "web-kov",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist" }
+}
