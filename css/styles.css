@@ -368,3 +368,52 @@ body.is-booting .topbar, body.is-booting #view, body.is-booting .bottom-nav { vi
   .boot__ring, .boot__bars, .boot__bar span, .boot__step.is-active i, .boot__card { animation: none; }
   .boot__bar span { width: 100%; }
 }
+
+/* ---------- Chào mừng, chia sẻ với quản lý, hướng dẫn lần đầu ---------- */
+.welcome { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px;
+  background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(8px); animation: boot-in .35s ease both; }
+.welcome[hidden] { display: none; }
+.welcome__card { position: relative; overflow: hidden; width: min(420px, 100%); text-align: center; padding: 30px 24px 22px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 22px; box-shadow: 0 30px 70px -28px var(--glow); }
+.welcome__card::before { content: ""; position: absolute; inset: 0 0 auto; height: 6px; background: linear-gradient(90deg, var(--good-fill), var(--accent)); }
+.welcome__card.is-warn::before { background: linear-gradient(90deg, var(--warn-fill), #fb923c); }
+.welcome__card.is-bad::before { background: linear-gradient(90deg, var(--bad-fill), #a78bfa); }
+.welcome__icon { font-size: 52px; line-height: 1; animation: welcome-pop .7s cubic-bezier(.2,1.6,.4,1) both; }
+.welcome__hello { margin: 12px 0 2px; color: var(--muted); font-size: .85rem; }
+.welcome__title { margin: 0 0 8px; font-size: 1.4rem; }
+.welcome__text { margin: 0 0 14px; color: var(--text); line-height: 1.5; }
+.welcome__stat { display: flex; justify-content: center; gap: 12px; margin: 0 0 16px; }
+.welcome__stat div { min-width: 120px; padding: 10px 14px; border-radius: 14px; background: var(--surface-2); }
+.welcome__stat dt { font-size: .75rem; color: var(--muted); }
+.welcome__stat dd { margin: 2px 0 0; font-size: 1.4rem; font-weight: 700; }
+.is-good .welcome__stat dd { color: var(--good); } .is-warn .welcome__stat dd { color: var(--warn); } .is-bad .welcome__stat dd { color: var(--bad); }
+.welcome__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.welcome__confetti { position: absolute; inset: 0; pointer-events: none; }
+.welcome__confetti i { position: absolute; top: -10px; left: calc(var(--i) * 4.2%); width: 8px; height: 14px; border-radius: 2px;
+  background: hsl(calc(var(--i) * 37) 85% 62%); animation: confetti 2.6s ease-in calc(var(--i) * 70ms) 1 both; }
+@keyframes confetti { to { transform: translateY(460px) rotate(540deg); opacity: 0; } }
+@keyframes welcome-pop { from { transform: scale(.3) rotate(-20deg); opacity: 0; } }
+
+.chat { margin-bottom: 14px; }
+.msg__form { display: flex; gap: 10px; align-items: flex-end; margin: 12px 0 6px; }
+.msg__input { flex: 1; min-width: 0; resize: vertical; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; color: var(--text); font: inherit; }
+.msg__input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.msg__hint { font-size: 12px; margin: 4px 0 0; }
+.msgs { display: grid; gap: 10px; }
+.msg { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+.msg__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.msg__text { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg__tag { margin-left: auto; padding: 2px 8px; border-radius: 99px; font-size: 11px; }
+.msg__tag.is-new { background: var(--warn-soft); color: var(--warn); } .msg__tag.is-done { background: var(--good-soft); color: var(--good); }
+.msg__reply { margin-top: 10px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 10px 10px 0; font-size: 14px; }
+.msg__reply p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .msg__form { flex-direction: column; align-items: stretch; } }
+
+.tour { position: fixed; inset: 0; z-index: 95; }
+.tour__spot { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(10, 16, 30, .62), 0 0 0 3px var(--accent); transition: all .25s ease; pointer-events: none; }
+.tour__tip { position: fixed; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 20px 50px -20px rgba(0,0,0,.5); transition: all .25s ease; }
+.tour__count { margin: 0; font-size: 11px; color: var(--muted); }
+.tour__title { margin: 2px 0 6px; font-size: 1.05rem; }
+.tour__text { margin: 0 0 12px; font-size: 14px; line-height: 1.5; }
+.tour__actions { display: flex; justify-content: space-between; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .welcome, .welcome__icon, .welcome__confetti i, .tour__spot, .tour__tip { animation: none; transition: none; } .welcome__confetti { display: none; } }

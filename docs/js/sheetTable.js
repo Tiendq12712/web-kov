@@ -44,3 +44,26 @@ export async function writeTable({ url, tab, columns, rows, previousLength }) {
   }
   if (!res.ok) throw new Error(`Không lưu được tab "${tab}" (${res.status})`);
 }
+
+const createTab = (url, tab, columns, token) => call(`${API}/${sheetId(url)}:batchUpdate`, token, {
+  method: 'POST', body: JSON.stringify({ requests: [{ addSheet: { properties: { title: tab } } }] }),
+}).then(() => call(`${API}/${sheetId(url)}/values/${rangeOf(tab, `A1:${lastColumn(columns)}1`)}?valueInputOption=RAW`, token,
+  { method: 'PUT', body: JSON.stringify({ values: [columns] }) }));
+
+/** Thêm một dòng vào cuối bảng (tạo tab nếu chưa có) — không ghi đè dữ liệu người khác. */
+export async function appendRow({ url, tab, columns, row }) {
+  const token = await getWriteToken();
+  const send = () => call(`${API}/${sheetId(url)}/values/${rangeOf(tab, `A1:${lastColumn(columns)}1`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, token,
+    { method: 'POST', body: JSON.stringify({ values: [row] }) });
+  let res = await send();
+  if (res.status === 400) { await createTab(url, tab, columns, token); res = await send(); }
+  if (!res.ok) throw new Error(`Không gửi được tin nhắn (${res.status})`);
+}
+
+/** Cập nhật đúng một dòng dữ liệu (index tính từ 0 sau dòng tiêu đề). */
+export async function updateRow({ url, tab, columns, index, row }) {
+  const token = await getWriteToken();
+  const res = await call(`${API}/${sheetId(url)}/values/${rangeOf(tab, `A${index + 2}:${lastColumn(columns)}${index + 2}`)}?valueInputOption=RAW`, token,
+    { method: 'PUT', body: JSON.stringify({ values: [row] }) });
+  if (!res.ok) throw new Error(`Không lưu được phản hồi (${res.status})`);
+}

@@ -11,9 +11,13 @@ import { workView, workRowsView } from './views/work.js';
 import { reportView, reportRowsView, reportDetailView } from './views/report.js';
 import { workdaysByCode } from './report.js';
 import { createSettings } from './settingsController.js';
+import { loadMessages, sendMessage, replyMessage } from './chat.js';
+import { chatView } from './views/chat.js';
+import { findMember, showWelcome, hideWelcome } from './welcome.js';
+import { startTour, tourSeen } from './tour.js';
 
 const $ = (id) => document.getElementById(id);
-const els = { view: $('view'), tabs: $('tabs'), month: $('month'), detail: $('detail'), bottomNav: $('bottom-nav'), logout: $('logout') };
+const els = { view: $('view'), tabs: $('tabs'), month: $('month'), detail: $('detail'), bottomNav: $('bottom-nav'), logout: $('logout'), welcome: $('welcome') };
 
 /** Lưu lựa chọn giao diện của riêng trình duyệt này; lỗi (chế độ riêng tư…) thì dùng mặc định. */
 function readPref(key, fallback) {
@@ -29,6 +33,7 @@ const state = {
   sort: { key: 'kpi', dir: 'desc' },
   report: { data: null, loading: false, error: '', region: 'all', weekMetric: 'calls', dayMetric: 'calls', query: '', sort: { key: 'talk', dir: 'desc' } },
   work: { team: 'all', matrix: 'backlogAll', query: '', sort: { key: 'pctDone', dir: 'desc' } },
+  chat: { items: null, loading: false, error: '', sending: false, draft: '' },
   me: null,                  // { email, role } — role: admin | manager | member
 };
 
@@ -46,6 +51,7 @@ const ICONS = {
   overview: '<path d="M4 13h6V4H4zM14 20h6V4h-6zM4 20h6v-4H4z"/>',
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M18 14.5c2.2.6 3.5 2.4 3.5 5.5"/>',
   report: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
   work: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 15l2.5 2.5L16 13"/>',
 };
 const tabIcon = (id) => raw(`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id] ?? ICONS.team}</svg>`);
@@ -55,6 +61,7 @@ function renderTabs() {
   const tabs = [{ id: 'overview', name: 'Tổng quan' }, ...state.data.teams];
   if (state.data.work) tabs.push({ id: 'work', name: 'Theo dõi công việc', short: 'Công việc' });
   if (hasReport(state.month)) tabs.push({ id: 'report', name: 'Năng suất' });
+  tabs.push({ id: 'chat', name: 'Chia sẻ' });
   const current = (t) => (t.id === state.tab ? html`aria-current="page"` : '');
   mount(els.tabs, html`${tabs.map((t) => html`
     <button class="tab" type="button" data-tab="${t.id}" ${current(t)}>${t.name}</button>`)}`);
@@ -85,6 +92,22 @@ function lazyTab(slice, tab, loader, render) {
   return html`<p class="muted" role="status">Đang tải dữ liệu…</p>`;
 }
 
+/** Tin nhắn tải mỗi lần mở tab (để thấy phản hồi mới); lỗi thì báo tại chỗ. */
+function renderChat() {
+  const c = state.chat;
+  if (!c.items && !c.loading && !c.error) loadChatNow();
+  return chatView(c, state.me, myName(), c.draft);
+}
+function loadChatNow() {
+  const c = state.chat;
+  c.loading = true; c.error = '';
+  loadMessages()
+    .then((items) => { c.items = items; })
+    .catch((err) => { if (err.code === 'auth') showLogin(err.message); else c.error = err.message; })
+    .finally(() => { c.loading = false; if (state.tab === 'chat') renderView(); });
+}
+const myName = () => findMember(state.me.email, state.data.teams)?.member.name ?? state.me.email;
+
 const renderWork = () => workView(state.data.work, state.work, kpiPeople(), state.data.teams.map(({ id, name }) => ({ id, name })));
 
 /** Tổng quan cũng cần dữ liệu năng suất: tải nền (không chặn trang), có rồi thì vẽ lại. Không có hoặc lỗi thì bỏ qua phần đó. */
@@ -113,6 +136,7 @@ function currentPage() {
   const report = preloadReport();   // ngày công và năng suất lấy từ file năng suất, nên luôn tải nền
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
+  if (state.tab === 'chat') return { view: renderChat(), title: 'Chia sẻ' };
   if (state.tab === 'work') return { view: renderWork(), title: 'Theo dõi công việc' };
   if (t) return { view: teamView(t, state), title: t.name };
   return { view: overviewView(state.data, state, report), title: 'Tổng quan' };
@@ -151,7 +175,7 @@ async function setMonth(ym, { boot = false } = {}) {
   els.month.value = ym;
   Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || (state.tab === 'report' && hasReport(ym)) || team();
+  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'report' && hasReport(ym)) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -246,6 +270,38 @@ document.addEventListener('click', (e) => {
   if (hit('[data-rmember]')) openReportMember(hit('[data-rmember]').dataset.rmember);
 });
 
+document.addEventListener('submit', async (e) => {
+  const form = e.target;
+  if (!form.matches('#chat-form, [data-reply]')) return;
+  e.preventDefault();
+  const c = state.chat, box = form.querySelector('textarea');
+  c.error = '';
+  try {
+    if (form.id === 'chat-form') {
+      c.sending = true; c.draft = box.value; renderView();
+      await sendMessage({ email: state.me.email, name: myName(), text: box.value });
+      c.draft = '';
+    } else {
+      const message = c.items.find((m) => m.id === form.dataset.reply);
+      await replyMessage(message, myName(), box.value);
+    }
+    c.items = null;   // tải lại để thấy tin vừa gửi
+  } catch (err) {
+    c.error = err.message;
+  } finally {
+    c.sending = false;
+    renderView();
+  }
+});
+
+els.welcome.addEventListener('click', (e) => {
+  const act = e.target.closest('[data-welcome]')?.dataset.welcome;
+  if (!act) return;
+  hideWelcome(els.welcome);
+  if (act === 'chat') setTab('chat'); else if (!tourSeen()) startTour();
+});
+$('help').addEventListener('click', startTour);
+
 els.month.addEventListener('change', () => setMonth(els.month.value));
 
 $('theme').addEventListener('click', () => {
@@ -332,7 +388,7 @@ async function handleLogin(button) {
 document.addEventListener('click', (e) => {
   if (e.target.id === 'login') handleLogin(e.target);
 });
-els.logout.addEventListener('click', () => { signOut(); clearCache(); settings.reset(); state.me = null; state.data = null; showLogin(); });
+els.logout.addEventListener('click', () => { hideWelcome(els.welcome); state.chat = { items: null, loading: false, error: '', sending: false, draft: '' }; signOut(); clearCache(); settings.reset(); state.me = null; state.data = null; showLogin(); });
 
 /* ---------- Khởi động ---------- */
 /** Email phải có trong tab "Tài khoản" của Sheet cấu hình; quyền lấy từ cột "Phân quyền". */
@@ -368,6 +424,13 @@ function setBoot(text, step) {
 async function start() {
   setBoot('Đang xác thực tài khoản…', 1);
   try { await startApp(); } finally { setBoot(); }
+  greet();
+}
+
+/** Thẻ chào mừng theo tiến độ của chính người đăng nhập; chỉ hiện một lần cho mỗi lần đăng nhập. */
+function greet() {
+  if (!state.data || !state.me || state.tab === 'settings') return;
+  showWelcome(els.welcome, { me: state.me, found: findMember(state.me.email, state.data.teams), data: state.data });
 }
 
 async function startApp() {
