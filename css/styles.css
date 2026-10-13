@@ -36,6 +36,7 @@
 
 /* ---------- Base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; color: var(--text); font: 15px/1.5 var(--font);
   background: radial-gradient(900px 320px at 50% -120px, var(--accent-soft), transparent), var(--bg); }
 h1, h2, h3, p { margin: 0; }
@@ -172,9 +173,11 @@ tbody tr.static { cursor: default; } tbody tr.static:hover { background: none; }
   .tabs { display: none; }
   body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
   .bottom-nav {
-    display: flex; position: fixed; inset: auto 0 0 0; z-index: 20;
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
     background: var(--surface); border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom);
+    /* iOS Safari: giữ thanh dưới trên lớp riêng để không nhấp nháy/lệch khi thanh địa chỉ co giãn lúc cuộn. */
+    transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0); backface-visibility: hidden; will-change: transform;
   }
   .bottom-nav:empty { display: none; }
   .bottom-nav__item {
