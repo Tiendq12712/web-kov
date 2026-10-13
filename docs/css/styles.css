@@ -172,11 +172,13 @@ tbody tr.static { cursor: default; } tbody tr.static:hover { background: none; }
 .bottom-nav { display: none; }
 @media (max-width: 640px) {
   .tabs { display: none; }
-  /* Thanh dưới dùng sticky (không dùng fixed): iOS co giãn thanh địa chỉ làm phần tử fixed lệch khỏi đáy màn hình. */
-  body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
-  body > .container { flex: 1 0 auto; }
+  /* Khung ứng dụng: chỉ #view cuộn, thanh trên/dưới đứng yên — nên thanh địa chỉ của iPhone không co giãn và thanh dưới không bao giờ lệch. */
+  html, body { height: 100%; overflow: hidden; }
+  body { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+  .topbar { position: static; flex: none; }
+  body > .container { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; align-content: start; grid-auto-rows: max-content; }
   .bottom-nav {
-    display: flex; position: sticky; bottom: 0; z-index: 20; margin-top: auto;
+    display: flex; flex: none; position: static; z-index: 20;
     background: var(--surface); border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom);
   }

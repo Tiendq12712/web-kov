@@ -187,6 +187,7 @@ function setTab(tab) {
   state.query = '';
   renderView();
   window.scrollTo({ top: 0 });
+  els.view.scrollTo({ top: 0 });   // điện thoại: nội dung cuộn trong khung #view
 }
 
 /* ---------- Chi tiết nhân sự ---------- */
@@ -483,4 +484,12 @@ async function open() {
 }
 open();
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  // Có bản mới được kích hoạt thì tải lại một lần để dùng ngay giao diện mới (không phải đóng mở app nhiều lần).
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+  });
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
