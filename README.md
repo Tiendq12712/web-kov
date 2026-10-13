@@ -41,6 +41,11 @@ Cài: `chrome://extensions` → bật **Developer mode** → **Load unpacked** �
 server không chạy thì tiện ích sao chép vào clipboard. Server chỉ nhận đường này từ đúng tiện ích (ID cố định `adlmjjkfhfjbfphjgkfocgikbakpmngb`
 nhờ khóa trong manifest; ID nằm ở `EXTENSION_ORIGIN` trong `server.py`) và chỉ cho `POST /api/call/cookie`.
 
+## Xuất bản
+- **GitHub Pages:** `sh scripts/build-pages.sh docs`, commit thư mục `docs/`, rồi Settings → Pages → Branch `main`, thư mục `/docs`. Chỉ giao diện web được phát hành, không có mã máy chủ.
+- **Cloudflare:** Build command `sh scripts/build-pages.sh`, deploy bằng `wrangler.jsonc` (thư mục `dist`).
+- Thêm địa chỉ phát hành vào **Authorized JavaScript origins** của Client ID (chỉ phần gốc, ví dụ `https://tiendq12712.github.io`).
+
 ## Chạy chỉ xem báo cáo (không cần tool CRM)
 ```bash
 python3 serve.py 8080   # rồi mở http://localhost:8080 (server không cache, tránh thấy bản cũ)

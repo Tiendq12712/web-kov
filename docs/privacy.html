@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Chính sách quyền riêng tư · web-kov</title>
+  <meta name="description" content="Chính sách quyền riêng tư của web-kov: dữ liệu truy cập, cách dùng và lưu trữ.">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .doc { max-width: 760px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 14px; }
+    .doc h1 { font-size: 26px; margin: 0; }
+    .doc h2 { font-size: 17px; margin: 14px 0 0; }
+    .doc p, .doc li { line-height: 1.65; }
+    .doc ul { margin: 0; padding-left: 20px; }
+    .doc a { color: var(--accent); }
+    .doc .meta { color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main class="doc">
+    <p class="meta"><a href="./">← Về web-kov</a> · <a href="privacy.html">Chính sách quyền riêng tư</a> · <a href="terms.html">Điều khoản dịch vụ</a></p>
+    <h1>Chính sách quyền riêng tư</h1>
+    <p class="meta">Cập nhật lần cuối: 13/10/2026</p>
+    <p><strong>web-kov</strong> là công cụ nội bộ để xem báo cáo tiến độ KPI, theo dõi công việc và năng suất của đội ngũ chăm sóc khách hàng, đọc dữ liệu từ các Google Sheet do chính tổ chức của bạn quản lý. Trang này giải thích web-kov truy cập, dùng và lưu dữ liệu nào.</p>
+
+    <h2>1. Dữ liệu web-kov truy cập</h2>
+    <ul>
+      <li><strong>Thông tin tài khoản Google:</strong> địa chỉ email của bạn (quyền <code>openid</code>, <code>email</code>) để kiểm tra bạn có trong danh sách được phép sử dụng.</li>
+      <li><strong>Nội dung Google Sheet:</strong> web-kov đọc các Google Sheet báo cáo (KPI, năng suất, theo dõi công việc) và Sheet cấu hình (danh sách tài khoản, danh sách link) bằng quyền chỉ đọc <code>spreadsheets.readonly</code>.</li>
+      <li><strong>Quyền ghi (chỉ khi cần):</strong> quyền <code>spreadsheets</code> chỉ được xin thêm khi một tài khoản Admin hoặc Quản trị bấm lưu thay đổi trong mục Thiết lập (thêm, sửa, xóa tài khoản, link báo cáo, cấu hình đồng bộ). Thành viên thông thường không dùng quyền này.</li>
+    </ul>
+
+    <h2>2. Cách dùng dữ liệu</h2>
+    <p>Dữ liệu chỉ dùng để hiển thị báo cáo cho chính bạn trong trình duyệt và để thực hiện các thao tác cấu hình bạn yêu cầu. web-kov không phân tích, không quảng cáo, không bán và không chia sẻ dữ liệu với bên thứ ba.</p>
+
+    <h2>3. Lưu trữ</h2>
+    <ul>
+      <li>web-kov chạy hoàn toàn trong trình duyệt của bạn. <strong>Không có máy chủ của nhà phát triển lưu dữ liệu của bạn.</strong></li>
+      <li>Mã truy cập Google chỉ được giữ trong bộ nhớ phiên của trình duyệt (<code>sessionStorage</code>) và mất khi bạn đóng tab hoặc bấm Đăng xuất.</li>
+      <li>Trình duyệt lưu cục bộ một số tùy chọn giao diện (sáng/tối, kiểu tô màu) và bản sao các tệp giao diện của ứng dụng để mở nhanh. Dữ liệu báo cáo không được lưu lâu dài.</li>
+    </ul>
+
+    <h2>4. Máy chủ cục bộ (tùy chọn)</h2>
+    <p>Các tính năng đồng bộ dữ liệu CRM và xuất dữ liệu cuộc gọi chạy bằng một chương trình nhỏ trên chính máy tính của bạn (<code>localhost</code>). Cookie phiên đăng nhập CRM / call-report chỉ nằm trong bộ nhớ của chương trình đó, không ghi ra tệp và không gửi cho nhà phát triển.</p>
+
+    <h2>5. Tuân thủ chính sách của Google</h2>
+    <p>Việc web-kov sử dụng và chuyển giao thông tin nhận được từ các API của Google tuân thủ
+      <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Chính sách dữ liệu người dùng của Dịch vụ API Google</a>, bao gồm các yêu cầu về Sử dụng hạn chế (Limited Use).</p>
+
+    <h2>6. Quyền của bạn</h2>
+    <p>Bạn có thể thu hồi quyền truy cập của web-kov bất cứ lúc nào tại
+      <a href="https://myaccount.google.com/permissions" rel="noopener">myaccount.google.com/permissions</a>, hoặc bấm <strong>Đăng xuất</strong> trong ứng dụng.</p>
+
+    <h2>7. Liên hệ</h2>
+    <p>Mọi câu hỏi về quyền riêng tư: <a href="mailto:tien0506021@gmail.com">tien0506021@gmail.com</a>.</p>
+
+  </main>
+</body>
+</html>
