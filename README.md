@@ -1,4 +1,4 @@
-# Báo cáo tiến độ KPI theo tháng
+# web-kov — báo cáo tiến độ KPI SC ONLINE KOV
 
 Web tĩnh (HTML/CSS/ES modules), không build, không thư viện ngoài. Dữ liệu đọc trực tiếp từ Google Sheet
 bằng quyền của người xem; chỉ email thuộc tên miền công ty được vào.
