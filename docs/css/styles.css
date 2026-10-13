@@ -461,10 +461,7 @@ html, body { max-width: 100%; overflow-x: clip; }
 /* ---------- Logo KiotViet ---------- */
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand__logo { width: 32px; height: 32px; flex: none; object-fit: contain; }
-.login__logo { display: block; width: 190px; height: auto; margin: 0 auto 16px; }
-:root[data-theme="dark"] .login__logo { background: #fff; padding: 8px 14px; border-radius: 12px; box-sizing: content-box; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .login__logo { background: #fff; padding: 8px 14px; border-radius: 12px; box-sizing: content-box; } }
-.boot__bars { width: 48px; height: 48px; object-fit: contain; }
+:root[data-theme="dark"] @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .boot__bars { width: 48px; height: 48px; object-fit: contain; }
 
 /* ---------- Điện thoại: thu gọn thanh khi cuộn, kéo để tải lại ---------- */
 @media (max-width: 640px) {
