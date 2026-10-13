@@ -17,6 +17,6 @@ if git diff --cached --quiet; then
   echo "Không có thay đổi để xuất bản."
 else
   git commit -q -m "Publish web-kov UI $(date '+%Y-%m-%d %H:%M')"
-  git push
+  git push -u origin HEAD
   echo "Đã xuất bản."
 fi
