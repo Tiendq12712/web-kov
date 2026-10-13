@@ -4,22 +4,38 @@ const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const SCOPE = 'openid email https://www.googleapis.com/auth/spreadsheets.readonly';
 const WRITE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const STORAGE_KEY = 'kpi.session';
+const DAY_KEY = 'kpi.day';   // nhớ đăng nhập trong ngày: { email, date } (không chứa token)
 const EXPIRY_MARGIN_MS = 60_000;
 
 let tokenClient = null;
 let session = readSession();
 let writeGrant = null;   // quyền ghi chỉ xin khi sửa danh sách, giữ trong bộ nhớ
 
-/* Token lưu trong sessionStorage (mất khi đóng tab), không lưu lâu dài. */
+/** Ngày hiện tại theo giờ máy (YYYY-MM-DD); qua nửa đêm là "hôm sau" và phải đăng nhập lại. */
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+/** Token (sống ~1 giờ) giữ ở localStorage để mở lại web trong ngày không phải đăng nhập; chỉ dùng được trong đúng ngày đăng nhập. */
 function readSession() {
   try {
-    const s = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
-    return s && s.expiresAt - EXPIRY_MARGIN_MS > Date.now() ? s : null;
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return s && s.date === today() && s.expiresAt - EXPIRY_MARGIN_MS > Date.now() ? s : null;
   } catch { return null; }
 }
 function writeSession(s) {
   session = s;
-  try { s ? sessionStorage.setItem(STORAGE_KEY, JSON.stringify(s)) : sessionStorage.removeItem(STORAGE_KEY); } catch {}
+  try {
+    if (!s) { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(DAY_KEY); sessionStorage.removeItem(STORAGE_KEY); return; }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    localStorage.setItem(DAY_KEY, JSON.stringify({ email: s.email, date: s.date }));
+  } catch {}
+}
+
+/** Email đã đăng nhập hôm nay (kể cả khi token đã hết hạn): đủ để hiện "Tiếp tục" thay vì bắt chọn lại tài khoản. */
+export function getRemembered() {
+  try {
+    const r = JSON.parse(localStorage.getItem(DAY_KEY));
+    return r && r.date === today() ? r : null;
+  } catch { return null; }
 }
 
 const loadGis = () => new Promise((resolve, reject) => {
@@ -54,15 +70,24 @@ const isAllowed = ({ email, email_verified: verified, hd }) =>
 export const getSession = () => session;
 export const getToken = () => session?.token;
 
-export async function signIn() {
+/**
+ * Đăng nhập. `resume`: cấp lại token cho tài khoản đã đăng nhập hôm nay mà không hỏi chọn tài khoản
+ * (`silent`: không hiện cửa sổ nào nếu Google đã nhớ, lỗi thì để người dùng bấm "Tiếp tục").
+ */
+export async function signIn({ resume = false, silent = false } = {}) {
   await loadGis();
-  const { access_token: token, expires_in: seconds } = await requestToken({ prompt: 'select_account' });  // cho phép chọn tài khoản khác
+  const remembered = resume ? getRemembered() : null;
+  const request = remembered
+    ? { prompt: silent ? 'none' : '', login_hint: remembered.email }
+    : { prompt: 'select_account' };   // cho phép chọn tài khoản khác
+  const { access_token: token, expires_in: seconds } = await requestToken(request);
   const profile = await fetchProfile(token);
   if (!isAllowed(profile)) {
     google.accounts.oauth2.revoke(token);
     throw new Error(`Chỉ tài khoản @${CONFIG.allowedDomain} được phép truy cập`);
   }
-  writeSession({ token, email: profile.email, expiresAt: Date.now() + seconds * 1000 });
+  const date = remembered && remembered.email === profile.email ? remembered.date : today();
+  writeSession({ token, email: profile.email, date, expiresAt: Date.now() + seconds * 1000 });
   return session;
 }
 

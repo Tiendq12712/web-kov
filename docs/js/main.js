@@ -1,6 +1,6 @@
 import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache } from './data.js';
 import { CONFIG } from './config.js';
-import { getSession, signIn, signOut } from './auth.js';
+import { getSession, getRemembered, signIn, signOut } from './auth.js';
 import { loadAccounts, findAccount, canOpenSettings } from './directory.js';
 import { html, mount, raw } from './dom.js';
 import { monthLabel } from './format.js';
@@ -374,6 +374,7 @@ const showError = (message) => {
 
 function showLogin(message = '') {
   setBoot();
+  const remembered = getRemembered();   // đã đăng nhập hôm nay nhưng token hết hạn: chỉ cần bấm Tiếp tục
   els.logout.hidden = true;
   $('user').hidden = true;
   $('settings-btn').hidden = true;
@@ -384,15 +385,18 @@ function showLogin(message = '') {
       <h2 class="big">Đăng nhập để xem báo cáo</h2>
       <p class="muted">Chỉ tài khoản Google <strong>@${CONFIG.allowedDomain}</strong> được truy cập. Dữ liệu được đọc trực tiếp từ Google Sheet bằng quyền của bạn.</p>
       ${message ? html`<p class="notice" role="alert">${message}</p>` : ''}
-      <button class="btn" id="login" type="button">Đăng nhập bằng Google</button>
+      ${remembered
+        ? html`<button class="btn" id="login" data-resume type="button">Tiếp tục với ${remembered.email}</button>
+               <p class="muted login__legal"><button class="link-btn" id="login-other" type="button">Dùng tài khoản khác</button></p>`
+        : html`<button class="btn" id="login" type="button">Đăng nhập bằng Google</button>`}
       <p class="muted login__legal"><a href="privacy.html">Chính sách quyền riêng tư</a> · <a href="terms.html">Điều khoản dịch vụ</a></p>
     </section>`);
 }
 
-async function handleLogin(button) {
+async function handleLogin(button, { resume = false } = {}) {
   button.disabled = true;
   try {
-    await signIn();
+    await signIn({ resume });
     clearCache();
     await start();
   } catch (err) {
@@ -401,7 +405,8 @@ async function handleLogin(button) {
 }
 
 document.addEventListener('click', (e) => {
-  if (e.target.id === 'login') handleLogin(e.target);
+  if (e.target.id === 'login') handleLogin(e.target, { resume: e.target.hasAttribute('data-resume') });
+  if (e.target.id === 'login-other') { signOut(); showLogin(); }
 });
 els.logout.addEventListener('click', () => { hideWelcome(els.welcome); state.chat = { items: null, loading: false, error: '', sending: false, draft: '' }; signOut(); clearCache(); settings.reset(); state.me = null; state.data = null; showLogin(); });
 
@@ -468,6 +473,14 @@ async function startApp() {
   }
 }
 
-getSession() ? start() : showLogin();
+/** Mở lại web: còn token thì vào luôn; hết token nhưng vẫn trong ngày thì thử cấp lại âm thầm, không được thì hiện nút Tiếp tục. */
+async function open() {
+  if (getSession()) return start();
+  if (getRemembered()) {
+    try { await signIn({ resume: true, silent: true }); return start(); } catch { /* cần người dùng bấm */ }
+  }
+  showLogin();
+}
+open();
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
