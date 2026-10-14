@@ -1,6 +1,7 @@
 import { getToken } from './auth.js';
 import { fetchRows, fetchTabs, parseKpi } from './sheet.js';
 import { parseTab, buildLibrary } from './library.js';
+import { buildHr } from './hr.js';
 import { parseReport, alignCodes } from './report.js';
 import { tryParseWork } from './work.js';
 import { loadLinks, resolveMonths } from './directory.js';
@@ -12,14 +13,17 @@ const store = new Map();   // kết quả đã tải xong (để lưu lại dùn
 let months = [];
 let monthsPromise = null;
 let pbiLink = null;      // link Power BI (dòng "PBI" trong tab Danh sách link)
+let hrLink = null;       // link "Danh sách nhân sự SC" (tab Danh sách + tab Phép năm)
 let libraryLink = null;  // link "Thư viện" (dòng Thư viện trong tab Danh sách link)
 
 /** Danh sách tháng được dựng từ tab "Danh sách link" của Sheet cấu hình. */
 const isPbi = (l) => l.info.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase() === 'pbi';
+const isHr = (l) => /nhan su/.test(l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase());
 const isLibrary = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'thu vien';
 export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
   pbiLink = links.find(isPbi) ?? null;
   libraryLink = links.find(isLibrary) ?? null;
+  hrLink = links.find(isHr) ?? null;
   return resolveMonths(links);
 }).then((list) => (months = list)));
 export const reloadMonths = () => { monthsPromise = null; cache.clear(); store.clear(); };
@@ -77,14 +81,29 @@ export const loadLibrary = () => memo('library', async () => {
   return buildLibrary(parsed);
 });
 
+/** Nhân sự và phép năm: đọc tab có chữ "danh sách" và tab có chữ "phép" trong Sheet nhân sự. */
+export const hasHr = () => Boolean(hrLink);
+export const loadHr = () => memo('hr', async () => {
+  if (!hrLink) throw new Error('Chưa có link Danh sách nhân sự trong tab Danh sách link');
+  const token = getToken();
+  const plain = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+  const tabs = await fetchTabs(hrLink.id, token);
+  const staffTab = tabs.find((t) => plain(t).includes('danh sach')), leaveTab = tabs.find((t) => plain(t).includes('phep'));
+  if (!staffTab || !leaveTab) throw new Error('Sheet nhân sự cần có tab "Danh sách" và tab "Phép năm …"');
+  const read = (name) => fetchRows(hrLink.id, token, { tab: `'${name.replace(/'/g, "''")}'`, range: 'A1:BZ300', render: 'FORMATTED_VALUE' });
+  const [staff, leave] = await Promise.all([read(staffTab), read(leaveTab)]);
+  return buildHr(staff, leave);
+});
+
 export const clearCache = () => { cache.clear(); store.clear(); };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
-export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, entries: [...store].filter(([key]) => key !== 'sync') });
-export function restoreData({ months: saved, pbi, library, entries }) {
+export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, entries: [...store].filter(([key]) => key !== 'sync') });
+export function restoreData({ months: saved, pbi, library, hr, entries }) {
   months = saved;
   pbiLink = pbi ?? null;
   libraryLink = library ?? null;
+  hrLink = hr ?? null;
   monthsPromise = Promise.resolve(saved);
   entries.forEach(([key, value]) => { cache.set(key, Promise.resolve(value)); store.set(key, value); });
 }

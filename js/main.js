@@ -1,4 +1,4 @@
-import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData, hasPbi, loadPbi, hasLibrary, loadLibrary } from './data.js';
+import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData, hasPbi, loadPbi, hasLibrary, loadLibrary, hasHr, loadHr } from './data.js';
 import { CONFIG } from './config.js';
 import { getSession, getRemembered, signIn, signOut, loadGis } from './auth.js';
 import { saveSnapshot, loadSnapshot, clearSnapshot } from './snapshot.js';
@@ -22,6 +22,7 @@ import { buildTodo } from './todo.js';
 import { coachFor } from './coach.js';
 import { coachFloat } from './views/coach.js';
 import { libraryView, libraryListView } from './views/library.js';
+import { hrView, hrRowsView } from './views/hr.js';
 import { summarizeMonth } from './compare.js';
 import { compareView } from './views/compare.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
@@ -52,6 +53,7 @@ const state = {
   cinfo: { data: null, loading: false, error: '', f: { ...DEFAULT_FILTERS } },   // báo cáo Customer Info (PBI) + bộ lọc
   trend: { data: null, loading: false, error: '', metric: 'kpi', who: 'all' },   // xu hướng theo ngày (lịch sử đồng bộ)
   compare: { a: null, b: null, key: '', data: null, loading: false, error: '' },   // so sánh hai tháng (quản lý)
+  hr: { data: null, loading: false, error: '', q: '', region: 'all' },   // nhân sự và phép năm
   library: { data: null, loading: false, error: '', cat: 'all', q: '' },   // thư viện tài liệu (quy trình, chính sách, giải trình…)
   coach: null, coachBump: 0,   // nhân vật Coach KPI nổi ở góc màn hình
   coachPref: readCoachPref(),  // { side: 'left' | 'right', open }
@@ -77,7 +79,8 @@ const writeHash = () => history.replaceState(null, '', `#/${state.month}/${state
 
 /* ---------- Render ---------- */
 const ICONS = {
-  overview: '<path d="M4 13h6V4H4zM14 20h6V4h-6zM4 20h6v-4H4z"/>',
+  overview: '<rect x="3.5" y="3.5" width="7" height="9" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.8"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.8"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.8"/>',
+  hr: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>',
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M18 14.5c2.2.6 3.5 2.4 3.5 5.5"/>',
   report: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
   chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
@@ -91,26 +94,86 @@ const ICONS = {
 const tabIcon = (id) => raw(`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id] ?? ICONS.team}</svg>`);
 
 /** Cùng một danh sách tab: thanh ngang trên desktop, thanh dưới cùng trên mobile. */
+/** Các mục điều hướng: một số mục gom thành nhóm (Team, Báo cáo, Phân tích) mở ra danh sách để chọn. */
+let navModel = [];
+function buildNav() {
+  const d = state.data, manager = state.me?.role !== 'member';
+  const item = (id, name, short, desc = '') => ({ id, name, short: short ?? name, desc });
+  const group = (id, name, icon, items) => (items.length > 1 ? { group: id, id, name, short: name, icon, items } : items[0]);
+  const teams = d.teams.map((t) => item(t.id, t.name, t.name.replace('Team ', ''), 'KPI và nhân sự của team'));
+  const reports = [];
+  if (d.work) reports.push(item('work', 'Theo dõi công việc', 'Công việc', 'Tiến độ xử lý data, bảng chia data'));
+  if (d.work?.backlogAll) reports.push(item('sla', 'SLA', 'SLA', 'Data đã trễ và sắp trễ hạn 7 ngày'));
+  if (hasPbi()) reports.push(item('cinfo', 'Customer Info', 'C-Info', 'Tỉ lệ SC dùng Customer Info'));
+  if (hasReport(state.month)) reports.push(item('report', 'Năng suất', 'Năng suất', 'Cuộc gọi, talktime, ngày công'));
+  if (hasHr()) reports.push(item('hr', 'Phép năm', 'Phép năm', 'Nhân sự và phép năm 2026'));
+  const analysis = [];
+  if (manager) analysis.push(item('trend', 'Xu hướng', 'Xu hướng', 'Biến động theo ngày'));
+  if (manager && monthList.length > 1) analysis.push(item('compare', 'So sánh tháng', 'So sánh', 'Đặt hai tháng cạnh nhau'));
+  return [item('overview', 'Tổng quan'), group('team', 'Team', 'team', teams), group('report', 'Báo cáo', 'report', reports), group('analysis', 'Phân tích', 'trend', analysis),
+    hasLibrary() ? item('library', 'Thư viện') : null, item('chat', 'Chia sẻ')].filter(Boolean);
+}
+
+/** Cùng một danh sách: thanh ngang trên desktop, thanh dưới cùng trên mobile. */
 function renderTabs() {
-  const tabs = [{ id: 'overview', name: 'Tổng quan' }, ...state.data.teams];
-  if (state.data.work) tabs.push({ id: 'work', name: 'Theo dõi công việc', short: 'Công việc' });
-  if (state.data.work?.backlogAll) tabs.push({ id: 'sla', name: 'SLA' });
-  if (hasPbi()) tabs.push({ id: 'cinfo', name: 'Customer Info', short: 'C-Info' });
-  if (state.me?.role !== 'member') tabs.push({ id: 'trend', name: 'Xu hướng' });   // chỉ Admin/Quản trị
-  if (hasReport(state.month)) tabs.push({ id: 'report', name: 'Năng suất' });
-  if (state.me?.role !== 'member' && monthList.length > 1) tabs.push({ id: 'compare', name: 'So sánh tháng', short: 'So sánh' });
-  if (hasLibrary()) tabs.push({ id: 'library', name: 'Thư viện' });
-  tabs.push({ id: 'chat', name: 'Chia sẻ' });
-  const current = (t) => (t.id === state.tab ? html`aria-current="page"` : '');
+  navModel = buildNav();
   const unread = state.me ? chat.unread() : 0;
-  const badge = (t) => (t.id === 'chat' && unread ? html`<span class="chat-badge" aria-label="${unread} tin chưa đọc">${unread > 99 ? '99+' : unread}</span>` : '');
-  mount(els.tabs, html`${tabs.map((t) => html`
-    <button class="tab" type="button" data-tab="${t.id}" ${current(t)}>${t.name}${badge(t)}</button>`)}`);
-  mount(els.bottomNav, html`${tabs.map((t) => html`
-    <button class="bottom-nav__item" type="button" data-tab="${t.id}" ${current(t)}>
-      <span class="bottom-nav__icon">${tabIcon(t.id)}${badge(t)}</span><span>${t.short ?? t.name.replace('Team ', '')}</span>
+  const badge = (n) => (n.id === 'chat' && unread ? html`<span class="chat-badge" aria-label="${unread} tin chưa đọc">${unread > 99 ? '99+' : unread}</span>` : '');
+  const active = (n) => (n.items ? n.items.some((i) => i.id === state.tab) : n.id === state.tab);
+  const label = (n, short) => {
+    const cur = n.items?.find((i) => i.id === state.tab);
+    return cur ? `${n.name}: ${cur.short}` : (short ? n.short : n.name);
+  };
+  const attrs = (n) => (n.items ? html`data-nav-group="${n.id}" aria-haspopup="menu" aria-expanded="false"` : html`data-tab="${n.id}"`);
+  const cur = (n) => (active(n) ? html`aria-current="page"` : '');
+  mount(els.tabs, html`${navModel.map((n) => html`
+    <button class="tab ${n.items ? 'tab--group' : ''}" type="button" title="${label(n)}" ${attrs(n)} ${cur(n)}>${tabIcon(n.icon ?? n.id)}<span class="tab__label">${label(n)}</span>${n.items ? html`<span class="tab__caret" aria-hidden="true">▾</span>` : ''}${badge(n)}</button>`)}`);
+  mount(els.bottomNav, html`${navModel.map((n) => html`
+    <button class="bottom-nav__item" type="button" ${attrs(n)} ${cur(n)}>
+      <span class="bottom-nav__icon">${tabIcon(n.icon ?? n.id)}${badge(n)}</span><span>${n.items ? (n.items.find((i) => i.id === state.tab)?.short ?? n.short) : n.short}</span>
     </button>`)}`);
 }
+
+/* ---------- Menu thả xuống (nhóm điều hướng, tài khoản) ---------- */
+const popmenu = $('popmenu'), accountMenu = $('account-menu'), accountBtn = $('user');
+function closeMenus() {
+  popmenu.hidden = true; accountMenu.hidden = true;
+  accountBtn.setAttribute('aria-expanded', 'false');
+  document.querySelectorAll('[data-nav-group][aria-expanded="true"]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+}
+function placeMenu(menu, anchor, { align = 'left' } = {}) {
+  const r = anchor.getBoundingClientRect(), w = menu.offsetWidth, margin = 8;
+  const fromBottom = Boolean(anchor.closest('#bottom-nav'));
+  const left = align === 'right' ? r.right - w : r.left + r.width / 2 - (fromBottom ? w / 2 : r.width / 2);
+  menu.style.left = `${Math.max(margin, Math.min(left, innerWidth - w - margin))}px`;
+  if (fromBottom) { menu.style.top = 'auto'; menu.style.bottom = `${innerHeight - r.top + 6}px`; }
+  else { menu.style.bottom = 'auto'; menu.style.top = `${r.bottom + 4}px`; }
+}
+function openNavMenu(btn) {
+  const was = btn.getAttribute('aria-expanded') === 'true';
+  closeMenus();
+  if (was) return;
+  const g = navModel.find((n) => n.id === btn.dataset.navGroup);
+  popmenu.innerHTML = html`${g.items.map((i) => html`<button class="menu__item menu__item--rich" type="button" role="menuitem" data-tab="${i.id}" ${i.id === state.tab ? html`aria-current="page"` : ''}><span class="menu__icon">${tabIcon(i.id)}</span><span class="menu__text"><strong>${i.name}</strong>${i.desc ? html`<small>${i.desc}</small>` : ''}</span></button>`)}`.toString();
+  popmenu.hidden = false;
+  placeMenu(popmenu, btn);
+  btn.setAttribute('aria-expanded', 'true');
+}
+function toggleAccountMenu() {
+  const was = !accountMenu.hidden;
+  closeMenus();
+  if (was) return;
+  accountMenu.hidden = false;
+  placeMenu(accountMenu, accountBtn, { align: 'right' });
+  accountBtn.setAttribute('aria-expanded', 'true');
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-nav-group]')) return openNavMenu(e.target.closest('[data-nav-group]'));
+  if (e.target.closest('#user')) return toggleAccountMenu();
+  closeMenus();   // bấm ra ngoài hoặc chọn một mục: đóng menu (mục vẫn được các xử lý khác thực hiện)
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(); });
+window.addEventListener('resize', closeMenus);
 
 /** Tên có dấu của nhân sự lấy từ báo cáo KPI (theo mã), vì Sheet năng suất ghi tên không dấu. */
 const kpiNames = () => new Map(state.data.teams.flatMap((t) => t.members.map((m) => [m.code, m.name])));
@@ -208,6 +271,7 @@ function currentPage() {
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
   if (state.tab === 'chat') return { view: renderChat(), title: 'Chia sẻ' };
+  if (state.tab === 'hr' && hasHr()) return { view: lazyTab(state.hr, 'hr', loadHr, (d) => hrView(d, state.hr, { manager: state.me.role !== 'member', code: myCode() })), title: 'Phép năm' };
   if (state.tab === 'library' && hasLibrary()) return { view: lazyTab(state.library, 'library', loadLibrary, (d) => libraryView(d, state.library)), title: 'Thư viện' };
   if (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) return { view: renderCompare(), title: 'So sánh tháng' };
   if (state.tab === 'trend' && state.me.role !== 'member') return { view: lazyTab(state.trend, 'trend', loadHistory, (h) => trendView(h, state.trend, { manager: state.me.role !== 'member', code: myCode() })), title: 'Xu hướng' };
@@ -278,7 +342,7 @@ async function setMonth(ym, { boot = false } = {}) {
   }
   Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || team();
+  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -380,6 +444,10 @@ document.addEventListener('input', (e) => {
     state.work.query = e.target.value;
     return mount($('work-rows'), workRowsView(state.data.work, state.work, kpiPeople()));
   }
+  if (e.target.id === 'hr-search') {   // chỉ vẽ lại phần thân bảng để giữ con trỏ khi gõ
+    state.hr.q = e.target.value;
+    return mount($('hr-rows'), hrRowsView(state.hr.data, state.hr));
+  }
   if (e.target.id === 'lib-search') {   // chỉ vẽ lại danh sách để giữ con trỏ khi gõ
     state.library.q = e.target.value;
     return mount($('lib-list'), libraryListView(state.library.data, state.library));
@@ -390,6 +458,7 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', (e) => {
+  if (e.target.id === 'hr-region') { state.hr.region = e.target.value; return renderView(); }
   if (e.target.id === 'compare-a' || e.target.id === 'compare-b') { state.compare[e.target.id === 'compare-a' ? 'a' : 'b'] = e.target.value; return renderView(); }
   if (e.target.id === 'trend-who') { state.trend.who = e.target.value; return renderView(); }
   if (e.target.id === 'month') return setMonth(e.target.value);
@@ -541,13 +610,17 @@ const settings = createSettings({
 function syncLogout() {
   const email = getSession()?.email ?? (staleSession ? state.me?.email : null);   // đang dùng dữ liệu đã lưu vẫn coi là đã đăng nhập
   els.logout.hidden = !email;
-  $('user').hidden = !email;
   $('settings-btn').hidden = !(email && canSettings());
-  if (email) {
-    els.logout.title = `Đăng xuất (${email}) để đăng nhập bằng tài khoản khác`;
-    $('user-email').textContent = email;
-    $('user-avatar').textContent = email[0].toUpperCase();
-  }
+  setAccount(email);
+}
+
+/** Nút tài khoản ở góc phải: chữ cái đầu + email khi đã đăng nhập, "Menu" khi chưa (vẫn mở được Hướng dẫn và Giao diện). */
+function setAccount(email) {
+  $('user').classList.toggle('is-out', !email);
+  $('user-avatar').textContent = email ? email[0].toUpperCase() : '☰';
+  $('user-email').textContent = email ?? 'Menu';
+  $('menu-who').textContent = email ?? 'Chưa đăng nhập';
+  els.logout.title = email ? `Đăng xuất (${email}) để đăng nhập bằng tài khoản khác` : '';
 }
 
 const showError = (message) => {
@@ -559,7 +632,7 @@ function showLogin(message = '') {
   setBoot();
   const remembered = getRemembered();   // đã đăng nhập hôm nay nhưng token hết hạn: chỉ cần bấm Tiếp tục
   els.logout.hidden = true;
-  $('user').hidden = true;
+  setAccount(null);
   $('settings-btn').hidden = true;
   els.tabs.replaceChildren();
   els.bottomNav.replaceChildren();
@@ -708,6 +781,7 @@ async function refreshSession() {
     Object.assign(state.report, { data: null, error: '' });
     Object.assign(state.cinfo, { data: null, error: '' });
     Object.assign(state.library, { data: null, error: '' });
+    Object.assign(state.hr, { data: null, error: '' });
     Object.assign(state.compare, { data: null, error: '', key: '' });
     preloadPbi();
     state.data = await loadMonth(state.month);

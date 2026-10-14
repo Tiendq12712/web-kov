@@ -253,13 +253,15 @@ const callSection = (ui) => html`${serverCard(ui.status, ui.serverError)}${cooki
   cookieSet: ui.status?.callCookieSet, needCookie: 'Cần nhập cookie call-report trước khi chạy.',
 })}`;
 
+/** Chỉ Admin được vào Cấu hình, Đồng bộ CRM và Xuất Call; Quản trị chỉ thấy Tài khoản. */
+export const ADMIN_ONLY = ['links', 'crm', 'call'];
 const BODY = { accounts: accountsSection, links: linksSection, crm: crmSection, call: callSection };
 
 export const settingsView = (ui) => html`
   <div class="toolbar">
     <h2 class="section-title"><button class="link-btn" type="button" data-tab="overview" aria-label="Về màn hình chính">← Tổng quan</button> <span class="muted">/</span> Thiết lập</h2>
     <div class="chips" role="group" aria-label="Mục thiết lập">
-      ${SECTIONS.map(([id, label]) => html`<button class="chip" type="button" data-act="section" data-key="${id}" aria-pressed="${id === ui.section}">${label}</button>`)}
+      ${SECTIONS.filter(([id]) => ui.me?.role === 'admin' || !ADMIN_ONLY.includes(id)).map(([id, label]) => html`<button class="chip" type="button" data-act="section" data-key="${id}" aria-pressed="${id === ui.section}">${label}</button>`)}
     </div>
   </div>
-  ${BODY[ui.section](ui)}`;
+  ${BODY[ui.me?.role === 'admin' || !ADMIN_ONLY.includes(ui.section) ? ui.section : 'accounts'](ui)}`;

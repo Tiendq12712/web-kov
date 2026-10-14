@@ -177,7 +177,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   const remove = (message, action) => (key) => { if (confirm(message(key))) run(action(key)); };
 
   const ACTIONS = {
-    section: (key) => { Object.assign(ui, { section: key, editing: null, error: '' }); rerender(); },
+    section: (key) => { if (['links', 'crm', 'call'].includes(key) && getMe()?.role !== 'admin') return; Object.assign(ui, { section: key, editing: null, error: '' }); rerender(); },
     cancel: () => { ui.editing = null; ui.error = ''; rerender(); },
     'account-edit': edit('account'),
     'account-delete': remove((e) => `Xóa tài khoản ${e}?`, (e) => async () => { ui.accounts = await removeAccount(getMe().role, e); }),
