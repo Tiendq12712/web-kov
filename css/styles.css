@@ -580,3 +580,20 @@ td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
 .updated.is-stale { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
 .updated__label { color: var(--text); opacity: .8; }
 @media (max-width: 640px) { .updated__hint { margin-left: 0; flex-basis: 100%; } .updated__time { font-size: 16px; } }
+
+/* Bảng "Đầy đủ": mỗi chỉ số tách thành nhiều cột */
+.table--full th, .table--full td { padding: 6px 8px; white-space: nowrap; }
+.table--full thead th { text-align: center; }
+.table--full th.group-head { border-bottom: 1px solid var(--border); font-weight: 700; color: var(--text); }
+.table--full th.sub-head button { font-size: 12px; font-weight: 600; }
+.table--full .grp { border-left: 2px solid var(--border); }
+.table--full td.strong { font-weight: 700; }
+.table--full td.is-done { color: var(--good); font-weight: 700; }
+.table--full .cell-bar { min-width: 70px; }
+.table--full td .person { white-space: nowrap; }
+
+/* Tiêu đề cột "Nhân sự" cố định phải đặc (không trong suốt) để các cột cuộn qua không lộ chữ */
+.table-wrap thead th.sticky-col { position: sticky; left: 0; z-index: 5; background: var(--surface-2); background-image: none; }
+.table-wrap thead th:not(.sticky-col) { position: relative; z-index: 1; }
+:root[data-theme="dark"] .table-wrap thead th.sticky-col { background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface-2)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) .table-wrap thead th.sticky-col { background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface-2)); } }

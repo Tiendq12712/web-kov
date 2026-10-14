@@ -28,6 +28,7 @@ function readPref(key, fallback) {
 const state = {
   month: null, data: null,
   tab: 'overview',           // 'overview' | 'work' | 'report' | 'settings' | team id
+  tview: readPref('tview', 'compact'),   // bảng nhân sự: compact (tối giản) | full (đầy đủ)
   osort: { key: 'kpi', dir: 'desc' },   // sắp xếp bảng nhân sự trang tổng quan
   mstatus: 'all', mquery: '',   // lọc tình trạng + tìm kiếm ở bảng nhân sự trang tổng quan
   filter: 'all',             // bộ lọc team ở bảng nhân sự trang tổng quan
@@ -220,6 +221,11 @@ document.addEventListener('click', (e) => {
   if (hit('[data-osort]')) {
     const key = hit('[data-osort]').dataset.osort;
     state.osort = { key, dir: state.osort.key === key && state.osort.dir === 'desc' ? 'asc' : 'desc' };
+    return renderView();
+  }
+  if (hit('[data-tview]')) {
+    state.tview = hit('[data-tview]').dataset.tview;
+    try { localStorage.setItem('kpi.tview', state.tview); } catch {}
     return renderView();
   }
   if (hit('[data-mstatus]')) { state.mstatus = hit('[data-mstatus]').dataset.mstatus; return renderView(); }

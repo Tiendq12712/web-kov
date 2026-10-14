@@ -1,4 +1,4 @@
-import { html } from '../dom.js';
+import { html, raw } from '../dom.js';
 import { pct, num, hm, dayMonth } from '../format.js';
 import { summarize, combineTeams, projectedKpi, memberStatus, elapsedRatio, paceStatus } from '../metrics.js';
 import { bar, badge, statusBadge, stackRow, legendList, rateCell, updatedBanner } from './components.js';
@@ -141,6 +141,49 @@ function memberRow({ team, member: m }, workdays, mode, podium) {
     </tr>`;
 }
 
+function fullRow({ team, member: m }, workdays, mode, podium) {
+  const rank = podium.indexOf(m.kpi);
+  const elapsed = elapsedRatio(team.asOf);
+  const status = memberStatus(m, team);
+  const paint = mode === 'full' || mode === 'text' ? heatClass : mode === 'alert' ? alertClass : () => '';
+  const bars = mode === 'bars';
+  const badgeFor = () => (mode === 'alert' && status.key !== 'bad' ? badge('neutral', status.label) : statusBadge(status));
+  const cells = METRICS.flatMap(([, , read]) => {
+    const x = read(m);
+    const fmt = x.time ? hm : num;
+    const missing = missingOf(x);
+    const rateRef = x.time ? 1 : elapsed;
+    return [
+      html`<td class="right num grp">${fmt(x.target)}</td>`,
+      html`<td class="right num strong">${fmt(x.done)}</td>`,
+      html`<td class="right num ${missing ? '' : 'is-done'}">${missing ? fmt(missing) : '✓'}</td>`,
+      html`<td class="right num ${paint(x.rate, rateRef)}">${bars ? withBar(pct(x.rate), x.rate, rateRef, { mark: rateRef }) : pct(x.rate)}</td>`,
+    ];
+  });
+  return html`
+    <tr class="clickable" data-member="${team.id}:${m.code}" tabindex="0">
+      <td class="sticky-col ${rank >= 0 ? `top top--${rank + 1}` : ''}"><span class="person"><strong>${rank >= 0 ? html`<span class="medal" role="img" aria-label="Top ${rank + 1} KPI tổng" title="Top ${rank + 1} KPI tổng">${MEDALS[rank]}</span> ` : ''}${m.name}</strong><small>${m.code} · Level ${m.level ?? '—'}${rank >= 0 ? ` · Top ${rank + 1} KPI` : ''}</small></span></td>
+      <td>${team.name.replace('Team ', '')}</td>
+      <td class="right num ${paint(m.kpi, elapsed)}">${bars ? withBar(pct(m.kpi, 1), m.kpi, elapsed, { mark: elapsed }) : pct(m.kpi, 1)}</td>
+      <td>${badgeFor()}</td>
+      ${cells}
+      <td class="right num grp">${num(workdays.get(m.code) ?? m.extra.workdays)}</td>
+    </tr>`;
+}
+
+const sortHead = (key, label, osort, cls = '', extra = '') => html`
+  <th scope="col" ${extra ? raw(extra) : ''} class="${cls}" aria-sort="${osort.key === key ? (osort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" data-osort="${key}">${label}</button></th>`;
+
+/** Đầu bảng "Đầy đủ": hàng 1 là tên chỉ số (gộp 4 cột), hàng 2 là KPI / Thực đạt / Còn thiếu / Tỉ lệ. */
+const fullHead = (osort) => html`
+  <tr>
+    ${sortHead('name', 'Nhân sự', osort, 'sticky-col', 'rowspan="2"')}${sortHead('team', 'Team', osort, '', 'rowspan="2"')}
+    ${sortHead('kpi', 'KPI tổng', osort, 'right', 'rowspan="2"')}${sortHead('status', 'Tiến độ', osort, '', 'rowspan="2"')}
+    ${METRICS.map(([, label]) => html`<th scope="colgroup" colspan="4" class="group-head">${label}</th>`)}
+    ${sortHead('workdays', 'Ngày công', osort, 'right grp', 'rowspan="2"')}
+  </tr>
+  <tr>${METRICS.map(([id]) => SUBS.map(([sub, label], i) => sortHead(`${id}_${sub}`, label, osort, `right sub-head ${i === 0 ? 'grp' : ''}`)))}</tr>`;
+
 const HEAT_MODES = [['bars', 'Thanh màu'], ['alert', 'Ít màu'], ['full', 'Nhiều màu'], ['text', 'Màu chữ']];
 const barLegend = () => html`
   <ul class="legend heat-legend" aria-label="Chú thích màu">
@@ -174,6 +217,20 @@ const MEMBER_COLUMNS = [
   { key: 'talk', label: 'Talk time', value: ({ member }) => ratio(member.talk.actual, member.talk.target) },
   { key: 'workdays', label: 'Ngày công', value: ({ member }, workdays) => workdays.get(member.code) ?? member.extra.workdays },
 ].map((c) => ({ align: 'right', ...c }));
+/** Bảng "Đầy đủ": mỗi chỉ số tách thành KPI (chỉ tiêu) | Thực đạt | Còn thiếu | Tỉ lệ. */
+const METRICS = [
+  ['need', 'Điều kiện cần', (m) => ({ target: m.need.target, done: m.need.done, rate: m.need.rate })],
+  ['main', 'Điểm tổng', (m) => ({ target: m.main.target, done: m.main.done, rate: m.main.rate })],
+  ['addon', 'Add-on', (m) => ({ target: m.addon.target, done: m.addon.done, rate: m.addon.rate })],
+  ['act', 'Act', (m) => ({ target: m.extra.assigned, done: m.extra.actDone, rate: ratio(m.extra.actDone, m.extra.assigned) })],
+  ['talk', 'Talk time', (m) => ({ target: m.talk.target, done: m.talk.actual, rate: ratio(m.talk.actual, m.talk.target), time: true })],
+];
+const SUBS = [['target', 'KPI'], ['done', 'Thực đạt'], ['missing', 'Còn thiếu'], ['rate', 'Tỉ lệ']];
+const missingOf = (x) => Math.max((x.target ?? 0) - (x.done ?? 0), 0);
+const FULL_SORT = METRICS.flatMap(([id, , read]) => SUBS.map(([sub]) => ({
+  key: `${id}_${sub}`, value: ({ member }) => { const x = read(member); return sub === 'missing' ? missingOf(x) : x[sub]; },
+})));
+const SORT_COLUMNS = [...MEMBER_COLUMNS, ...FULL_SORT];
 const sortValue = (v) => (v == null || Number.isNaN(v) ? -Infinity : v);
 
 /** Các dòng sau khi lọc theo team, tình trạng và ô tìm kiếm (tên/mã), rồi sắp theo cột đang chọn. */
@@ -184,7 +241,7 @@ const filteredRows = (data, { filter, mstatus = 'all', mquery = '', osort = { ke
     .flatMap((team) => team.members.map((member) => ({ team, member })))
     .filter((row) => byStatus(row) && (!q || plainText(`${row.member.name} ${row.member.code}`).includes(q)))
     .sort((a, b) => {
-      const col = MEMBER_COLUMNS.find((c) => c.key === osort.key) ?? MEMBER_COLUMNS[2];
+      const col = SORT_COLUMNS.find((c) => c.key === osort.key) ?? MEMBER_COLUMNS[2];
       const x = col.value(a, workdays), y = col.value(b, workdays);
       const diff = typeof x === 'string' ? x.localeCompare(y, 'vi') : sortValue(x) - sortValue(y);
       return osort.dir === 'asc' ? diff : -diff;
@@ -197,8 +254,9 @@ export function memberRowsView(data, ui, report) {
   const rows = filteredRows(data, ui, workdays);
   // Top 3 KPI tổng của toàn bộ Online (người bằng điểm cùng hạng), không đổi theo bộ lọc.
   const podium = [...new Set(data.teams.flatMap((t) => t.members.map((m) => m.kpi ?? 0)).filter((k) => k > 0))].sort((a, b) => b - a).slice(0, 3);
-  return rows.length ? html`${rows.map((row) => memberRow(row, workdays, mode, podium))}`
-    : html`<tr class="static"><td colspan="10" class="muted">Không có nhân sự nào khớp bộ lọc.</td></tr>`;
+  const full = ui.tview === 'full';
+  return rows.length ? html`${rows.map((row) => (full ? fullRow : memberRow)(row, workdays, mode, podium))}`
+    : html`<tr class="static"><td colspan="${full ? 25 : 10}" class="muted">Không có nhân sự nào khớp bộ lọc.</td></tr>`;
 }
 
 function memberTable(data, ui, report) {
@@ -227,16 +285,20 @@ function memberTable(data, ui, report) {
       </div>
       <div class="toolbar">
         <p class="muted" id="member-count">Hiển thị ${shown}/${total} nhân sự · bấm tiêu đề cột để sắp xếp. Bấm một dòng để xem chi tiết.</p>
+        <div class="chips" role="group" aria-label="Kiểu bảng">
+          ${[['compact', 'Tối giản'], ['full', 'Đầy đủ']].map(([id, label]) => html`
+            <button class="chip" type="button" data-tview="${id}" aria-pressed="${id === (ui.tview === 'full' ? 'full' : 'compact')}">${label}</button>`)}
+        </div>
         <div class="chips" role="group" aria-label="Kiểu tô màu">
           ${HEAT_MODES.map(([id, label]) => html`
             <button class="chip" type="button" data-heat="${id}" aria-pressed="${id === mode}">${label}</button>`)}
         </div>
       </div>
-      <div class="table-wrap"><table class="${mode === 'text' ? 'table--text' : ''}">
-        <thead><tr>${MEMBER_COLUMNS.map((c) => html`
+      <div class="table-wrap"><table class="${mode === 'text' ? 'table--text' : ''} ${ui.tview === 'full' ? 'table--full' : ''}">
+        <thead>${ui.tview === 'full' ? fullHead(osort) : html`<tr>${MEMBER_COLUMNS.map((c) => html`
           <th scope="col" class="${c.sticky ? 'sticky-col' : ''} ${c.align === 'right' ? 'right' : ''}" aria-sort="${osort.key === c.key ? (osort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">
             <button type="button" data-osort="${c.key}">${c.label}</button>
-          </th>`)}</tr></thead>
+          </th>`)}</tr>`}</thead>
         <tbody id="member-rows">${memberRowsView(data, ui, report)}</tbody>
       </table></div>
       <div class="${mode === 'text' ? 'legend--text' : ''}">${legend}</div>

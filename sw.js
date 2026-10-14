@@ -1,6 +1,6 @@
 /* Service worker: chỉ cache "vỏ" ứng dụng (HTML/CSS/JS/icon cùng origin).
    Dữ liệu KPI và đăng nhập Google (khác origin) KHÔNG bao giờ được cache. */
-const CACHE = 'kpi-shell-v79';
+const CACHE = 'kpi-shell-v81';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/main.js', 'js/config.js', 'js/auth.js', 'js/sheet.js', 'js/data.js',
