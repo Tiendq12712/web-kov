@@ -1,39 +1,58 @@
 import { html } from '../dom.js';
 import { CHAT_MAX_LENGTH } from '../chat.js';
 
-const bubble = (m) => html`
-  <article class="msg">
-    <header class="msg__head"><strong>${m.name || m.email}</strong><span class="muted">${m.at}</span>
-      <span class="msg__tag ${m.reply ? 'is-done' : 'is-new'}">${m.reply ? 'Đã trả lời' : 'Chờ phản hồi'}</span></header>
-    <p class="msg__text">${m.text}</p>
-    ${m.reply ? html`<div class="msg__reply"><strong>${m.by}</strong> <span class="muted">${m.repliedAt}</span><p>${m.reply}</p></div>` : ''}
-  </article>`;
+const initial = (name) => (name?.trim()[0] ?? '?').toUpperCase();
+const preview = (m) => (m ? `${m.email ? '' : ''}${m.text.length > 46 ? `${m.text.slice(0, 46)}…` : m.text}` : 'Chưa có tin nhắn');
 
-const replyBox = (m) => html`
-  <form class="msg__form" data-reply="${m.id}">
-    <textarea class="msg__input" maxlength="${CHAT_MAX_LENGTH}" rows="2" placeholder="${m.reply ? 'Sửa phản hồi…' : 'Viết phản hồi cho ' + (m.name || m.email) + '…'}" aria-label="Phản hồi"></textarea>
-    <button class="btn" type="submit">${m.reply ? 'Cập nhật' : 'Trả lời'}</button>
-  </form>`;
+const threadItem = (t, { active, unread }) => html`
+  <button class="chatlist__item ${t.key === active ? 'is-active' : ''}" type="button" data-chat-open="${t.key}" aria-current="${t.key === active}">
+    <span class="chatlist__avatar ${t.general ? 'is-general' : ''}" aria-hidden="true">${t.general ? '#' : initial(t.label)}</span>
+    <span class="chatlist__text"><strong>${t.label}</strong><small>${preview(t.last)}</small></span>
+    ${unread[t.key] ? html`<span class="chat-badge" aria-label="${unread[t.key]} tin chưa đọc">${unread[t.key]}</span>` : html`<time>${t.last?.at?.split(' ')[0] ?? ''}</time>`}
+  </button>`;
 
-/** Nhân sự: ô soạn tin + các tin của mình. Quản lý (Admin/Quản trị): mọi tin, kèm ô phản hồi. */
-export function chatView({ items, error, loading, sending }, me, name, draft = '') {
-  const manager = me.role !== 'member';
-  const list = manager ? items : items?.filter((m) => m.email.toLowerCase() === me.email.toLowerCase());
+const bubble = (m, me) => {
+  const mine = m.email === me.email.toLowerCase();
   return html`
-    <section class="card chat">
-      <h2 class="big">${manager ? 'Chia sẻ từ nhân sự' : 'Chia sẻ khó khăn với quản lý'}</h2>
-      <p class="muted">${manager
-        ? 'Tin nhắn nhân sự gửi lên. Trả lời trực tiếp bên dưới — nhân sự sẽ thấy phản hồi khi mở lại tab này.'
-        : 'Bạn đang gặp khó khăn về KPI, khách hàng hay công cụ? Hãy nói với quản lý — chỉ Admin và Quản trị đọc được tin này.'}</p>
-      ${manager ? '' : html`
-        <form class="msg__form" id="chat-form">
-          <textarea class="msg__input" id="chat-input" maxlength="${CHAT_MAX_LENGTH}" rows="3" placeholder="Ví dụ: Tuần này em bị dồn nhiều khách chưa liên lạc được, em cần hỗ trợ…" aria-label="Nội dung chia sẻ">${draft}</textarea>
-          <button class="btn" type="submit" ${sending ? 'disabled' : ''}>${sending ? 'Đang gửi…' : 'Gửi cho quản lý'}</button>
+    <div class="msg ${mine ? 'is-mine' : ''}">
+      <div class="msg__bubble">
+        ${mine ? '' : html`<span class="msg__who">${m.name || m.email || 'Quản lý'}${m.role !== 'member' ? html` <em class="msg__role">Quản lý</em>` : ''}</span>`}
+        <p class="msg__text">${m.text}</p>
+        <time class="msg__time">${m.at}</time>
+      </div>
+    </div>`;
+};
+
+/**
+ * Hội thoại: bên trái là danh sách (Cả nhóm + riêng tư), bên phải là nội dung và ô soạn tin.
+ * Trên điện thoại chỉ hiện một bên: danh sách hoặc hội thoại (nút ← để quay lại).
+ */
+export function chatView({ threads, active, messages, unread, me, draft, error, loading, sending, mobileList, startable = [] }) {
+  const thread = threads.find((t) => t.key === active);
+  const manager = me.role !== 'member';
+  const note = thread?.general ? 'Cả nhóm cùng thấy tin nhắn trong kênh này.'
+    : manager ? `Riêng tư giữa ${thread?.label ?? 'nhân sự'} và quản lý (Admin, Quản trị).` : 'Riêng tư: chỉ bạn và quản lý (Admin, Quản trị) thấy.';
+  return html`
+    <section class="chatbox ${mobileList ? 'is-list' : 'is-thread'}">
+      <aside class="chatlist" aria-label="Danh sách hội thoại">
+        ${startable.length ? html`<label class="chatlist__new"><span class="visually-hidden">Nhắn cho nhân sự</span>
+          <select id="chat-new" class="select"><option value="">＋ Nhắn cho nhân sự…</option>${startable.map((m) => html`<option value="${m.email}">${m.name}</option>`)}</select></label>` : ''}
+        ${threads.map((t) => threadItem(t, { active, unread }))}
+      </aside>
+      <div class="chatpane">
+        <header class="chatpane__head">
+          <button class="icon-btn chatpane__back" type="button" data-chat-back aria-label="Về danh sách hội thoại">←</button>
+          <div><h2 class="chatpane__title">${thread?.label ?? ''}</h2><p class="muted">${note}</p></div>
+        </header>
+        <div class="chatpane__messages" id="chat-messages" tabindex="0" aria-live="polite">
+          ${loading && !messages.length ? html`<p class="muted">Đang tải tin nhắn…</p>`
+            : messages.length ? messages.map((m) => bubble(m, me)) : html`<p class="muted chatpane__empty">Chưa có tin nhắn nào. Hãy là người nhắn đầu tiên.</p>`}
+        </div>
+        ${error ? html`<p class="notice" role="alert">${error}</p>` : ''}
+        <form class="chatpane__form" data-chat-form data-channel="${active}">
+          <textarea id="chat-input" class="msg__input" maxlength="${CHAT_MAX_LENGTH}" rows="2" placeholder="Nhập tin nhắn… (Enter để gửi, Shift+Enter xuống dòng)" aria-label="Tin nhắn">${draft}</textarea>
+          <button class="btn" type="submit" ${sending ? 'disabled' : ''}>${sending ? 'Đang gửi…' : 'Gửi'}</button>
         </form>
-        <p class="muted msg__hint">Lần đầu gửi, Google sẽ hỏi quyền ghi vào Sheet — bạn chỉ cần đồng ý.${name ? '' : ''}</p>`}
-      ${error ? html`<p class="notice" role="alert">${error}</p>` : ''}
-    </section>
-    ${loading && !items ? html`<p class="muted" role="status">Đang tải tin nhắn…</p>` : ''}
-    ${list?.length ? html`<div class="msgs">${[...list].reverse().map((m) => html`${bubble(m)}${manager ? replyBox(m) : ''}`)}</div>`
-      : items ? html`<p class="muted">${manager ? 'Chưa có tin nhắn nào.' : 'Bạn chưa gửi tin nhắn nào.'}</p>` : ''}`;
+      </div>
+    </section>`;
 }

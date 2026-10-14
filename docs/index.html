@@ -19,6 +19,13 @@
     try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
   </script>
   <script type="module" src="js/main.js"></script>
+  <script>
+    // Nếu sau 15 giây màn hình chờ vẫn còn (mạng lỗi/tải thiếu tệp), báo cho người dùng thay vì quay mãi.
+    setTimeout(() => {
+      const text = document.getElementById('boot-text');
+      if (document.body.classList.contains('is-booting') && text) text.innerHTML = 'Tải lâu hơn bình thường. <a href="" onclick="location.reload();return false">Tải lại trang</a>';
+    }, 15000);
+  </script>
 </head>
 <body class="is-booting">
   <div id="boot" class="boot" role="status" aria-live="polite">
@@ -64,6 +71,7 @@
     <nav class="tabs" id="tabs" aria-label="Chọn team"></nav>
   </header>
 
+  <div id="refresh-bar" class="refresh-bar" role="status" hidden></div>
   <div id="welcome" class="welcome" hidden></div>
   <main id="view" class="container" aria-live="polite"></main>
   <nav class="bottom-nav" id="bottom-nav" aria-label="Điều hướng chính"></nav>

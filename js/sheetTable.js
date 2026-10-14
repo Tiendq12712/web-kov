@@ -16,8 +16,8 @@ async function call(url, token, options = {}) {
 }
 
 /** Đọc các dòng dữ liệu; tab chưa tồn tại thì trả về danh sách rỗng. */
-export async function readTable({ url, tab, columns, token = getToken() }) {
-  const area = `A2:${lastColumn(columns)}${MAX_ROWS}`;
+export async function readTable({ url, tab, columns, token = getToken(), maxRows = MAX_ROWS }) {
+  const area = `A2:${lastColumn(columns)}${maxRows}`;
   const res = await call(`${API}/${sheetId(url)}/values/${rangeOf(tab, area)}?valueRenderOption=FORMATTED_VALUE`, token);
   if (res.status === 400) return [];
   if (!res.ok) throw new Error(`Không đọc được tab "${tab}" (${res.status})`);

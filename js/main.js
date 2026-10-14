@@ -1,6 +1,7 @@
-import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache } from './data.js';
+import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData } from './data.js';
 import { CONFIG } from './config.js';
-import { getSession, getRemembered, signIn, signOut } from './auth.js';
+import { getSession, getRemembered, signIn, signOut, loadGis } from './auth.js';
+import { saveSnapshot, loadSnapshot, clearSnapshot } from './snapshot.js';
 import { loadAccounts, findAccount, canOpenSettings } from './directory.js';
 import { html, mount, raw } from './dom.js';
 import { monthLabel } from './format.js';
@@ -11,8 +12,7 @@ import { workView, workRowsView } from './views/work.js';
 import { reportView, reportRowsView, reportDetailView } from './views/report.js';
 import { workdaysByCode } from './report.js';
 import { createSettings } from './settingsController.js';
-import { loadMessages, sendMessage, replyMessage } from './chat.js';
-import { chatView } from './views/chat.js';
+import { createChat } from './chatController.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
 import { startTour, tourSeen } from './tour.js';
 import './mobileShell.js';
@@ -37,7 +37,7 @@ const state = {
   sort: { key: 'kpi', dir: 'desc' },
   report: { data: null, loading: false, error: '', region: 'all', weekMetric: 'calls', dayMetric: 'calls', query: '', sort: { key: 'talk', dir: 'desc' } },
   work: { team: 'all', matrix: 'backlogAll', query: '', sort: { key: 'pctDone', dir: 'desc' } },
-  chat: { items: null, loading: false, error: '', sending: false, draft: '' },
+  accounts: [],              // danh sách tài khoản (để Admin/Quản trị chọn nhân sự trong tab Chia sẻ)
   me: null,                  // { email, role } — role: admin | manager | member
 };
 
@@ -67,11 +67,13 @@ function renderTabs() {
   if (hasReport(state.month)) tabs.push({ id: 'report', name: 'Năng suất' });
   tabs.push({ id: 'chat', name: 'Chia sẻ' });
   const current = (t) => (t.id === state.tab ? html`aria-current="page"` : '');
+  const unread = state.me ? chat.unread() : 0;
+  const badge = (t) => (t.id === 'chat' && unread ? html`<span class="chat-badge" aria-label="${unread} tin chưa đọc">${unread > 99 ? '99+' : unread}</span>` : '');
   mount(els.tabs, html`${tabs.map((t) => html`
-    <button class="tab" type="button" data-tab="${t.id}" ${current(t)}>${t.name}</button>`)}`);
+    <button class="tab" type="button" data-tab="${t.id}" ${current(t)}>${t.name}${badge(t)}</button>`)}`);
   mount(els.bottomNav, html`${tabs.map((t) => html`
     <button class="bottom-nav__item" type="button" data-tab="${t.id}" ${current(t)}>
-      ${tabIcon(t.id)}<span>${t.short ?? t.name.replace('Team ', '')}</span>
+      <span class="bottom-nav__icon">${tabIcon(t.id)}${badge(t)}</span><span>${t.short ?? t.name.replace('Team ', '')}</span>
     </button>`)}`);
 }
 
@@ -90,27 +92,35 @@ function lazyTab(slice, tab, loader, render) {
     const month = state.month;
     loader(month)
       .then((data) => { if (month === state.month) slice.data = data; })
-      .catch((err) => { if (err.code === 'auth') showLogin(err.message); else slice.error = err.message; })
+      .catch((err) => { if (err.code === 'auth') authLost(err.message); else slice.error = err.message; })
       .finally(() => { slice.loading = false; if (state.tab === tab && state.month === month) renderView(); });
   }
   return html`<p class="muted" role="status">Đang tải dữ liệu…</p>`;
 }
 
-/** Tin nhắn tải mỗi lần mở tab (để thấy phản hồi mới); lỗi thì báo tại chỗ. */
-function renderChat() {
-  const c = state.chat;
-  if (!c.items && !c.loading && !c.error) loadChatNow();
-  return chatView(c, state.me, myName(), c.draft);
+/** Hội thoại (Cả nhóm + riêng tư): trạng thái nằm trong chatController. */
+const myName = () => state.me.name || findMember(state.me.email, state.data.teams, state.me.name)?.member.name || state.me.email.split('@')[0];
+
+/** Vẽ lại hội thoại/huy hiệu khi có tin mới, giữ nguyên chữ đang gõ và vị trí con trỏ. */
+function onChatChange(kind) {
+  if (!state.me || !state.data) return;
+  if (kind === 'badge') { renderTabs(); applyTitle(); return; }
+  if (state.tab !== 'chat') return;
+  const box = $('chat-input'), focused = box && document.activeElement === box, caret = box?.selectionStart;
+  const list = $('chat-messages'), nearBottom = !list || list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+  renderView();
+  const after = $('chat-input');
+  if (focused && after) { after.focus(); after.setSelectionRange(caret, caret); }
+  const msgs = $('chat-messages');
+  if (msgs && nearBottom) msgs.scrollTop = msgs.scrollHeight;
 }
-function loadChatNow() {
-  const c = state.chat;
-  c.loading = true; c.error = '';
-  loadMessages()
-    .then((items) => { c.items = items; })
-    .catch((err) => { if (err.code === 'auth') showLogin(err.message); else c.error = err.message; })
-    .finally(() => { c.loading = false; if (state.tab === 'chat') renderView(); });
-}
-const myName = () => state.me.name || findMember(state.me.email, state.data.teams, state.me.name)?.member.name || state.me.email;
+const chat = createChat({
+  getMe: () => state.me, getAccounts: () => state.accounts, getName: myName,
+  onChange: onChatChange, onAuthExpired: (message) => authLost(message), isOpen: () => state.tab === 'chat',
+});
+const renderChat = () => chat.view();
+let baseTitle = document.title;
+const applyTitle = () => { const n = state.me ? chat.unread() : 0; document.title = n ? `(${n}) ${baseTitle}` : baseTitle; };
 
 const renderWork = () => workView(state.data.work, state.work, kpiPeople(), state.data.teams.map(({ id, name }) => ({ id, name })));
 
@@ -151,14 +161,16 @@ function renderView() {
     els.tabs.replaceChildren();
     els.bottomNav.replaceChildren();
     mount(els.view, settings.view());
-    document.title = 'Thiết lập · Report SC ONLINE';
+    baseTitle = 'Thiết lập · Report SC ONLINE'; applyTitle();
     return;
   }
   const page = currentPage();
   mount(els.view, page.view);
   renderTabs();
-  document.title = `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE`;
+  baseTitle = `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE`;
+  applyTitle();
   writeHash();
+  if (state.tab === 'chat') { const msgs = $('chat-messages'); if (msgs) msgs.scrollTop = msgs.scrollHeight; }
 }
 
 async function setMonth(ym, { boot = false } = {}) {
@@ -174,7 +186,7 @@ async function setMonth(ym, { boot = false } = {}) {
     state.data = data;
     report = rep;
   } catch (err) {
-    return err.code === 'auth' ? showLogin(err.message) : showError(err.message);
+    return err.code === 'auth' ? authLost(err.message) : showError(err.message);
   }
   els.month.value = ym;
   Object.assign(state.report, { data: report, error: '', query: '' });
@@ -186,6 +198,7 @@ async function setMonth(ym, { boot = false } = {}) {
 
 function setTab(tab) {
   state.tab = tab;
+  if (tab === 'chat') chat.refresh({ silent: true });
   state.query = '';
   renderView();
   window.scrollTo({ top: 0 });
@@ -301,28 +314,22 @@ document.addEventListener('click', (e) => {
   if (hit('[data-rmember]')) openReportMember(hit('[data-rmember]').dataset.rmember);
 });
 
-document.addEventListener('submit', async (e) => {
-  const form = e.target;
-  if (!form.matches('#chat-form, [data-reply]')) return;
+document.addEventListener('submit', (e) => {
+  if (!e.target.matches('[data-chat-form]')) return;
   e.preventDefault();
-  const c = state.chat, box = form.querySelector('textarea');
-  c.error = '';
-  try {
-    if (form.id === 'chat-form') {
-      c.sending = true; c.draft = box.value; renderView();
-      await sendMessage({ email: state.me.email, name: myName(), text: box.value });
-      c.draft = '';
-    } else {
-      const message = c.items.find((m) => m.id === form.dataset.reply);
-      await replyMessage(message, myName(), box.value);
-    }
-    c.items = null;   // tải lại để thấy tin vừa gửi
-  } catch (err) {
-    c.error = err.message;
-  } finally {
-    c.sending = false;
-    renderView();
-  }
+  chat.send(e.target.querySelector('textarea').value);
+});
+document.addEventListener('keydown', (e) => {   // Enter gửi tin, Shift+Enter xuống dòng
+  if (e.target.id !== 'chat-input' || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  e.preventDefault();
+  e.target.form.requestSubmit();
+});
+document.addEventListener('input', (e) => { if (e.target.id === 'chat-input') chat.setDraft(e.target.value); });
+document.addEventListener('change', (e) => { if (e.target.id === 'chat-new' && e.target.value) chat.start(e.target.value); });
+document.addEventListener('click', (e) => {
+  const open = e.target.closest('[data-chat-open]');
+  if (open) return chat.open(open.dataset.chatOpen);
+  if (e.target.closest('[data-chat-back]')) chat.back();
 });
 
 els.welcome.addEventListener('click', (e) => {
@@ -365,7 +372,7 @@ const settings = createSettings({
   getMe: () => state.me,
   getMonths: () => monthList,
   rerender: () => { if (state.tab === 'settings' || !state.data) renderView(); },
-  onAuthExpired: (message) => showLogin(message),
+  onAuthExpired: (message) => authLost(message),
   onLinksChanged: refreshMonths,
   onSynced: async () => { clearCache(); state.data = await loadMonth(state.month); },
 });
@@ -373,14 +380,14 @@ const settings = createSettings({
 /* ---------- Đăng nhập ---------- */
 /** Nút đăng xuất luôn hiện khi còn phiên đăng nhập, kể cả lúc đang báo lỗi. */
 function syncLogout() {
-  const session = getSession();
-  els.logout.hidden = !session;
-  $('user').hidden = !session;
-  $('settings-btn').hidden = !(session && canSettings());
-  if (session) {
-    els.logout.title = `Đăng xuất (${session.email}) để đăng nhập bằng tài khoản khác`;
-    $('user-email').textContent = session.email;
-    $('user-avatar').textContent = session.email[0].toUpperCase();
+  const email = getSession()?.email ?? (staleSession ? state.me?.email : null);   // đang dùng dữ liệu đã lưu vẫn coi là đã đăng nhập
+  els.logout.hidden = !email;
+  $('user').hidden = !email;
+  $('settings-btn').hidden = !(email && canSettings());
+  if (email) {
+    els.logout.title = `Đăng xuất (${email}) để đăng nhập bằng tài khoản khác`;
+    $('user-email').textContent = email;
+    $('user-avatar').textContent = email[0].toUpperCase();
   }
 }
 
@@ -423,15 +430,17 @@ async function handleLogin(button, { resume = false } = {}) {
 
 document.addEventListener('click', (e) => {
   if (e.target.id === 'login') handleLogin(e.target, { resume: e.target.hasAttribute('data-resume') });
-  if (e.target.id === 'login-other') { signOut(); showLogin(); }
+  if (e.target.id === 'login-other') { clearSnapshot(); signOut(); showLogin(); }
 });
-els.logout.addEventListener('click', () => { hideWelcome(els.welcome); state.chat = { items: null, loading: false, error: '', sending: false, draft: '' }; signOut(); clearCache(); settings.reset(); state.me = null; state.data = null; showLogin(); });
+els.logout.addEventListener('click', () => { hideWelcome(els.welcome); chat.reset(); clearSnapshot(); disarmRefresh(); signOut(); clearCache(); settings.reset(); state.me = null; state.data = null; showLogin(); });
 
 /* ---------- Khởi động ---------- */
 /** Email phải có trong tab "Tài khoản" của Sheet cấu hình; quyền lấy từ cột "Phân quyền". */
 async function authorize() {
   const email = getSession().email;
-  const account = findAccount(await loadAccounts(), email);
+  const accounts = await loadAccounts();
+  state.accounts = accounts;
+  const account = findAccount(accounts, email);
   if (!account) {
     signOut();
     showLogin('Email của bạn chưa được cấp quyền. Hãy liên hệ Admin để được thêm vào danh sách tài khoản.');
@@ -462,6 +471,7 @@ async function start() {
   setBoot('Đang xác thực tài khoản…', 1);
   try { await startApp(); } finally { setBoot(); }
   greet();
+  if (state.me && state.data) { chat.watch(); persistSnapshot(); }   // thăm dò tin mới + lưu bản dữ liệu hôm nay
 }
 
 /** Thẻ chào mừng theo tiến độ của chính người đăng nhập; chỉ hiện một lần cho mỗi lần đăng nhập. */
@@ -490,11 +500,87 @@ async function startApp() {
   }
 }
 
-/** Mở lại web: còn token thì vào luôn; hết token nhưng vẫn trong ngày thì thử cấp lại âm thầm, không được thì hiện nút Tiếp tục. */
+/* ---------- Đăng nhập một lần trong ngày ---------- */
+let staleSession = false;   // token Google đã hết hạn: đang dùng dữ liệu đã lưu, chờ lần chạm đầu tiên để làm mới
+const refreshBar = $('refresh-bar');
+const clock = (t) => new Date(t).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Lưu dữ liệu đã tải để lần mở sau trong ngày vào thẳng trang chủ, không qua màn hình đăng nhập. */
+function persistSnapshot() {
+  if (!state.me || !state.data || staleSession) return;
+  saveSnapshot({ email: state.me.email, month: state.month, me: state.me, accounts: state.accounts, data: snapshotData() });
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) persistSnapshot(); });
+
+function disarmRefresh() {
+  staleSession = false;
+  refreshBar.hidden = true;
+  document.removeEventListener('click', onTouch, true);
+  document.removeEventListener('keydown', onTouch, true);
+}
+function onTouch() { document.removeEventListener('click', onTouch, true); document.removeEventListener('keydown', onTouch, true); refreshSession(); }
+
+/** Token hết hạn nhưng vẫn trong ngày: giữ nguyên giao diện, làm mới ngay ở lần chạm kế tiếp (cần thao tác người dùng để Google cấp lại). */
+function armRefresh(text) {
+  staleSession = true;
+  refreshBar.textContent = text ?? `Đang hiển thị dữ liệu đã lưu lúc ${clock(loadSnapshot(state.me?.email)?.savedAt ?? Date.now())}. Chạm bất kỳ đâu để cập nhật.`;
+  refreshBar.hidden = false;
+  loadGis().catch(() => {});   // nạp sẵn để cửa sổ cấp quyền mở kịp trong lần chạm
+  document.addEventListener('click', onTouch, true);
+  document.addEventListener('keydown', onTouch, true);
+}
+
+function authLost(message) {
+  if (getRemembered() && state.data && state.me) return armRefresh('Phiên làm việc vừa hết hạn. Chạm bất kỳ đâu để làm mới dữ liệu.');
+  showLogin(message);
+}
+
+async function refreshSession() {
+  refreshBar.textContent = 'Đang làm mới dữ liệu…';
+  try {
+    await signIn({ resume: true });
+    clearCache();
+    if (!(await authorize())) return;
+    Object.assign(state.report, { data: null, error: '' });
+    state.data = await loadMonth(state.month);
+    staleSession = false;
+    syncLogout();
+    renderView();
+    refreshBar.hidden = true;
+    persistSnapshot();
+    chat.watch();
+  } catch (err) {
+    armRefresh(`Chưa làm mới được (${err.message}). Chạm bất kỳ đâu để thử lại.`);
+  }
+}
+
+/** Mở lại trong ngày khi token đã hết: dựng trang chủ từ bản đã lưu (sau màn hình loading), rồi làm mới ở lần chạm đầu. */
+async function startFromSnapshot(snap) {
+  setBoot('Đang mở báo cáo…', 2);
+  try {
+    state.me = snap.me; state.accounts = snap.accounts;
+    restoreData(snap.data);
+    staleSession = true;
+    const months = await loadMonths();
+    fillMonths(months);
+    state.tab = 'overview';
+    await Promise.all([setMonth(months.some((m) => m.month === snap.month) ? snap.month : months[0].month, { boot: true }), sleep(700)]);
+    if (!state.data) { staleSession = false; return showLogin(); }
+    syncLogout();
+  } finally { setBoot(); }
+  greet();
+  armRefresh();
+}
+
+/** Mở lại web: còn token thì vào luôn; hết token mà vẫn trong ngày thì vào bằng dữ liệu đã lưu, không hiện màn hình đăng nhập. */
 async function open() {
   if (getSession()) return start();
-  if (getRemembered()) {
-    try { await signIn({ resume: true, silent: true }); return start(); } catch { /* cần người dùng bấm */ }
+  const remembered = getRemembered();
+  if (remembered) {
+    const snap = loadSnapshot(remembered.email);
+    if (snap) return startFromSnapshot(snap);
+    try { await signIn({ resume: true, silent: true }); return start(); } catch { /* chưa có bản lưu: cần một lần bấm */ }
   }
   showLogin();
 }

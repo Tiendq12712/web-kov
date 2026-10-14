@@ -620,3 +620,56 @@ td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
 .filters__clear { align-self: flex-end; height: 36px; white-space: nowrap; }
 .table-hint { font-size: 12.5px; margin-top: 8px; }
 @media (max-width: 640px) { .filter { flex: 1 1 calc(50% - 8px); } .filter--grow { flex-basis: 100%; } .filters--view .filter { flex-basis: auto; } }
+
+/* ---------- Hội thoại: danh sách bên trái, tin nhắn bên phải ---------- */
+.chat-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 99px;
+  background: var(--bad-fill); color: #fff; font-size: 11px; font-weight: 700; line-height: 1; animation: badge-pop .35s cubic-bezier(.2,1.6,.4,1); vertical-align: middle; }
+@keyframes badge-pop { from { transform: scale(.3); } }
+.bottom-nav__icon { position: relative; display: inline-flex; }
+.bottom-nav__icon .chat-badge { position: absolute; top: -6px; right: -12px; margin: 0; min-width: 16px; height: 16px; font-size: 10px; }
+.chatbox { display: grid; grid-template-columns: 290px 1fr; height: calc(100vh - 190px); min-height: 420px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.chatlist { overflow-y: auto; border-right: 1px solid var(--border); background: var(--surface-2); }
+.chatlist__item { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.chatlist__item:hover { background: var(--accent-soft); }
+.chatlist__item.is-active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.chatlist__item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.chatlist__avatar { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; }
+.chatlist__avatar.is-general { background: var(--good-fill); }
+.chatlist__text { display: grid; min-width: 0; }
+.chatlist__text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chatlist__text small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chatlist__item time { color: var(--muted); font-size: 11px; }
+.chatpane { display: grid; grid-template-rows: auto 1fr auto auto; min-width: 0; min-height: 0; }
+.chatpane__head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.chatpane__title { margin: 0; font-size: 1.05rem; }
+.chatpane__back { display: none; }
+.chatpane__messages { overflow-y: auto; padding: 14px 16px; display: grid; gap: 8px; align-content: start; background: var(--bg); }
+.chatpane__empty { text-align: center; padding: 30px 0; }
+.chatpane__form { display: flex; gap: 10px; align-items: flex-end; padding: 10px 12px; border-top: 1px solid var(--border); background: var(--surface); }
+.msg { display: flex; }
+.msg.is-mine { justify-content: flex-end; }
+.msg__bubble { max-width: min(78%, 520px); padding: 8px 12px; border-radius: 14px 14px 14px 4px; background: var(--surface); border: 1px solid var(--border); }
+.msg.is-mine .msg__bubble { border-radius: 14px 14px 4px 14px; background: var(--accent); border-color: var(--accent); color: #fff; }
+.msg__who { display: block; font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 2px; }
+.msg__role { font-style: normal; font-weight: 600; font-size: 10.5px; padding: 1px 6px; border-radius: 99px; background: var(--good-soft); color: var(--good); }
+.msg__text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg__time { display: block; margin-top: 2px; font-size: 10.5px; opacity: .7; text-align: right; }
+@media (max-width: 640px) {
+  .chatbox { grid-template-columns: 1fr; height: calc(100dvh - 190px); }
+  .chatbox.is-list .chatpane, .chatbox.is-thread .chatlist { display: none; }
+  .chatpane__back { display: inline-grid; }
+  .chatbox { border-radius: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .chat-badge { animation: none; } }
+
+/* Cửa sổ chi tiết nhân sự rộng hơn để bảng công hiển thị đầy đủ */
+.drawer { width: min(980px, 100%); }
+.drawer__body { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.drawer__body > .drawer__head, .drawer__body > .timesheet, .drawer__body > .table-wrap, .drawer__body > .chart-card, .drawer__body > .card.chart, .drawer__body > dl.kv.card { grid-column: 1 / -1; }
+.timesheet .table-wrap { max-height: none; }
+
+/* Thanh báo đang dùng dữ liệu đã lưu */
+.refresh-bar { flex: none; padding: 8px 16px; text-align: center; font-size: 13px; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-bottom: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); cursor: pointer; }
+.refresh-bar[hidden] { display: none; }
+.chatlist__new { display: block; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.chatlist__new .select { width: 100%; height: 34px; }

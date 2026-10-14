@@ -9,10 +9,12 @@ const EXPIRY_MARGIN_MS = 60_000;
 
 let tokenClient = null;
 let session = readSession();
-let writeGrant = null;   // quyền ghi chỉ xin khi sửa danh sách, giữ trong bộ nhớ
+const WRITE_FLAG = 'kpi.write';   // đã từng đồng ý quyền ghi (để gửi tin nhắn / sửa cấu hình): các token sau xin kèm quyền ghi luôn
+const wantsWrite = () => { try { return localStorage.getItem(WRITE_FLAG) === '1'; } catch { return false; } };
+const rememberWrite = (on) => { try { on ? localStorage.setItem(WRITE_FLAG, '1') : localStorage.removeItem(WRITE_FLAG); } catch {} };
 
 /** Ngày hiện tại theo giờ máy (YYYY-MM-DD); qua nửa đêm là "hôm sau" và phải đăng nhập lại. */
-const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 /** Token (sống ~1 giờ) giữ ở localStorage để mở lại web trong ngày không phải đăng nhập; chỉ dùng được trong đúng ngày đăng nhập. */
 function readSession() {
@@ -38,7 +40,7 @@ export function getRemembered() {
   } catch { return null; }
 }
 
-const loadGis = () => new Promise((resolve, reject) => {
+export const loadGis = () => new Promise((resolve, reject) => {
   if (window.google?.accounts?.oauth2) return resolve();
   const script = Object.assign(document.createElement('script'), { src: GIS_SRC, async: true });
   script.onload = resolve;
@@ -77,9 +79,11 @@ export const getToken = () => session?.token;
 export async function signIn({ resume = false, silent = false } = {}) {
   await loadGis();
   const remembered = resume ? getRemembered() : null;
+  const write = wantsWrite();
+  const scope = write ? `${SCOPE} ${WRITE_SCOPE}` : SCOPE;
   const request = remembered
-    ? { prompt: silent ? 'none' : '', login_hint: remembered.email }
-    : { prompt: 'select_account' };   // cho phép chọn tài khoản khác
+    ? { prompt: silent ? 'none' : '', login_hint: remembered.email, scope }
+    : { prompt: 'select_account', scope };   // cho phép chọn tài khoản khác
   const { access_token: token, expires_in: seconds } = await requestToken(request);
   const profile = await fetchProfile(token);
   if (!isAllowed(profile)) {
@@ -87,21 +91,26 @@ export async function signIn({ resume = false, silent = false } = {}) {
     throw new Error(`Chỉ tài khoản @${CONFIG.allowedDomain} được phép truy cập`);
   }
   const date = remembered && remembered.email === profile.email ? remembered.date : today();
-  writeSession({ token, email: profile.email, date, expiresAt: Date.now() + seconds * 1000 });
+  writeSession({ token, email: profile.email, date, write, expiresAt: Date.now() + seconds * 1000 });
   return session;
 }
 
-/** Xin thêm quyền ghi (chỉ khi quản lý danh sách truy cập). Google vẫn chặn nếu bạn không có quyền sửa Sheet. */
+/**
+ * Token có quyền ghi (gửi tin nhắn, sửa cấu hình). Chỉ xin khi cần; Google vẫn chặn nếu bạn không có quyền sửa Sheet.
+ * Sau khi đồng ý một lần, token (đã gồm quyền ghi) dùng chung cho cả đọc và ghi và được lưu như phiên đăng nhập,
+ * nên các lần gửi sau không hỏi lại; các lần cấp token mới cũng xin sẵn quyền ghi.
+ */
 export async function getWriteToken() {
-  if (writeGrant && writeGrant.expiresAt - EXPIRY_MARGIN_MS > Date.now()) return writeGrant.token;
+  if (session?.write && session.expiresAt - EXPIRY_MARGIN_MS > Date.now()) return session.token;
   await loadGis();
-  const { access_token: token, expires_in: seconds } = await requestToken({ scope: WRITE_SCOPE, login_hint: session?.email });
-  writeGrant = { token, expiresAt: Date.now() + seconds * 1000 };
+  const { access_token: token, expires_in: seconds } = await requestToken({ scope: `${SCOPE} ${WRITE_SCOPE}`, login_hint: session?.email });
+  rememberWrite(true);
+  writeSession({ ...session, token, write: true, expiresAt: Date.now() + seconds * 1000 });
   return token;
 }
 
 export function signOut() {
-  writeGrant = null;
+  rememberWrite(false);
   if (session && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(session.token);
   writeSession(null);
 }
