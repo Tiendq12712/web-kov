@@ -26,6 +26,9 @@ export function computeSla(work, asOf, month) {
   if (!block || !asOf) return null;
   const now = toDate(asOf);
   const dayCols = block.labels.map((l, i) => [l, i]).filter(([l]) => typeof l === 'number');
+  // Tổng data được chia trong tháng của từng người: mẫu số của các tỉ lệ (không có thì tạm tính trên tổng data tồn).
+  const assignedCols = work.assigned ? work.assigned.labels.map((l, i) => [l, i]).filter(([l]) => typeof l === 'number').map(([, i]) => i) : [];
+  const assignedBy = new Map((work.assigned?.members ?? []).map((m) => [m.code, sum(assignedCols.map((i) => m.values[i]))]));
   const rows = block.members.map((m) => {
     const batches = dayCols.map(([day, i]) => {
       const count = m.values[i] ?? 0;
@@ -36,9 +39,12 @@ export function computeSla(work, asOf, month) {
       return { day, date, count, age, left: SLA_DAYS - age, due: `${pad(due.getDate())}/${pad(due.getMonth() + 1)}`, status: slaStatus(age) };
     }).filter((b) => b && b.age >= 0);
     const by = (s) => sum(batches.filter((b) => b.status === s).map((b) => b.count));
-    return { code: m.code, name: m.name, batches, late: by('late'), soon: by('soon'), ok: by('ok'), total: sum(batches.map((b) => b.count)) };
+    const total = sum(batches.map((b) => b.count));
+    const assigned = assignedBy.get(m.code) ?? 0;
+    return { code: m.code, name: m.name, batches, late: by('late'), soon: by('soon'), ok: by('ok'), total, assigned, base: assigned || total };
   });
-  const totals = { late: sum(rows.map((r) => r.late)), soon: sum(rows.map((r) => r.soon)), ok: sum(rows.map((r) => r.ok)), total: sum(rows.map((r) => r.total)) };
+  const totals = { late: sum(rows.map((r) => r.late)), soon: sum(rows.map((r) => r.soon)), ok: sum(rows.map((r) => r.ok)), total: sum(rows.map((r) => r.total)), assigned: sum(rows.map((r) => r.assigned)) };
+  totals.base = rows.reduce((a, r) => a + r.base, 0);
   const ranges = [['0–2 ngày', 0, 2], ['3–4 ngày', 3, 4], [`5–${SLA_DAYS} ngày`, 5, SLA_DAYS], [`Trên ${SLA_DAYS} ngày`, SLA_DAYS + 1, Infinity]];
   const buckets = ranges.map(([label, lo, hi]) => ({ label, status: slaStatus(lo), count: sum(rows.flatMap((r) => r.batches.filter((b) => b.age >= lo && b.age <= hi).map((b) => b.count))) }));
   return { asOf, rows, totals, buckets, days: dayRows(rows) };

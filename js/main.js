@@ -18,6 +18,7 @@ import { slaView } from './views/sla.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
 import { startTour, tourSeen } from './tour.js';
 import './mobileShell.js';
+import { applyTableSorts } from './tableSort.js';
 
 const $ = (id) => document.getElementById(id);
 const els = { view: $('view'), tabs: $('tabs'), month: $('month'), detail: $('detail'), bottomNav: $('bottom-nav'), logout: $('logout'), welcome: $('welcome') };
@@ -108,6 +109,25 @@ function lazyTab(slice, tab, loader, render) {
 /** Hội thoại (Cả nhóm + riêng tư): trạng thái nằm trong chatController. */
 const myName = () => state.me.name || findMember(state.me.email, state.data.teams, state.me.name, state.me.code)?.member.name || state.me.email.split('@')[0];
 
+/**
+ * Vẽ lại mà giữ nguyên chữ đang nhập dở trong các ô (form Thiết lập…): dùng cho các lần vẽ lại tự động
+ * (lấy lại tiêu điểm cửa sổ, làm mới token, job xong) — không dùng sau khi người dùng bấm Lưu/Thêm.
+ */
+function withKeptInputs(render) {
+  const key = (el) => `${el.form?.dataset.sform ?? ''}|${el.form?.dataset.key ?? ''}|${el.name || el.id}`;
+  const saved = [...els.view.querySelectorAll('input, textarea, select')].filter((el) => el.name || el.id)
+    .map((el) => ({ key: key(el), value: el.value, checked: el.checked, focused: el === document.activeElement, caret: el.selectionStart }));
+  render();
+  const fresh = new Map([...els.view.querySelectorAll('input, textarea, select')].filter((el) => el.name || el.id).map((el) => [key(el), el]));
+  for (const s of saved) {
+    const el = fresh.get(s.key);
+    if (!el || el.type === 'password' && !s.value) continue;
+    if (el.type === 'checkbox' || el.type === 'radio') continue;   // trạng thái bật/tắt lấy từ dữ liệu mới
+    if (el.value !== s.value) el.value = s.value;
+    if (s.focused) { el.focus(); try { el.setSelectionRange(s.caret, s.caret); } catch { /* ô không hỗ trợ con trỏ */ } }
+  }
+}
+
 /** Vẽ lại hội thoại/huy hiệu khi có tin mới, giữ nguyên chữ đang gõ và vị trí con trỏ. */
 function onChatChange(kind) {
   if (!state.me || !state.data) return;
@@ -175,6 +195,7 @@ function renderView() {
   const page = currentPage();
   mount(els.view, page.view);
   renderTabs();
+  applyTableSorts(els.view);
   baseTitle = `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE`;
   applyTitle();
   writeHash();
@@ -384,7 +405,7 @@ async function refreshMonths() {
 const settings = createSettings({
   getMe: () => state.me,
   getMonths: () => monthList,
-  rerender: () => { if (state.tab === 'settings' || !state.data) renderView(); },
+  rerender: ({ keep = false } = {}) => { if (state.tab === 'settings' || !state.data) (keep ? withKeptInputs(renderView) : renderView()); },
   onAuthExpired: (message) => authLost(message),
   onLinksChanged: refreshMonths,
   onSynced: async () => { clearCache(); state.data = await loadMonth(state.month); },
@@ -560,7 +581,7 @@ async function refreshSession() {
     state.data = await loadMonth(state.month);
     staleSession = false;
     syncLogout();
-    renderView();
+    withKeptInputs(renderView);
     refreshBar.hidden = true;
     persistSnapshot();
     chat.watch();

@@ -27,7 +27,7 @@ export function timesheetView(report, code) {
       <summary><strong>Chi tiết ngày công</strong> <span class="badge badge--good">${num(total)} ngày</span></summary>
       <p class="muted">Đối chiếu ngày công của bạn: <strong>X</strong> = 1 ngày, <strong>X/2</strong> = nửa ngày, để trống = không tính công.
         Thấy chưa đúng? <button class="link-btn" type="button" data-tab="chat">Báo cho quản lý</button></p>
-      <div class="table-wrap"><table class="timesheet__table">
+      <div class="table-wrap"><table class="timesheet__table sortable">
         <thead><tr><th>Ngày</th><th>Thứ</th><th class="right">Công</th><th>Ghi chú</th><th class="right">Call</th><th class="right">Talktime</th></tr></thead>
         <tbody>${rows.map((r) => html`
           <tr class="static ${r.weight ? 'is-work' : 'is-off'} ${off(r.day) ? 'is-weekend' : ''}">

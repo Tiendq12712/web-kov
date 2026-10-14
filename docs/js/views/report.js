@@ -152,7 +152,7 @@ const weekChart = (report, region, metricKey) => {
 const hourHeatmap = (report, members, c) => {
   const reference = mean(members.flatMap((m) => m.hourly).filter((v) => v > 0));
   return html`
-    <div class="table-wrap"><table class="heat-table">
+    <div class="table-wrap"><table class="heat-table sortable">
       <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>${report.hours.map((h) => html`<th scope="col">${h.replace('h', '')}</th>`)}</tr></thead>
       <tbody>${[...members].sort(byName(c)).map((m) => html`<tr class="static">
         <td class="sticky-col"><span class="person"><strong>${c.nameOf(m)}</strong><small>${m.code}</small></span></td>
@@ -188,7 +188,7 @@ function dailyTable(report, ui, c) {
           <button class="chip" type="button" data-daymetric="${k}" aria-pressed="${k === ui.dayMetric}">${m.label}</button>`)}
       </div>
     </div>
-    <div class="table-wrap"><table class="day-table">
+    <div class="table-wrap"><table class="day-table sortable">
       <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>
         ${days.map((d) => html`<th scope="col" class="right">${d}</th>`)}
         <th scope="col" class="right">Tổng</th><th scope="col" class="right">TB/ngày</th></tr></thead>
@@ -264,7 +264,7 @@ export function reportDetailView(report, code, names) {
         series: [{ name: 'Tổng call', cls: 's1', values: days.map((d) => d.calls) }, { name: 'Kết nối', cls: 's2', values: days.map((d) => d.success ?? 0) }],
         ratio: false, format: (v) => num(v),
       })) : ''}
-      ${days.length ? html`<div class="table-wrap"><table>
+      ${days.length ? html`<div class="table-wrap"><table class="sortable">
         <thead><tr><th>Ngày</th><th class="right">Call</th><th class="right">Kết nối</th><th class="right">Tỉ lệ</th><th class="right">Talktime</th><th class="right">Công</th></tr></thead>
         <tbody>${days.map((d) => html`<tr class="static"><td>${d.day}</td><td class="right num">${d.calls}</td><td class="right num">${d.success ?? '—'}</td>
           <td class="right num">${d.rate == null ? '—' : pct(d.rate)}</td><td class="right num">${hm(d.talk)}</td><td class="right num">${d.work}</td></tr>`)}</tbody>

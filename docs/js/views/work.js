@@ -174,7 +174,7 @@ function matrixTable(work, ui, selected) {
   const heat = (v) => (info.invert && v > 0 ? heatClass(v, reference, { invert: true }) : '');
   const cell = (v, klass = '') => html`<td class="right num ${v ? klass : 'muted'}">${v ? num(v) : '·'}</td>`;
   return html`
-    <div class="table-wrap"><table class="day-table">
+    <div class="table-wrap"><table class="day-table sortable">
       <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>${days.map((d) => html`<th scope="col" class="right">${d + 1}</th>`)}<th scope="col" class="right">Tổng</th></tr></thead>
       <tbody>${members.map((m) => html`<tr class="static"><td class="sticky-col"><span class="person"><strong>${m.name}</strong><small>${m.code}</small></span></td>
         ${days.map((d) => cell(m.values[d], heat(m.values[d])))}${cell(sum(days.map((d) => m.values[d])))}</tr>`)}
@@ -197,7 +197,7 @@ function divideTable(work, rows) {
   const totals = (get) => sum(people.map(get));
   return html`
     <div class="toolbar"><h2 class="section-title">Bảng chia data</h2><p class="muted">Số data mỗi nhân sự được chia từ đầu tháng</p></div>
-    <div class="table-wrap"><table class="divide-table">
+    <div class="table-wrap"><table class="divide-table sortable">
       <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>${labels.map((l) => col(SOURCE_SHORT(l)))}${col('Tổng đã chia')}${col('Đã làm')}${col('Đang làm')}${col('Chưa làm')}${col('% hoàn thành')}</tr></thead>
       <tbody>${people.map((r) => html`<tr class="static">
         <td class="sticky-col"><span class="person"><strong>${r.name}</strong><small>${r.code}</small></span></td>

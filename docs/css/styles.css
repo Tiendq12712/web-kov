@@ -726,3 +726,10 @@ td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
 /* Tiêu đề cột của mọi bảng căn giữa */
 table thead th, table thead th.right, table thead th.sticky-col, .sla-matrix thead th, .sla-matrix thead th.sticky-col { text-align: center; }
 table thead th button { justify-content: center; text-align: center; }
+
+/* Bảng thống kê bấm tiêu đề để sắp xếp */
+table.sortable thead th { cursor: pointer; user-select: none; }
+table.sortable thead th[colspan] { cursor: default; }
+table.sortable thead th:hover { color: var(--text); }
+table.sortable thead th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; color: var(--accent); }
+table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; color: var(--accent); }

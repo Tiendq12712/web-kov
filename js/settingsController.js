@@ -45,12 +45,12 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
         if (data.finished) {
           await refreshStatus();
           if (ui.job.kind === 'crm' && data.ok > 0) await stampSync();
-          return rerender();
+          return rerender({ keep: true });
         }
       } catch (err) {
         ui.job.lines.push(`Mất kết nối máy chủ cục bộ: ${err.message}`);
         ui.job.finished = true;
-        return rerender();
+        return rerender({ keep: true });
       }
       timer = setTimeout(tick, POLL_MS);
     };
@@ -200,7 +200,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   window.addEventListener('focus', async () => {
     if (!ui.loaded || ui.busy || !['crm', 'call'].includes(ui.section)) return;
     await refreshStatus();
-    rerender();
+    rerender({ keep: true });   // đừng xóa chữ đang gõ dở khi cửa sổ lấy lại tiêu điểm
   });
 
   document.addEventListener('click', (e) => {

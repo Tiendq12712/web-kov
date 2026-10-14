@@ -65,7 +65,7 @@ export function showWelcome(el, { me, found, data }) {
   const sla = computeSla(data.work, asOf, data.month);
   const slaNow = sla && (found ? sla.rows.find((r) => r.code === found.member.code) : me.role !== 'member' ? sla.totals : null);
   const slaBlock = slaNow ? html`<div class="welcome__sla ${slaNow.late ? 'has-late' : slaNow.soon ? 'has-soon' : 'is-clear'}">
-      <div><small>Data trễ SLA</small><strong class="is-bad">${slaNow.late}</strong><em>${pct(slaNow.total ? slaNow.late / slaNow.total : 0, 1)} data tồn</em></div><div><small>Data sắp trễ SLA</small><strong class="is-warn">${slaNow.soon}</strong><em>${pct(slaNow.total ? slaNow.soon / slaNow.total : 0, 1)} data tồn</em></div>
+      <div><small>Data trễ SLA</small><strong class="is-bad">${slaNow.late}</strong><em>${pct(slaNow.base ? slaNow.late / slaNow.base : 0, 1)} tổng data</em></div><div><small>Data sắp trễ SLA</small><strong class="is-warn">${slaNow.soon}</strong><em>${pct(slaNow.base ? slaNow.soon / slaNow.base : 0, 1)} tổng data</em></div>
       <p>${slaNow.late ? 'Hãy ưu tiên xử lý các data đã quá hạn 7 ngày.' : slaNow.soon ? 'Có data sắp tới hạn, xử lý sớm để không bị trễ.' : 'Không có data nào trễ hoặc sắp trễ. Tuyệt vời!'}</p></div>` : '';
   const name = me.name || (found && firstName(found.member.name)) || me.email.split('@')[0];
   mount(el, html`
