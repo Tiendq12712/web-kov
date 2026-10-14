@@ -102,19 +102,27 @@ const WORK_WEIGHT = { X: 1, 'X/2': 0.5 };
 
 function parseDaily(rows) {
   const days = {};
+  const timesheets = {};
   rows.forEach((row, r) => {
     if (text(row[2]) !== 'Ngày' || !codeOf(text(cellAt(rows, r - 1, 2)))) return;
     const code = codeOf(text(rows[r - 1][2]));
     const cols = columnsFrom(row, 2);
     const list = [];
-    for (let i = r + 1; typeof cellAt(rows, i, 2) === 'number'; i++) {
+    const sheet = [];
+    let i = r + 1;
+    for (; typeof cellAt(rows, i, 2) === 'number'; i++) {
       const work = text(cellAt(rows, i, cols.get('Công thực tế')));
-      list.push({ day: rows[i][2], ...readMetrics(rows, i, cols), work: WORK_WEIGHT[work] ?? 0 });
+      const metrics = readMetrics(rows, i, cols);
+      list.push({ day: rows[i][2], ...metrics, work: WORK_WEIGHT[work] ?? 0 });
+      sheet.push({ day: rows[i][2], mark: work, weight: WORK_WEIGHT[work] ?? 0, note: text(cellAt(rows, i, cols.get('Ghi chú'))), calls: metrics.calls, talk: metrics.talk });
     }
+    // Dòng tổng ngay dưới bảng: "Công thực tế" cộng sẵn trong Sheet, để đối chiếu với số tự cộng.
+    const total = toNumber(cellAt(rows, i, cols.get('Công thực tế')));
     while (list.length && !list.at(-1).calls) list.pop();   // bỏ các ngày chưa tới
     days[code] = list;
+    timesheets[code] = { rows: sheet, total };
   });
-  return days;
+  return { days, timesheets };
 }
 
 function findCell(rows, test, maxRow = rows.length) {
@@ -126,10 +134,10 @@ function findCell(rows, test, maxRow = rows.length) {
 }
 
 /** Kết quả: { hours, members, averages, weeks, days } — xem các hàm parse* ở trên. */
-export function parseReport(rows) {
+export function parseReport(rows, month = null) {
   if (rows.length < 5) throw new Error('Tab năng suất của tháng này chưa có dữ liệu');
   const monthly = parseMonthly(rows);
-  return { regions: REGIONS, ...monthly, weeks: parseWeekly(rows), days: parseDaily(rows) };
+  return { month, regions: REGIONS, ...monthly, weeks: parseWeekly(rows), ...parseDaily(rows) };
 }
 
 /** Ngày công thực tế của từng nhân sự theo mã (nguồn: file năng suất, cột "Ngày công làm thực tế"). */

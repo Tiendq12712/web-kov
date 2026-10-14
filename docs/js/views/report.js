@@ -1,3 +1,4 @@
+import { timesheetView } from './timesheet.js';
 import { html } from '../dom.js';
 import { num, pct, hm } from '../format.js';
 import { bar, badge } from './components.js';
@@ -257,6 +258,7 @@ export function reportDetailView(report, code, names) {
       </div>
       <div class="card"><div class="card__head"><h3 class="card__title">Talktime TB / ngày</h3>${badge(m.talkOk ? 'good' : 'bad', m.talkOk ? 'Đạt' : 'Không đạt')}</div>
         <p class="big num">${hm(m.talk)}</p><p class="muted">Chỉ tiêu ${hm(m.kpiTalk)} · ${num(m.calls)} call/ngày · kết nối ${pct(m.rate, 1)}</p></div>
+      ${timesheetView(report, code)}
       ${days.length ? chartCard('Call theo ngày', groupedColumns({
         categories: days.map((d) => String(d.day)),
         series: [{ name: 'Tổng call', cls: 's1', values: days.map((d) => d.calls) }, { name: 'Kết nối', cls: 's2', values: days.map((d) => d.success ?? 0) }],

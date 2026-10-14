@@ -2,6 +2,7 @@ import { html } from '../dom.js';
 import { pct, num, hm } from '../format.js';
 import { memberStatus, elapsedRatio } from '../metrics.js';
 import { meter, statusBadge, passBadge } from './components.js';
+import { timesheetView } from './timesheet.js';
 
 const section = (title, b, extra = '') => html`
   <section class="card">
@@ -21,7 +22,7 @@ const EXTRA_LABELS = [
 ];
 
 /** `workdays`: ngày công từ file năng suất (nếu đã tải), thay cho số trong bảng KPI. */
-export function detailView(team, m, workdays) {
+export function detailView(team, m, workdays, report) {
   const status = memberStatus(m, team);
   const extra = workdays == null ? m.extra : { ...m.extra, workdays };
   const extras = EXTRA_LABELS.filter(([key]) => extra[key] != null);
@@ -47,6 +48,7 @@ export function detailView(team, m, workdays) {
           <div class="card__head"><h3 class="card__title">Talk time</h3>${passBadge(m.talk.pass)}</div>
           <dl class="kv"><dt>Thực đạt</dt><dd class="num">${hm(m.talk.actual)}</dd><dt>Mục tiêu</dt><dd class="num">${hm(m.talk.target)}</dd></dl>
         </section>` : ''}
+      ${timesheetView(report, m.code)}
       <dl class="kv card">${extras.map(([k, label, fmt]) => html`<dt>${label}</dt><dd class="num">${fmt(extra[k])}</dd>`)}</dl>
     </div>`;
 }

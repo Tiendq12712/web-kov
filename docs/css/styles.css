@@ -597,3 +597,26 @@ td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
 .table-wrap thead th:not(.sticky-col) { position: relative; z-index: 1; }
 :root[data-theme="dark"] .table-wrap thead th.sticky-col { background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface-2)); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme]) .table-wrap thead th.sticky-col { background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface-2)); } }
+
+/* Bảng công của nhân sự */
+.timesheet > summary { cursor: pointer; display: flex; align-items: center; gap: 10px; list-style: none; }
+.timesheet > summary::-webkit-details-marker { display: none; }
+.timesheet > summary::before { content: "▸"; color: var(--accent); transition: transform .15s ease; }
+.timesheet[open] > summary::before { transform: rotate(90deg); }
+.timesheet .table-wrap { margin-top: 10px; max-height: 360px; overflow: auto; }
+.timesheet__table th, .timesheet__table td { padding: 6px 10px; white-space: nowrap; }
+.timesheet__table tr.is-off td { color: var(--muted); }
+.timesheet__table tr.is-weekend td { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+.timesheet__table tr.is-work .timesheet__mark { color: var(--good); }
+.timesheet__table tfoot td { border-top: 2px solid var(--border); background: var(--surface-2); }
+
+/* Bộ lọc bảng nhân sự: mỗi ô có nhãn rõ ràng, gọn trên một hàng */
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; }
+.filters--view { padding-top: 10px; border-top: 1px dashed var(--border); }
+.filter { display: grid; gap: 4px; min-width: 0; }
+.filter > span { font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.filter--grow { flex: 1 1 220px; }
+.filter .search, .filter .select { width: 100%; min-width: 0; height: 36px; }
+.filters__clear { align-self: flex-end; height: 36px; white-space: nowrap; }
+.table-hint { font-size: 12.5px; margin-top: 8px; }
+@media (max-width: 640px) { .filter { flex: 1 1 calc(50% - 8px); } .filter--grow { flex-basis: 100%; } .filters--view .filter { flex-basis: auto; } }

@@ -267,32 +267,31 @@ function memberTable(data, ui, report) {
   const shown = filteredRows(data, ui, workdays).length;
   const osort = ui.osort ?? { key: 'kpi', dir: 'desc' };
   const legend = { bars: barLegend, alert: () => alertLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)'), full: () => heatLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)'), text: () => heatLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)') }[mode]();
+  const view = ui.tview === 'full' ? 'full' : 'compact';
+  const filtered = filter !== 'all' || mstatus !== 'all' || mquery.trim() !== '';
+  const option = (value, label, current) => html`<option value="${value}" ${value === current ? 'selected' : ''}>${label}</option>`;
   return html`
     <section class="card">
       <div class="toolbar">
         <h2 class="section-title">Toàn bộ nhân sự</h2>
-        <div class="chips" role="group" aria-label="Lọc theo team">
-          ${[{ id: 'all', name: 'Tất cả' }, ...data.teams].map((t) => html`
-            <button class="chip" type="button" data-filter="${t.id}" aria-pressed="${t.id === filter}">${t.name}</button>`)}
-        </div>
+        <p class="muted" id="member-count">Hiển thị ${shown}/${total} nhân sự</p>
       </div>
-      <div class="toolbar">
-        <input id="member-search" class="search" type="search" placeholder="Tìm tên hoặc mã nhân sự…" value="${mquery}" aria-label="Tìm nhân sự" autocomplete="off">
-        <div class="chips" role="group" aria-label="Lọc theo tình trạng">
-          ${MEMBER_FILTERS.map(([id, label]) => html`
-            <button class="chip" type="button" data-mstatus="${id}" aria-pressed="${id === mstatus}">${label}</button>`)}
-        </div>
+      <div class="filters" role="search" aria-label="Lọc nhân sự">
+        <label class="filter filter--grow"><span>Tìm</span>
+          <input id="member-search" class="search" type="search" placeholder="Tên hoặc mã nhân sự…" value="${mquery}" autocomplete="off"></label>
+        <label class="filter"><span>Team</span>
+          <select id="member-team" class="select">${[{ id: 'all', name: 'Tất cả team' }, ...data.teams].map((t) => option(t.id, t.name, filter))}</select></label>
+        <label class="filter"><span>Tình trạng</span>
+          <select id="member-status" class="select">${MEMBER_FILTERS.map(([id, label]) => option(id, id === 'all' ? 'Tất cả tình trạng' : label, mstatus))}</select></label>
+        ${filtered ? html`<button class="link-btn filters__clear" type="button" data-clear-filters>Xóa lọc</button>` : ''}
       </div>
-      <div class="toolbar">
-        <p class="muted" id="member-count">Hiển thị ${shown}/${total} nhân sự · bấm tiêu đề cột để sắp xếp. Bấm một dòng để xem chi tiết.</p>
-        <div class="chips" role="group" aria-label="Kiểu bảng">
-          ${[['compact', 'Tối giản'], ['full', 'Đầy đủ']].map(([id, label]) => html`
-            <button class="chip" type="button" data-tview="${id}" aria-pressed="${id === (ui.tview === 'full' ? 'full' : 'compact')}">${label}</button>`)}
-        </div>
-        <div class="chips" role="group" aria-label="Kiểu tô màu">
-          ${HEAT_MODES.map(([id, label]) => html`
-            <button class="chip" type="button" data-heat="${id}" aria-pressed="${id === mode}">${label}</button>`)}
-        </div>
+      <div class="filters filters--view" aria-label="Cách hiển thị">
+        <div class="filter"><span>Kiểu bảng</span>
+          <div class="chips" role="group" aria-label="Kiểu bảng">
+            ${[['compact', 'Tối giản'], ['full', 'Đầy đủ']].map(([id, label]) => html`<button class="chip" type="button" data-tview="${id}" aria-pressed="${id === view}">${label}</button>`)}
+          </div></div>
+        <label class="filter"><span>Cách tô màu</span>
+          <select id="member-heat" class="select">${HEAT_MODES.map(([id, label]) => option(id, label, mode))}</select></label>
       </div>
       <div class="table-wrap"><table class="${mode === 'text' ? 'table--text' : ''} ${ui.tview === 'full' ? 'table--full' : ''}">
         <thead>${ui.tview === 'full' ? fullHead(osort) : html`<tr>${MEMBER_COLUMNS.map((c) => html`
@@ -301,6 +300,7 @@ function memberTable(data, ui, report) {
           </th>`)}</tr>`}</thead>
         <tbody id="member-rows">${memberRowsView(data, ui, report)}</tbody>
       </table></div>
+      <p class="muted table-hint">Bấm tiêu đề cột để sắp xếp · bấm một dòng để xem chi tiết.</p>
       <div class="${mode === 'text' ? 'legend--text' : ''}">${legend}</div>
     </section>`;
 }

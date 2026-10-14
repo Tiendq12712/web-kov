@@ -198,7 +198,7 @@ function openMember(ref) {
   const t = state.data.teams.find((x) => x.id === teamId);
   const member = t.members.find((m) => m.code === code);
   const workdays = state.report.data ? workdaysByCode(state.report.data).get(member.code) : undefined;
-  mount(els.detail, detailView(t, member, workdays));
+  mount(els.detail, detailView(t, member, workdays, state.report.data));
   els.detail.showModal();
 }
 
@@ -223,6 +223,7 @@ document.addEventListener('click', (e) => {
     state.osort = { key, dir: state.osort.key === key && state.osort.dir === 'desc' ? 'asc' : 'desc' };
     return renderView();
   }
+  if (hit('[data-clear-filters]')) { Object.assign(state, { filter: 'all', mstatus: 'all', mquery: '' }); return renderView(); }
   if (hit('[data-tview]')) {
     state.tview = hit('[data-tview]').dataset.tview;
     try { localStorage.setItem('kpi.tview', state.tview); } catch {}
@@ -253,7 +254,7 @@ document.addEventListener('input', (e) => {
   if (e.target.id === 'member-search') {   // chỉ vẽ lại thân bảng để giữ con trỏ gõ
     state.mquery = e.target.value;
     mount($('member-rows'), memberRowsView(state.data, state, state.report.data));
-    $('member-count').textContent = `Hiển thị ${$('member-rows').querySelectorAll('tr.clickable').length}/${state.data.teams.reduce((n, t) => n + (state.filter === 'all' || t.id === state.filter ? t.members.length : 0), 0)} nhân sự · bấm tiêu đề cột để sắp xếp. Bấm một dòng để xem chi tiết.`;
+    $('member-count').textContent = `Hiển thị ${$('member-rows').querySelectorAll('tr.clickable').length}/${state.data.teams.reduce((n, t) => n + (state.filter === 'all' || t.id === state.filter ? t.members.length : 0), 0)} nhân sự`;
     return;
   }
   if (e.target.id === 'work-search') {
@@ -266,7 +267,15 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', (e) => {
-  if (e.target.id !== 'week-metric') return;
+  const id = e.target.id;
+  if (id === 'member-team') { state.filter = e.target.value; return renderView(); }
+  if (id === 'member-status') { state.mstatus = e.target.value; return renderView(); }
+  if (id === 'member-heat') {
+    state.heat = e.target.value;
+    try { localStorage.setItem('kpi.heat2', state.heat); } catch {}
+    return renderView();
+  }
+  if (id !== 'week-metric') return;
   state.report.weekMetric = e.target.value;
   renderView();
 });

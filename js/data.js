@@ -41,7 +41,7 @@ export const hasReport = (ym) => Boolean(months.find((m) => m.month === ym)?.pro
 export const loadReport = (ym) => memo(`report:${ym}`, () => {
   const { productivity } = entryOf(ym);
   if (!productivity) throw new Error('Tháng này chưa có link báo cáo năng suất');
-  return fetchRows(productivity.id, getToken(), { tab: productivity.tab, range: 'A1:DZ1000' }).then(parseReport);
+  return fetchRows(productivity.id, getToken(), { tab: productivity.tab, range: 'A1:DZ1000' }).then((rows) => parseReport(rows, ym));
 });
 
 export const clearCache = () => cache.clear();
