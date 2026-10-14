@@ -1,6 +1,7 @@
 import { html, mount } from './dom.js';
 import { pct } from './format.js';
 import { memberStatus, elapsedRatio } from './metrics.js';
+import { computeSla } from './sla.js';
 
 const plain = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z\s]/g, ' ').trim();
 
@@ -59,6 +60,13 @@ export function showWelcome(el, { me, found, data }) {
     tone = TONES[status.key];
     stat = html`<dl class="welcome__stat"><div><dt>KPI của ${who}</dt><dd>${pct(found.member.kpi, 1)}</dd></div><div><dt>Tiến độ tháng</dt><dd>${pct(elapsedRatio(found.team.asOf), 0)}</dd></div></dl>`;
   }
+  // SLA data: của chính nhân sự, hoặc tổng cả nhóm với Admin/Quản trị (nếu tab công việc có bảng tồn theo ngày).
+  const asOf = data.teams?.map((t) => t.asOf).sort().at(-1);
+  const sla = computeSla(data.work, asOf, data.month);
+  const slaNow = sla && (found ? sla.rows.find((r) => r.code === found.member.code) : me.role !== 'member' ? sla.totals : null);
+  const slaBlock = slaNow ? html`<div class="welcome__sla ${slaNow.late ? 'has-late' : slaNow.soon ? 'has-soon' : 'is-clear'}">
+      <div><small>Data trễ SLA</small><strong class="is-bad">${slaNow.late}</strong></div><div><small>Data sắp trễ SLA</small><strong class="is-warn">${slaNow.soon}</strong></div>
+      <p>${slaNow.late ? 'Hãy ưu tiên xử lý các data đã quá hạn 7 ngày.' : slaNow.soon ? 'Có data sắp tới hạn, xử lý sớm để không bị trễ.' : 'Không có data nào trễ hoặc sắp trễ. Tuyệt vời!'}</p></div>` : '';
   const name = me.name || (found && firstName(found.member.name)) || me.email.split('@')[0];
   mount(el, html`
     <div class="welcome__card ${tone?.cls ?? 'is-good'}" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
@@ -68,8 +76,10 @@ export function showWelcome(el, { me, found, data }) {
       <h2 id="welcome-title" class="welcome__title">${tone ? tone.title(name) : `Chào mừng ${name}!`}</h2>
       <p class="welcome__text">${tone?.text(who, cap(who)) ?? `Chúc ${who} một ngày làm việc hiệu quả. Cùng xem tiến độ KPI của đội nhé.`}</p>
       ${stat}
+      ${slaBlock}
       <div class="welcome__actions">
         ${tone?.cls === 'is-bad' || tone?.cls === 'is-warn' ? html`<button class="btn" type="button" data-welcome="chat">Chia sẻ với quản lý</button>` : ''}
+        ${slaNow ? html`<button class="btn btn--ghost" type="button" data-welcome="sla">Xem chi tiết SLA</button>` : ''}
         <button class="btn btn--ghost" type="button" data-welcome="close">${found ? 'Xem báo cáo' : 'Bắt đầu'}</button>
       </div>
     </div>`);

@@ -13,6 +13,8 @@ import { reportView, reportRowsView, reportDetailView } from './views/report.js'
 import { workdaysByCode } from './report.js';
 import { createSettings } from './settingsController.js';
 import { createChat } from './chatController.js';
+import { computeSla } from './sla.js';
+import { slaView } from './views/sla.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
 import { startTour, tourSeen } from './tour.js';
 import './mobileShell.js';
@@ -41,6 +43,9 @@ const state = {
   me: null,                  // { email, role } — role: admin | manager | member
 };
 
+/** Ngày số liệu mới nhất trong các team (mốc tính tuổi data cho SLA). */
+const latestAsOf = (data) => data.teams.map((t) => t.asOf).sort().at(-1);
+
 const team = () => state.data?.teams.find((t) => t.id === state.tab);
 
 /* ---------- Routing: #/<tháng>/<tab> ---------- */
@@ -56,6 +61,7 @@ const ICONS = {
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M18 14.5c2.2.6 3.5 2.4 3.5 5.5"/>',
   report: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
   chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
+  sla: '<circle cx="12" cy="13" r="8"/><path d="M12 8v5l3 2M9 3h6"/>',
   work: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 15l2.5 2.5L16 13"/>',
 };
 const tabIcon = (id) => raw(`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id] ?? ICONS.team}</svg>`);
@@ -64,6 +70,7 @@ const tabIcon = (id) => raw(`<svg viewBox="0 0 24 24" width="22" height="22" fil
 function renderTabs() {
   const tabs = [{ id: 'overview', name: 'Tổng quan' }, ...state.data.teams];
   if (state.data.work) tabs.push({ id: 'work', name: 'Theo dõi công việc', short: 'Công việc' });
+  if (state.data.work?.backlogAll) tabs.push({ id: 'sla', name: 'SLA' });
   if (hasReport(state.month)) tabs.push({ id: 'report', name: 'Năng suất' });
   tabs.push({ id: 'chat', name: 'Chia sẻ' });
   const current = (t) => (t.id === state.tab ? html`aria-current="page"` : '');
@@ -151,6 +158,7 @@ function currentPage() {
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
   if (state.tab === 'chat') return { view: renderChat(), title: 'Chia sẻ' };
+  if (state.tab === 'sla') return { view: slaView(computeSla(state.data.work, latestAsOf(state.data), state.month), { manager: state.me.role !== 'member', code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code }), title: 'SLA' };
   if (state.tab === 'work') return { view: renderWork(), title: 'Theo dõi công việc' };
   if (t) return { view: teamView(t, state), title: t.name };
   return { view: overviewView(state.data, state, report), title: 'Tổng quan' };
@@ -191,7 +199,7 @@ async function setMonth(ym, { boot = false } = {}) {
   els.month.value = ym;
   Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'report' && hasReport(ym)) || team();
+  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'report' && hasReport(ym)) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -341,7 +349,7 @@ els.welcome.addEventListener('click', (e) => {
   const act = e.target.closest('[data-welcome]')?.dataset.welcome;
   if (!act) return;
   hideWelcome(els.welcome);
-  if (act === 'chat') setTab('chat'); else if (!tourSeen()) startTour();
+  if (act === 'chat') setTab('chat'); else if (act === 'sla') setTab('sla'); else if (!tourSeen()) startTour();
 });
 $('help').addEventListener('click', startTour);
 

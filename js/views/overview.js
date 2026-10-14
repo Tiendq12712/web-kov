@@ -7,6 +7,7 @@ import { contactDonut, sourceDonut, statusDonut } from './donuts.js';
 import { heatClass, alertClass, heatLegend, alertLegend, mean } from './heat.js';
 import { workdaysByCode } from '../report.js';
 import { findMember } from '../welcome.js';
+import { computeSla } from '../sla.js';
 
 const sum = (list, pick) => list.reduce((a, m) => a + (pick(m) ?? 0), 0);
 const ratio = (a, b) => (b ? a / b : 0);
@@ -307,7 +308,7 @@ function memberTable(data, ui, report) {
 
 /** Trang Tổng quan: toàn cảnh KPI, công việc và năng suất; chi tiết từng team nằm ở các tab riêng. */
 /** Thẻ KPI cá nhân của nhân sự đăng nhập (chỉ khi nhận ra được họ trong báo cáo). */
-function myCard({ team, member: m }, report) {
+function myCard({ team, member: m }, report, sla) {
   const workdays = report ? workdaysByCode(report).get(m.code) : null;
   const hasSheet = Boolean(report?.timesheets?.[m.code]);
   const status = memberStatus(m, team);
@@ -324,15 +325,23 @@ function myCard({ team, member: m }, report) {
         <dt>Add-on</dt><dd class="num">${rateCell(m.addon)}</dd>
         <dt>Act đã làm</dt><dd class="num">${num(m.extra.actDone)}/${num(m.extra.assigned)}</dd>
         ${workdays != null ? html`<dt>Ngày công</dt><dd class="num">${num(workdays)}</dd>` : ''}
+        ${sla ? html`<dt>Data trễ SLA</dt><dd class="num ${sla.late ? 'is-bad' : ''}">${num(sla.late)}</dd><dt>Data sắp trễ SLA</dt><dd class="num ${sla.soon ? 'is-warn' : ''}">${num(sla.soon)}</dd>` : ''}
       </dl>
+      ${sla ? html`<button class="link-btn" type="button" data-tab="sla">Xem chi tiết SLA →</button>` : ''}
       ${hasSheet ? html`<button class="btn btn--ghost card__action" type="button" data-timesheet="${team.id}:${m.code}">Xem chi tiết công</button>` : ''}
     </div>`;
 }
 
 /** Nhân sự (quyền Thành viên) chỉ xem KPI cá nhân và bảng nhân sự; chỉ số tổng hợp và biểu đồ dành cho Quản trị/Admin. */
+/** SLA của chính nhân sự (nếu tab công việc có bảng tồn theo ngày). */
+function mySla(data, { member }) {
+  const asOf = data.teams.map((t) => t.asOf).sort().at(-1);
+  return computeSla(data.work, asOf, data.month)?.rows.find((r) => r.code === member.code) ?? null;
+}
+
 function memberOverview(data, ui, report) {
   const mine = findMember(ui.me.email, data.teams, ui.me.name, ui.me.code);
-  return html`${updatedBanner(data.teams)}${mine ? html`<div class="grid">${myCard(mine, report)}</div>` : ''}${memberTable(data, ui, report)}`;
+  return html`${updatedBanner(data.teams)}${mine ? html`<div class="grid">${myCard(mine, report, mySla(data, mine))}</div>` : ''}${memberTable(data, ui, report)}`;
 }
 
 export function overviewView(data, ui, report) {

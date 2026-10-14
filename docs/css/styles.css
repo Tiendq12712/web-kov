@@ -690,3 +690,32 @@ td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
 .table-wrap .day-table thead th:last-child { position: sticky; right: 0; z-index: 5; }
 /* Hàng chẵn tô nền mờ: cột cố định phải đặc để các cột cuộn qua không lộ chữ */
 .day-table tbody tr:nth-child(even) td.sticky-col, .day-table tbody tr:nth-child(even) td:last-child { background: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); }
+
+/* Báo cáo SLA */
+.sla-stat--bad .big { color: var(--bad); } .sla-stat--warn .big { color: var(--warn); } .sla-stat--good .big { color: var(--good); }
+.sla-age { display: grid; gap: 8px; }
+.sla-age__row { display: grid; grid-template-columns: 110px 1fr 70px; align-items: center; gap: 12px; font-size: 14px; }
+.sla-age__row strong { text-align: right; }
+.sla-table th, .sla-table td { padding: 8px 12px; white-space: nowrap; }
+.sla-table td.strong { font-weight: 700; }
+.sla-table tfoot td { border-top: 2px solid var(--border); background: var(--surface-2); font-weight: 600; }
+.sla-row--late td { background: color-mix(in srgb, var(--bad-soft) 55%, transparent); }
+.sla-row--soon td { background: color-mix(in srgb, var(--warn-soft) 55%, transparent); }
+.kv .is-bad { color: var(--bad); } .kv .is-warn { color: var(--warn); }
+.notice--good { background: var(--good-soft); color: var(--good); }
+
+/* Popup chào mừng: số data trễ / sắp trễ SLA */
+.welcome__sla { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 14px; padding: 12px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface-2); text-align: center; }
+.welcome__sla.has-late { border-color: color-mix(in srgb, var(--bad) 50%, transparent); background: var(--bad-soft); }
+.welcome__sla.has-soon { border-color: color-mix(in srgb, var(--warn) 50%, transparent); background: var(--warn-soft); }
+.welcome__sla.is-clear { border-color: color-mix(in srgb, var(--good) 45%, transparent); background: var(--good-soft); }
+.welcome__sla small { display: block; font-size: .75rem; color: var(--muted); }
+.welcome__sla strong { display: block; margin-top: 2px; font-size: 1.5rem; font-weight: 800; }
+.welcome__sla strong.is-bad { color: var(--bad); } .welcome__sla strong.is-warn { color: var(--warn); }
+.welcome__sla p { grid-column: 1 / -1; margin: 0; font-size: .85rem; }
+
+/* Ma trận SLA nhân sự × ngày */
+.sla-cell--late { background: color-mix(in srgb, var(--bad-soft) 80%, transparent); color: var(--bad); font-weight: 700; }
+.sla-cell--soon { background: color-mix(in srgb, var(--warn-soft) 80%, transparent); color: var(--warn); font-weight: 700; }
+.sla-matrix thead th { text-align: right; } .sla-matrix thead th.sticky-col { text-align: left; }
+.sla-left { font-size: 11px; font-weight: 600; }
