@@ -150,13 +150,13 @@ function renderView() {
     els.tabs.replaceChildren();
     els.bottomNav.replaceChildren();
     mount(els.view, settings.view());
-    document.title = 'Thiết lập · Báo cáo KPI';
+    document.title = 'Thiết lập · Report SC ONLINE';
     return;
   }
   const page = currentPage();
   mount(els.view, page.view);
   renderTabs();
-  document.title = `${page.title} · ${monthLabel(state.month)} · Báo cáo KPI`;
+  document.title = `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE`;
   writeHash();
 }
 
@@ -210,7 +210,7 @@ function openReportMember(code) {
 document.addEventListener('click', (e) => {
   const hit = (sel) => e.target.closest(sel);
   if (hit('[data-close]') || e.target === els.detail) return els.detail.close();
-  if (hit('[data-tab]')) { els.detail.close(); return setTab(hit('[data-tab]').dataset.tab); }
+  if (hit('[data-tab]')) { e.preventDefault(); els.detail.close(); return setTab(hit('[data-tab]').dataset.tab); }
   if (hit('[data-member]')) return openMember(hit('[data-member]').dataset.member);
   if (hit('[data-heat]')) {
     state.heat = hit('[data-heat]').dataset.heat;

@@ -35,6 +35,6 @@ export const stackRow = (name, parts, label) => {
 
 export const legendList = (items) => html`<ul class="legend">${items.map((i) => html`<li><i class="swatch ${i.cls}"></i>${i.label}</li>`)}</ul>`;
 
-/** Tỷ lệ kèm con số: "30%" trên, "91/300" (thực đạt / chỉ tiêu) dưới. */
+/** Con số "91/300" (thực đạt / chỉ tiêu) nổi bật ở trên, tỷ lệ "30%" nhỏ hơn ở dưới. */
 export const rateCell = (block) => html`
-  <span class="rate"><strong class="num">${pct(block.rate)}</strong><small class="muted num">${num(block.done ?? 0)}/${num(block.target)}</small></span>`;
+  <span class="rate"><strong class="num">${num(block.done ?? 0)}/${num(block.target)}</strong><small class="muted num">${pct(block.rate)}</small></span>`;

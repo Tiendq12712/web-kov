@@ -1,6 +1,6 @@
 {
-  "name": "Báo cáo tiến độ KPI",
-  "short_name": "KPI",
+  "name": "Report SC ONLINE",
+  "short_name": "Report SC",
   "description": "Theo dõi tiến độ KPI theo tháng của các team",
   "lang": "vi",
   "start_url": "./",

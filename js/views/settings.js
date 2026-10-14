@@ -224,7 +224,7 @@ const BODY = { accounts: accountsSection, links: linksSection, crm: crmSection, 
 
 export const settingsView = (ui) => html`
   <div class="toolbar">
-    <h2 class="section-title">Thiết lập</h2>
+    <h2 class="section-title"><button class="link-btn" type="button" data-tab="overview" aria-label="Về màn hình chính">← Tổng quan</button> <span class="muted">/</span> Thiết lập</h2>
     <div class="chips" role="group" aria-label="Mục thiết lập">
       ${SECTIONS.map(([id, label]) => html`<button class="chip" type="button" data-act="section" data-key="${id}" aria-pressed="${id === ui.section}">${label}</button>`)}
     </div>

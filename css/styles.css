@@ -322,7 +322,8 @@ tbody tr:hover .sticky-col { background: var(--accent-soft); }
   .topbar__inner { flex-wrap: wrap; gap: 8px 6px; padding-bottom: 8px; }
   .brand-group { flex: 1 1 auto; min-width: 0; }
   .topbar__actions { display: contents; }
-  .topbar__actions > .select { order: 3; flex: 1 1 100%; max-width: none; }
+  .topbar__actions > .select { order: 3; flex: 1 1 0; min-width: 0; max-width: none; }
+  .topbar__actions > #help { order: 3; }
 }
 
 /* Kiểu "Thanh màu" trong bảng: con số + thanh mảnh */
@@ -461,7 +462,7 @@ html, body { max-width: 100%; overflow-x: clip; }
 /* ---------- Logo KiotViet ---------- */
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand__logo { width: 32px; height: 32px; flex: none; object-fit: contain; }
-:root[data-theme="dark"] @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .boot__bars { width: 48px; height: 48px; object-fit: contain; }
+.boot__bars { width: 48px; height: 48px; object-fit: contain; }
 
 /* ---------- Điện thoại: thu gọn thanh khi cuộn, kéo để tải lại ---------- */
 @media (max-width: 640px) {
@@ -487,3 +488,18 @@ html, body { max-width: 100%; overflow-x: clip; }
 .grid > .card .kv { font-size: 13px; gap: 3px 10px; }
 .grid > .card .muted { font-size: 12.5px; }
 @media (max-width: 640px) { .grid > .card .big { font-size: 22px; } }
+
+/* Logo bấm được: về màn hình chính */
+a.brand { color: inherit; text-decoration: none; border-radius: 10px; padding: 2px 6px 2px 2px; transition: background .15s ease; }
+a.brand:hover { background: var(--accent-soft); }
+a.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a.brand, a.brand:hover, a.brand:visited, a.brand:focus, a.brand *, a.brand:hover * { text-decoration: none; }
+:root[data-theme="dark"] a.brand .brand__title { color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) a.brand .brand__title { color: #fff; } }
+@media (max-width: 640px) { a.brand { min-width: 0; } .brand__title { overflow: hidden; text-overflow: ellipsis; font-size: 15px; } }
+
+/* Bảng KPI: chỉ số (con số) to và đậm, tỷ lệ % nhỏ lại */
+.rate strong { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.rate small { font-size: 11px; opacity: .85; }
+.cell-bar > :first-child:not(.rate) { font-size: 15px; font-weight: 700; }
+td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
