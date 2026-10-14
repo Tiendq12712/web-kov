@@ -5,7 +5,12 @@ import { memberStatus, elapsedRatio } from './metrics.js';
 const plain = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z\s]/g, ' ').trim();
 
 /** Email kiểu "phong.nh1@" = tên + chữ cái đầu họ/đệm ("Nguyễn Hoàng Phong"); khớp được đúng một người thì mới chào riêng. */
-export function findMember(email, teams, name = '') {
+/** Nhận ra nhân sự trong báo cáo KPI: ưu tiên đầu số (mã nhân sự), rồi tới tên/biệt danh, cuối cùng đoán theo email. */
+export function findMember(email, teams, name = '', code = '') {
+  if (code) {
+    const hit = teams.flatMap((team) => team.members.map((member) => ({ team, member }))).find(({ member }) => member.code === String(code));
+    if (hit) return hit;
+  }
   const byName = findByName(name, teams);
   if (byName) return byName;
   const [first = '', initials = ''] = email.split('@')[0].split('.').map((p) => p.replace(/[^a-z]/gi, '').toLowerCase());

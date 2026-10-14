@@ -23,12 +23,12 @@ export const canManage = (actorRole, targetRole) =>
 export const canOpenSettings = (role) => role === 'admin' || role === 'manager';
 
 /* ---------- Tab "Tài khoản" ---------- */
-const ACCOUNT_COLUMNS = ['STT', 'Email', 'Phân quyền', 'Mô tả quyền', 'Tên/Biệt danh', 'Giới tính'];
+const ACCOUNT_COLUMNS = ['STT', 'Email', 'Phân quyền', 'Mô tả quyền', 'Tên/Biệt danh', 'Giới tính', 'Đầu số'];
 const accountTarget = { url: CONFIG.configSheet, tab: CONFIG.tabs.accounts, columns: ACCOUNT_COLUMNS };
 export const GENDERS = ['Nam', 'Nữ'];
 const genderFrom = (text) => GENDERS.find((g) => plain(g) === plain(text)) ?? '';
-const toAccount = ([, email, label, note, name, gender]) => ({ email: email.trim(), role: roleFrom(label), note: note.trim(), name: name.trim(), gender: genderFrom(gender) });
-const fromAccount = (a, i) => [String(i + 1), a.email, ROLES[a.role].label, a.note || ROLES[a.role].note, a.name ?? '', a.gender ?? ''];
+const toAccount = ([, email, label, note, name, gender, code]) => ({ email: email.trim(), role: roleFrom(label), note: note.trim(), name: name.trim(), gender: genderFrom(gender), code: String(code ?? '').trim() });
+const fromAccount = (a, i) => [String(i + 1), a.email, ROLES[a.role].label, a.note || ROLES[a.role].note, a.name ?? '', a.gender ?? '', a.code ?? ''];
 
 export const loadAccounts = async () => (await readTable(accountTarget)).map(toAccount).filter((a) => a.email);
 export const findAccount = (list, email) => list.find((a) => a.email.toLowerCase() === email.toLowerCase());
@@ -40,24 +40,31 @@ async function mutateAccounts(change) {
   return next;
 }
 
+/** Đầu số (mã nhân sự trong báo cáo KPI) là duy nhất: hai người không được dùng chung. */
+const assertCodeFree = (list, code, self) => {
+  if (code && list.some((a) => a !== self && a.code === code)) throw new Error(`Đầu số ${code} đã gán cho tài khoản khác`);
+};
+
 const assertCan = (actor, target, message) => {
   if (!canManage(actor, target)) throw new Error(message);
 };
 
-export const addAccount = (actor, email, role, name = '', gender = '') => mutateAccounts((list) => {
+export const addAccount = (actor, email, role, name = '', gender = '', code = '') => mutateAccounts((list) => {
   assertCan(actor, role, 'Bạn không có quyền tạo tài khoản với quyền này');
   if (findAccount(list, email)) throw new Error('Email này đã có trong danh sách');
-  return [...list, { email, role, note: '', name, gender }];
+  assertCodeFree(list, code, null);
+  return [...list, { email, role, note: '', name, gender, code }];
 });
 
-export const updateAccount = (actor, original, email, role, name = '', gender = '') => mutateAccounts((list) => {
+export const updateAccount = (actor, original, email, role, name = '', gender = '', code = '') => mutateAccounts((list) => {
   const target = findAccount(list, original);
   if (!target) throw new Error('Không tìm thấy tài khoản (có thể đã bị người khác xóa)');
   assertCan(actor, target.role, 'Không thể sửa tài khoản này');
   assertCan(actor, role, 'Bạn không có quyền gán quyền này');
   const clash = findAccount(list, email);
   if (clash && clash !== target) throw new Error('Email này đã có trong danh sách');
-  return list.map((a) => (a === target ? { email, role, name, gender, note: a.role === role ? a.note : '' } : a));
+  assertCodeFree(list, code, target);
+  return list.map((a) => (a === target ? { email, role, name, gender, code, note: a.role === role ? a.note : '' } : a));
 });
 
 export const removeAccount = (actor, email) => mutateAccounts((list) => {

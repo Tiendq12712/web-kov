@@ -125,11 +125,13 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
       const { role } = form.elements;
       const name = form.elements.name.value.trim();
       const gender = form.elements.gender.value;
+      const code = form.elements.code.value.trim();
+      if (code && !/^\d{3,10}$/.test(code)) return fail('Đầu số chỉ gồm chữ số (ví dụ 8407)');
       if (!emailOk(email)) return fail(`Chỉ nhận email @${CONFIG.allowedDomain}`);
       const original = form.dataset.key;
       const actor = getMe().role;
       return run(async () => {
-        ui.accounts = original ? await updateAccount(actor, original, email, role.value, name, gender) : await addAccount(actor, email, role.value, name, gender);
+        ui.accounts = original ? await updateAccount(actor, original, email, role.value, name, gender, code) : await addAccount(actor, email, role.value, name, gender, code);
       });
     },
 

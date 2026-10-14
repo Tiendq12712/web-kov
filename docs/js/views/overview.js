@@ -307,7 +307,9 @@ function memberTable(data, ui, report) {
 
 /** Trang Tổng quan: toàn cảnh KPI, công việc và năng suất; chi tiết từng team nằm ở các tab riêng. */
 /** Thẻ KPI cá nhân của nhân sự đăng nhập (chỉ khi nhận ra được họ trong báo cáo). */
-function myCard({ team, member: m }) {
+function myCard({ team, member: m }, report) {
+  const workdays = report ? workdaysByCode(report).get(m.code) : null;
+  const hasSheet = Boolean(report?.timesheets?.[m.code]);
   const status = memberStatus(m, team);
   const elapsed = elapsedRatio(team.asOf);
   return html`
@@ -321,14 +323,16 @@ function myCard({ team, member: m }) {
         <dt>Điểm tổng</dt><dd class="num">${rateCell(m.main)}</dd>
         <dt>Add-on</dt><dd class="num">${rateCell(m.addon)}</dd>
         <dt>Act đã làm</dt><dd class="num">${num(m.extra.actDone)}/${num(m.extra.assigned)}</dd>
+        ${workdays != null ? html`<dt>Ngày công</dt><dd class="num">${num(workdays)}</dd>` : ''}
       </dl>
+      ${hasSheet ? html`<button class="btn btn--ghost card__action" type="button" data-timesheet="${team.id}:${m.code}">Xem chi tiết công</button>` : ''}
     </div>`;
 }
 
 /** Nhân sự (quyền Thành viên) chỉ xem KPI cá nhân và bảng nhân sự; chỉ số tổng hợp và biểu đồ dành cho Quản trị/Admin. */
 function memberOverview(data, ui, report) {
-  const mine = findMember(ui.me.email, data.teams, ui.me.name);
-  return html`${updatedBanner(data.teams)}${mine ? html`<div class="grid">${myCard(mine)}</div>` : ''}${memberTable(data, ui, report)}`;
+  const mine = findMember(ui.me.email, data.teams, ui.me.name, ui.me.code);
+  return html`${updatedBanner(data.teams)}${mine ? html`<div class="grid">${myCard(mine, report)}</div>` : ''}${memberTable(data, ui, report)}`;
 }
 
 export function overviewView(data, ui, report) {

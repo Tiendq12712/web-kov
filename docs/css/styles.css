@@ -673,3 +673,4 @@ td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
 .refresh-bar[hidden] { display: none; }
 .chatlist__new { display: block; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 .chatlist__new .select { width: 100%; height: 34px; }
+.card__action { justify-self: start; margin-top: 4px; }

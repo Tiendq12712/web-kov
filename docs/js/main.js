@@ -99,7 +99,7 @@ function lazyTab(slice, tab, loader, render) {
 }
 
 /** Hội thoại (Cả nhóm + riêng tư): trạng thái nằm trong chatController. */
-const myName = () => state.me.name || findMember(state.me.email, state.data.teams, state.me.name)?.member.name || state.me.email.split('@')[0];
+const myName = () => state.me.name || findMember(state.me.email, state.data.teams, state.me.name, state.me.code)?.member.name || state.me.email.split('@')[0];
 
 /** Vẽ lại hội thoại/huy hiệu khi có tin mới, giữ nguyên chữ đang gõ và vị trí con trỏ. */
 function onChatChange(kind) {
@@ -206,13 +206,17 @@ function setTab(tab) {
 }
 
 /* ---------- Chi tiết nhân sự ---------- */
-function openMember(ref) {
+function openMember(ref, { timesheet = false } = {}) {
   const [teamId, code] = ref.split(':');
   const t = state.data.teams.find((x) => x.id === teamId);
   const member = t.members.find((m) => m.code === code);
   const workdays = state.report.data ? workdaysByCode(state.report.data).get(member.code) : undefined;
   mount(els.detail, detailView(t, member, workdays, state.report.data));
   els.detail.showModal();
+  if (timesheet) {   // mở sẵn bảng công và cuộn tới đó
+    const sheet = els.detail.querySelector('details.timesheet');
+    if (sheet) { sheet.open = true; sheet.scrollIntoView({ block: 'start' }); }
+  }
 }
 
 function openReportMember(code) {
@@ -225,6 +229,7 @@ document.addEventListener('click', (e) => {
   const hit = (sel) => e.target.closest(sel);
   if (hit('[data-close]') || e.target === els.detail) return els.detail.close();
   if (hit('[data-tab]')) { e.preventDefault(); els.detail.close(); return setTab(hit('[data-tab]').dataset.tab); }
+  if (hit('[data-timesheet]')) return openMember(hit('[data-timesheet]').dataset.timesheet, { timesheet: true });
   if (hit('[data-member]')) return openMember(hit('[data-member]').dataset.member);
   if (hit('[data-heat]')) {
     state.heat = hit('[data-heat]').dataset.heat;
@@ -446,7 +451,7 @@ async function authorize() {
     showLogin('Email của bạn chưa được cấp quyền. Hãy liên hệ Admin để được thêm vào danh sách tài khoản.');
     return false;
   }
-  state.me = { email, role: account.role, name: account.name, gender: account.gender };
+  state.me = { email, role: account.role, name: account.name, gender: account.gender, code: account.code };
   return true;
 }
 
@@ -477,7 +482,7 @@ async function start() {
 /** Thẻ chào mừng theo tiến độ của chính người đăng nhập; chỉ hiện một lần cho mỗi lần đăng nhập. */
 function greet() {
   if (!state.data || !state.me || state.tab === 'settings') return;
-  showWelcome(els.welcome, { me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name), data: state.data });
+  showWelcome(els.welcome, { me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data });
 }
 
 async function startApp() {

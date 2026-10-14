@@ -22,6 +22,7 @@ const accountForm = (ui, account) => html`
   <form class="task-form" data-sform="account" data-key="${account?.email ?? ''}">
     <input name="email" type="email" required placeholder="ten@kiotviet.com" value="${account?.email ?? ''}" aria-label="Email" autocomplete="off">
     <input name="name" maxlength="80" placeholder="Tên / biệt danh nhân sự" value="${account?.name ?? ''}" aria-label="Tên hoặc biệt danh" autocomplete="off">
+    <input name="code" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Đầu số (vd 8407)" value="${account?.code ?? ''}" aria-label="Đầu số" autocomplete="off">
     <select name="gender" class="select" aria-label="Giới tính"><option value="">Giới tính</option>${GENDERS.map((g) => html`<option value="${g}" ${g === account?.gender ? 'selected' : ''}>${g}</option>`)}</select>
     <select name="role" class="select" aria-label="Phân quyền">${roleOptions(ui.me.role, account?.role ?? 'member')}</select>
     <button class="btn" type="submit" ${ui.busy ? 'disabled' : ''}>${account ? 'Lưu' : 'Thêm'}</button>
@@ -30,11 +31,11 @@ const accountForm = (ui, account) => html`
 
 const accountRow = (a, i, ui) => {
   if (ui.editing?.kind === 'account' && ui.editing.key === a.email) {
-    return html`<tr><td colspan="7">${accountForm(ui, a)}</td></tr>`;
+    return html`<tr><td colspan="8">${accountForm(ui, a)}</td></tr>`;
   }
   const editable = canManage(ui.me.role, a.role);
   return html`<tr class="static">
-    <td class="num">${i + 1}</td><td>${a.email}</td><td>${a.name || html`<span class="muted">—</span>`}</td><td>${a.gender || html`<span class="muted">—</span>`}</td>
+    <td class="num">${i + 1}</td><td>${a.email}</td><td>${a.name || html`<span class="muted">—</span>`}</td><td>${a.gender || html`<span class="muted">—</span>`}</td><td class="num">${a.code || html`<span class="muted">—</span>`}</td>
     <td>${badge(ROLE_TONE[a.role], ROLES[a.role].label)}</td>
     <td>${a.note || ROLES[a.role].note}</td>
     <td class="right">${editable
@@ -49,7 +50,7 @@ const accountsSection = (ui) => html`
     ${notice(ui)}
     ${accountForm(ui)}
     <div class="table-wrap"><table>
-      <thead><tr><th>STT</th><th>Email</th><th>Tên/Biệt danh</th><th>Giới tính</th><th>Phân quyền</th><th>Mô tả quyền</th><th class="right">Thao tác</th></tr></thead>
+      <thead><tr><th>STT</th><th>Email</th><th>Tên/Biệt danh</th><th>Giới tính</th><th>Đầu số</th><th>Phân quyền</th><th>Mô tả quyền</th><th class="right">Thao tác</th></tr></thead>
       <tbody>${ui.accounts.map((a, i) => accountRow(a, i, ui))}</tbody></table></div>
   </section>`;
 
