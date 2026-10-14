@@ -1,6 +1,7 @@
 import { getToken } from './auth.js';
-import { fetchRows, parseKpi } from './sheet.js';
-import { parseReport } from './report.js';
+import { fetchRows, fetchTabs, parseKpi } from './sheet.js';
+import { parseTab, buildLibrary } from './library.js';
+import { parseReport, alignCodes } from './report.js';
 import { tryParseWork } from './work.js';
 import { loadLinks, resolveMonths } from './directory.js';
 import { loadSyncTime, applySyncTime } from './syncTime.js';
@@ -11,11 +12,14 @@ const store = new Map();   // kết quả đã tải xong (để lưu lại dùn
 let months = [];
 let monthsPromise = null;
 let pbiLink = null;      // link Power BI (dòng "PBI" trong tab Danh sách link)
+let libraryLink = null;  // link "Thư viện" (dòng Thư viện trong tab Danh sách link)
 
 /** Danh sách tháng được dựng từ tab "Danh sách link" của Sheet cấu hình. */
 const isPbi = (l) => l.info.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase() === 'pbi';
+const isLibrary = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'thu vien';
 export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
   pbiLink = links.find(isPbi) ?? null;
+  libraryLink = links.find(isLibrary) ?? null;
   return resolveMonths(links);
 }).then((list) => (months = list)));
 export const reloadMonths = () => { monthsPromise = null; cache.clear(); store.clear(); };
@@ -48,7 +52,9 @@ export const hasReport = (ym) => Boolean(months.find((m) => m.month === ym)?.pro
 export const loadReport = (ym) => memo(`report:${ym}`, () => {
   const { productivity } = entryOf(ym);
   if (!productivity) throw new Error('Tháng này chưa có link báo cáo năng suất');
-  return fetchRows(productivity.id, getToken(), { tab: productivity.tab, range: 'A1:DZ1000' }).then((rows) => parseReport(rows, ym));
+  // Cần danh sách nhân sự của file KPI để ghép lại các mã nhân sự lệch giữa hai file.
+  return Promise.all([fetchRows(productivity.id, getToken(), { tab: productivity.tab, range: 'A1:DZ1000' }), loadMonth(ym)])
+    .then(([rows, kpi]) => alignCodes(parseReport(rows, ym), kpi.teams.flatMap((t) => t.members)));
 });
 
 /** Báo cáo Power BI "SC sử dụng Customer Info": có khi tab Danh sách link có dòng PBI. */
@@ -58,13 +64,27 @@ export const loadPbi = () => memo('pbi', () => {
   return fetchRows(pbiLink.id, getToken(), { tab: pbiLink.tab || 'Data', range: 'A1:Z8000' }).then(parsePbi);
 });
 
+/** Thư viện tài liệu: mỗi tab hiển thị của Sheet là một nhóm (Quy trình/quy định, Chính sách, Giải trình…). */
+export const hasLibrary = () => Boolean(libraryLink);
+export const loadLibrary = () => memo('library', async () => {
+  if (!libraryLink) throw new Error('Chưa có link Thư viện trong tab Danh sách link');
+  const token = getToken();
+  const tabs = libraryLink.tab ? [libraryLink.tab] : await fetchTabs(libraryLink.id, token);
+  const parsed = await Promise.all(tabs.map(async (name) => {
+    const rows = await fetchRows(libraryLink.id, token, { tab: `'${name.replace(/'/g, "''")}'`, range: 'A1:H500', render: 'FORMATTED_VALUE' });
+    return parseTab(name, rows);
+  }));
+  return buildLibrary(parsed);
+});
+
 export const clearCache = () => { cache.clear(); store.clear(); };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
-export const snapshotData = () => ({ months, pbi: pbiLink, entries: [...store].filter(([key]) => key !== 'sync') });
-export function restoreData({ months: saved, pbi, entries }) {
+export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, entries: [...store].filter(([key]) => key !== 'sync') });
+export function restoreData({ months: saved, pbi, library, entries }) {
   months = saved;
   pbiLink = pbi ?? null;
+  libraryLink = library ?? null;
   monthsPromise = Promise.resolve(saved);
   entries.forEach(([key, value]) => { cache.set(key, Promise.resolve(value)); store.set(key, value); });
 }

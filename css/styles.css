@@ -796,3 +796,17 @@ table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-s
 .monthbar { display: flex; align-items: center; gap: 10px; }
 .monthbar label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 .monthbar .select { height: 36px; min-width: 150px; font-weight: 600; }
+
+/* Thư viện tài liệu */
+.lib-stat { text-align: left; } .lib-stat.is-active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.lib-groups { display: grid; gap: 14px; }
+.lib-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lib-item { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.lib-item:hover { border-color: var(--accent); }
+.lib-item__icon { font-size: 22px; text-align: center; }
+.lib-item__text { display: grid; min-width: 0; } .lib-item__text strong { overflow-wrap: anywhere; } .lib-item__text small { color: var(--muted); }
+.lib-item__go { text-decoration: none; padding: 6px 16px; }
+.lib-icon { display: inline-grid; place-items: center; flex: none; border-radius: 10px; color: #fff; background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 70%, #000)); box-shadow: 0 4px 10px -5px var(--c); }
+.lib-title { display: flex; align-items: center; gap: 8px; }
+.lib-item { grid-template-columns: 36px 1fr auto; }
+:root[data-theme="light"] .lib-icon { box-shadow: none; }

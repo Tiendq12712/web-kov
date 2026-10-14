@@ -140,5 +140,31 @@ export function parseReport(rows, month = null) {
   return { month, regions: REGIONS, ...monthly, weeks: parseWeekly(rows), ...parseDaily(rows) };
 }
 
+const plain = (s) => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
+const rekey = (obj, map) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [map.get(k) ?? k, v]));
+
+/**
+ * File năng suất đôi khi ghi mã nhân sự khác file KPI (ví dụ cùng một người là 8452 ở file này nhưng 8618 ở file KPI),
+ * khiến ngày công/năng suất không khớp được. Mã không có trong KPI thì ghép theo họ tên (không dấu) với người KPI chưa được ghép;
+ * chỉ ghép khi duy nhất một người khớp. Trả về báo cáo đã đổi sang mã của file KPI.
+ */
+export function alignCodes(report, kpiMembers) {
+  const kpiCodes = new Set(kpiMembers.map((m) => m.code));
+  const taken = new Set(report.members.filter((m) => kpiCodes.has(m.code)).map((m) => m.code));
+  const map = new Map();
+  for (const m of report.members) {
+    if (kpiCodes.has(m.code)) continue;
+    const hits = kpiMembers.filter((k) => !taken.has(k.code) && plain(k.name) === plain(m.name));
+    if (hits.length === 1) { map.set(m.code, hits[0].code); taken.add(hits[0].code); }
+  }
+  if (!map.size) return report;
+  return {
+    ...report, codeMap: map,
+    members: report.members.map((m) => (map.has(m.code) ? { ...m, code: map.get(m.code), reportCode: m.code } : m)),
+    days: rekey(report.days, map), timesheets: rekey(report.timesheets, map),
+    weeks: report.weeks.map((w) => ({ ...w, members: rekey(w.members, map) })),
+  };
+}
+
 /** Ngày công thực tế của từng nhân sự theo mã (nguồn: file năng suất, cột "Ngày công làm thực tế"). */
 export const workdaysByCode = (report) => new Map(report.members.map((m) => [m.code, m.workdays]));
