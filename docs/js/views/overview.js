@@ -1,7 +1,7 @@
 import { html } from '../dom.js';
 import { pct, num, hm, dayMonth } from '../format.js';
 import { summarize, combineTeams, projectedKpi, memberStatus, elapsedRatio, paceStatus } from '../metrics.js';
-import { bar, badge, statusBadge, stackRow, legendList, rateCell } from './components.js';
+import { bar, badge, statusBadge, stackRow, legendList, rateCell, updatedBanner } from './components.js';
 import { teamCompare, chartCard, lineChart } from './charts.js';
 import { contactDonut, sourceDonut, statusDonut } from './donuts.js';
 import { heatClass, alertClass, heatLegend, alertLegend, mean } from './heat.js';
@@ -118,7 +118,7 @@ function memberRow({ team, member: m }, workdays, mode, podium) {
   const rank = podium.indexOf(m.kpi);   // 0, 1, 2 = top 1, 2, 3; -1 = ngoài top
   const elapsed = elapsedRatio(team.asOf);
   const status = memberStatus(m, team);
-  const paint = mode === 'full' ? heatClass : mode === 'alert' ? alertClass : () => '';
+  const paint = mode === 'full' || mode === 'text' ? heatClass : mode === 'alert' ? alertClass : () => '';
   const bars = mode === 'bars';
   // `rate`: tỷ lệ so với thời gian đã qua; `inner`: nội dung ô.
   const rateCell_ = (inner, rate) => (bars ? withBar(inner, rate, elapsed, { mark: elapsed }) : inner);
@@ -141,7 +141,7 @@ function memberRow({ team, member: m }, workdays, mode, podium) {
     </tr>`;
 }
 
-const HEAT_MODES = [['bars', 'Thanh màu'], ['alert', 'Ít màu'], ['full', 'Nhiều màu']];
+const HEAT_MODES = [['bars', 'Thanh màu'], ['alert', 'Ít màu'], ['full', 'Nhiều màu'], ['text', 'Màu chữ']];
 const barLegend = () => html`
   <ul class="legend heat-legend" aria-label="Chú thích màu">
     <li><i class="swatch" style="background: var(--good-fill)"></i>Đạt tiến độ</li>
@@ -208,7 +208,7 @@ function memberTable(data, ui, report) {
   const workdays = report ? workdaysByCode(report) : new Map();
   const shown = filteredRows(data, ui, workdays).length;
   const osort = ui.osort ?? { key: 'kpi', dir: 'desc' };
-  const legend = { bars: barLegend, alert: () => alertLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)'), full: () => heatLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)') }[mode]();
+  const legend = { bars: barLegend, alert: () => alertLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)'), full: () => heatLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)'), text: () => heatLegend('mức thời gian đã qua của tháng (talk time: chỉ tiêu)') }[mode]();
   return html`
     <section class="card">
       <div class="toolbar">
@@ -232,14 +232,14 @@ function memberTable(data, ui, report) {
             <button class="chip" type="button" data-heat="${id}" aria-pressed="${id === mode}">${label}</button>`)}
         </div>
       </div>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="${mode === 'text' ? 'table--text' : ''}">
         <thead><tr>${MEMBER_COLUMNS.map((c) => html`
           <th scope="col" class="${c.sticky ? 'sticky-col' : ''} ${c.align === 'right' ? 'right' : ''}" aria-sort="${osort.key === c.key ? (osort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">
             <button type="button" data-osort="${c.key}">${c.label}</button>
           </th>`)}</tr></thead>
         <tbody id="member-rows">${memberRowsView(data, ui, report)}</tbody>
       </table></div>
-      ${legend}
+      <div class="${mode === 'text' ? 'legend--text' : ''}">${legend}</div>
     </section>`;
 }
 
@@ -266,7 +266,7 @@ function myCard({ team, member: m }) {
 /** Nhân sự (quyền Thành viên) chỉ xem KPI cá nhân và bảng nhân sự; chỉ số tổng hợp và biểu đồ dành cho Quản trị/Admin. */
 function memberOverview(data, ui, report) {
   const mine = findMember(ui.me.email, data.teams, ui.me.name);
-  return html`${mine ? html`<div class="grid">${myCard(mine)}</div>` : ''}${memberTable(data, ui, report)}`;
+  return html`${updatedBanner(data.teams)}${mine ? html`<div class="grid">${myCard(mine)}</div>` : ''}${memberTable(data, ui, report)}`;
 }
 
 export function overviewView(data, ui, report) {
@@ -276,8 +276,9 @@ export function overviewView(data, ui, report) {
   const stats = [...kpiStats(all, summary), ...workStats(data.work), ...reportStats(report)];
 
   return html`
+    ${updatedBanner(data.teams)}
     <div class="grid">${teamCard(all, { all: true })}${data.teams.map((t) => teamCard(t))}</div>
-    <p class="muted overview-note">Cập nhật ${data.teams.map((t) => `${t.name.replace('Team ', '')}: ${t.updatedTime} · ${dayMonth(t.asOf)}`).join(' — ')}. Bấm một team để xem chi tiết.</p>
+    <p class="muted overview-note">Bấm một team để xem chi tiết.</p>
     <div class="grid">${stats}</div>
     <div class="charts">
       ${chartCard('So sánh tỷ lệ hoàn thành giữa các team', teamCompare(data.teams, data.teams.map(summarize)))}

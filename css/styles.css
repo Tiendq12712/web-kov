@@ -559,3 +559,24 @@ td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
   :root:not([data-theme]) .boot__bar span { background: var(--accent); }
   :root:not([data-theme]) .grid > .card::before { opacity: 1; }
 }
+
+/* Bảng nhân sự ở Tổng quan: tô màu chữ thay vì tô cả ô (dễ đọc hơn) */
+.table--text td.heat-low, .table--text td.heat-mid, .table--text td.heat-good, .table--text td.heat-top { background: none !important; font-weight: 700; }
+.table--text td.heat-low { color: var(--bad); }
+.table--text td.heat-mid { color: var(--warn); }
+.table--text td.heat-good, .table--text td.heat-top { color: var(--good); }
+.table--text td.heat-low .muted, .table--text td.heat-mid .muted, .table--text td.heat-good .muted, .table--text td.heat-top .muted { color: inherit; opacity: .75; }
+.legend--text .swatch.heat-low { background: var(--bad) !important; }
+.legend--text .swatch.heat-mid { background: var(--warn-fill) !important; }
+.legend--text .swatch.heat-good, .legend--text .swatch.heat-top { background: var(--good-fill) !important; }
+
+/* Dải "báo cáo cập nhật lúc" nổi bật */
+.updated { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 14px; border-radius: 12px; border: 1px solid; font-size: 14px; }
+.updated svg { flex: none; }
+.updated__time { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.updated__rel { padding: 1px 9px; border-radius: 99px; font-size: 12px; font-weight: 700; background: color-mix(in srgb, currentColor 16%, transparent); }
+.updated__hint { margin-left: auto; font-size: 12.5px; font-weight: 600; }
+.updated.is-fresh { color: var(--good); background: var(--good-soft); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.updated.is-stale { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.updated__label { color: var(--text); opacity: .8; }
+@media (max-width: 640px) { .updated__hint { margin-left: 0; flex-basis: 100%; } .updated__time { font-size: 16px; } }

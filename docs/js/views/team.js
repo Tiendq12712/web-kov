@@ -2,7 +2,7 @@ import { html } from '../dom.js';
 import { pct, num, hm, dayMonth } from '../format.js';
 import { summarize, memberStatus, elapsedRatio } from '../metrics.js';
 import { memberCompare, actBreakdown, chartCard } from './charts.js';
-import { bar, meter, badge, statusBadge, passBadge, rateCell } from './components.js';
+import { bar, meter, badge, statusBadge, passBadge, rateCell, updatedBanner } from './components.js';
 
 const person = (m) => html`<span class="person"><strong>${m.name}</strong><small>${m.code} · Level ${m.level ?? '—'}</small></span>`;
 const ctxOf = (team) => ({ mark: elapsedRatio(team.asOf) });
@@ -53,6 +53,7 @@ export function teamView(team, { query, sort }) {
   const s = summarize(team);
   const behind = team.members.filter((m) => memberStatus(m, team).key === 'bad').length;
   return html`
+    ${updatedBanner([team])}
     <div class="grid">
       ${stat('KPI tổng team', pct(s.kpi, 1), html`${statusBadge(s.status)} · thời gian đã qua ${pct(s.elapsed)}`)}
       ${stat('Điểm tổng', num(s.main.done), `/ ${num(s.main.target)} (${pct(s.main.rate)}) · còn thiếu ${num(s.main.missing)}`)}

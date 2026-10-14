@@ -35,6 +35,27 @@ export const stackRow = (name, parts, label) => {
 
 export const legendList = (items) => html`<ul class="legend">${items.map((i) => html`<li><i class="swatch ${i.cls}"></i>${i.label}</li>`)}</ul>`;
 
+/** Dải nổi bật "Cập nhật lần cuối": xanh nếu cập nhật hôm nay, vàng nếu cũ hơn để nhân sự biết số liệu đã cũ. */
+export function updatedBanner(teams) {
+  const stamp = (t) => `${t.updatedTime} · ${t.asOf.split('-').slice(1).reverse().map(Number).join('/')}`;
+  const d = new Date(), pad = (n) => String(n).padStart(2, '0');
+  const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const y = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
+  const yesterday = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
+  const newest = teams.map((t) => t.asOf).sort().at(-1);
+  const same = new Set(teams.map(stamp)).size === 1;
+  const when = newest === today ? 'hôm nay' : newest === yesterday ? 'hôm qua' : '';
+  const stale = newest < today;
+  return html`
+    <div class="updated ${stale ? 'is-stale' : 'is-fresh'}" role="status">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="updated__label">Báo cáo cập nhật lúc</span>
+      <strong class="updated__time">${same ? stamp(teams[0]) : teams.map((t) => `${t.name.replace('Team ', '')}: ${stamp(t)}`).join(' — ')}</strong>
+      ${when ? html`<span class="updated__rel">${when}</span>` : ''}
+      ${stale ? html`<span class="updated__hint">Chưa có số liệu mới hôm nay</span>` : ''}
+    </div>`;
+}
+
 /** Con số "91/300" (thực đạt / chỉ tiêu) nổi bật ở trên, tỷ lệ "30%" nhỏ hơn ở dưới. */
 export const rateCell = (block) => html`
   <span class="rate"><strong class="num">${num(block.done ?? 0)}/${num(block.target)}</strong><small class="muted num">${pct(block.rate)}</small></span>`;
