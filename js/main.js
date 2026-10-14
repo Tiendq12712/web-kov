@@ -27,6 +27,7 @@ import { summarizeMonth } from './compare.js';
 import { compareView } from './views/compare.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
 import { startTour, tourSeen } from './tour.js';
+import { openGuide } from './guide.js';
 import './mobileShell.js';
 import { applyTableSorts } from './tableSort.js';
 
@@ -520,9 +521,9 @@ els.welcome.addEventListener('click', (e) => {
   const act = e.target.closest('[data-welcome]')?.dataset.welcome;
   if (!act) return;
   hideWelcome(els.welcome);
-  if (act === 'chat') setTab('chat'); else if (act === 'sla') setTab('sla'); else if (!tourSeen()) startTour();
+  if (act === 'chat') setTab('chat'); else if (act === 'sla') setTab('sla'); 
 });
-$('help').addEventListener('click', startTour);
+$('help').addEventListener('click', () => openGuide(state.me?.role, { onTour: () => startTour({ email: state.me?.email }) }));
 
 
 $('theme').addEventListener('click', () => {
@@ -709,7 +710,10 @@ async function start() {
 /** Thẻ chào mừng theo tiến độ của chính người đăng nhập; chỉ hiện một lần cho mỗi lần đăng nhập. */
 function greet() {
   if (!state.data || !state.me || state.tab === 'settings') return;
-  showWelcome(els.welcome, { me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data });
+  const welcome = () => showWelcome(els.welcome, { me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data });
+  // Tài khoản vào lần đầu: xem tour nhanh trước, xong mới tới thẻ chào.
+  if (tourSeen(state.me.email)) return welcome();
+  requestAnimationFrame(() => startTour({ email: state.me.email, onClose: welcome }));
 }
 
 async function startApp() {

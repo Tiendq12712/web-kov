@@ -1,5 +1,6 @@
 /** Hướng dẫn lần đầu: làm nổi từng phần tử và giải thích ngắn. Bước nào không thấy trên màn hình thì bỏ qua. */
-const KEY = 'kpi.tour1';
+const KEY = 'kpi.tour1';   // đã xem hướng dẫn: ghi theo từng tài khoản (email)
+const keyOf = (email) => `${KEY}.${String(email ?? '').toLowerCase()}`;
 const visible = (el) => el && el.getClientRects().length > 0;
 const first = (...sels) => sels.map((s) => document.querySelector(s)).find(visible);
 const heat = () => { const b = document.querySelector('[data-heat]'); return visible(b) ? b.parentElement : null; };
@@ -13,11 +14,12 @@ const STEPS = [
   { el: () => first('#user'), title: 'Tài khoản và tuỳ chọn', text: 'Bấm vào đây để mở Thiết lập (Admin/Quản trị), xem lại hướng dẫn này, đổi giao diện sáng/tối hoặc đăng xuất.' },
 ];
 
-export const tourSeen = () => { try { return localStorage.getItem(KEY) === '1'; } catch { return true; } };
-const markSeen = () => { try { localStorage.setItem(KEY, '1'); } catch {} };
+export const tourSeen = (email) => { try { return localStorage.getItem(keyOf(email)) === '1'; } catch { return true; } };
+const markSeen = (email) => { try { localStorage.setItem(keyOf(email), '1'); } catch {} };
 
 let root = null;
-export function startTour() {
+/** `email`: tài khoản đang xem (để chỉ tự hiện lần đầu); `onClose`: chạy khi kết thúc hoặc bỏ qua. */
+export function startTour({ email, onClose } = {}) {
   if (root) return;
   const steps = STEPS.map((s) => ({ ...s, target: s.el() })).filter((s) => s.target || s.title === 'Cách đọc trạng thái');
   if (!steps.length) return;
@@ -29,7 +31,7 @@ export function startTour() {
   const spot = root.querySelector('.tour__spot'), tip = root.querySelector('.tour__tip');
 
   const lock = (e) => e.preventDefault();
-  const close = () => { markSeen(); root.remove(); root = null; document.documentElement.style.overflow = ''; window.removeEventListener('resize', place); window.removeEventListener('scroll', place); document.removeEventListener('keydown', onKey); };
+  const close = () => { markSeen(email); root.remove(); root = null; document.documentElement.style.overflow = ''; window.removeEventListener('resize', place); window.removeEventListener('scroll', place); document.removeEventListener('keydown', onKey); onClose?.(); };
   function place() {
     const step = steps[i], el = step.target;
     root.querySelector('.tour__count').textContent = `Bước ${i + 1}/${steps.length}`;

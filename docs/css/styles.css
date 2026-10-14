@@ -972,3 +972,37 @@ table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-s
   .topbar__inner .tabs { order: 3; flex: 1 1 100%; justify-content: flex-start; overflow-x: auto; }
   .topbar__inner .tabs .tab:not([aria-current="page"]) .tab__label { display: inline; }
 }
+
+/* Hướng dẫn sử dụng */
+.guide { position: fixed; inset: 0; z-index: 96; display: grid; place-items: center; padding: 20px; background: rgb(8 12 24 / .6); backdrop-filter: blur(4px); }
+.guide__panel { width: min(1000px, 100%); height: min(760px, 100%); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 30px 80px -30px rgb(0 0 0 / .6); overflow: hidden; }
+.guide__head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.guide__head h2 { margin: 0; font-size: 1.15rem; white-space: nowrap; }
+.guide__search { flex: 1; min-width: 0; }
+.guide__close { border: 0; background: transparent; color: var(--muted); font-size: 18px; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; }
+.guide__close:hover { background: var(--accent-soft); color: var(--text); }
+.guide__main { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px 1fr; }
+.guide__toc { overflow-y: auto; padding: 12px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.guide__toc a { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; color: var(--muted); font-size: 14px; font-weight: 600; text-decoration: none; }
+.guide__toc a:hover { background: var(--accent-soft); color: var(--text); }
+.guide__toc a[hidden] { display: none; }
+.guide__body { overflow-y: auto; padding: 8px 26px 40px; scroll-behavior: smooth; }
+.guide__body section { padding: 18px 0; border-bottom: 1px solid var(--border); }
+.guide__body section[hidden] { display: none; }
+.guide__body h3 { margin: 0 0 10px; font-size: 1.1rem; display: flex; gap: 10px; align-items: center; }
+.guide__body h4 { margin: 14px 0 6px; font-size: .95rem; color: var(--accent); }
+.guide__body p, .guide__body li { font-size: 14.5px; line-height: 1.65; }
+.guide__body p { margin: 6px 0; }
+.guide__body ul { margin: 6px 0; padding-left: 20px; display: grid; gap: 5px; }
+.guide__table { overflow-x: auto; margin: 8px 0; }
+.guide__table table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.guide__table th, .guide__table td { border: 1px solid var(--border); padding: 8px 12px; text-align: center; }
+.guide__table th { background: var(--surface-2); }
+.guide__empty { text-align: center; color: var(--muted); padding: 40px 0; }
+@media (max-width: 760px) {
+  .guide { padding: 0; } .guide__panel { height: 100%; border-radius: 0; }
+  .guide__head { flex-wrap: wrap; } .guide__head h2 { flex: 1; } .guide__search { order: 3; flex-basis: 100%; }
+  .guide__main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .guide__toc { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 8px; } .guide__toc a { white-space: nowrap; }
+  .guide__body { padding: 4px 16px 40px; }
+}
