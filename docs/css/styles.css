@@ -674,3 +674,19 @@ td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
 .chatlist__new { display: block; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 .chatlist__new .select { width: 100%; height: 34px; }
 .card__action { justify-self: start; margin-top: 4px; }
+
+/* Bảng chia data */
+.divide-table th, .divide-table td { padding: 7px 10px; white-space: nowrap; }
+.divide-table td.strong { font-weight: 700; }
+.divide-table tfoot td { border-top: 2px solid var(--border); background: var(--surface-2); font-weight: 600; }
+.day-table tr.group-row td { background: var(--surface-2); font-style: italic; }
+.day-table tr.group-row .person small { font-style: normal; }
+
+/* Bảng phân bổ theo ngày: đủ cả tháng, cố định cột Nhân sự (trái) và cột Tổng (phải) */
+.day-table th:last-child, .day-table td:last-child { position: sticky; right: 0; z-index: 2; background: var(--surface); box-shadow: -1px 0 0 var(--border); font-weight: 700; }
+.day-table thead th:last-child { background: var(--surface-2); z-index: 5; }
+.day-table tfoot td:last-child, .day-table tr.group-row td:last-child { background: var(--surface-2); }
+.day-table td.sticky-col, .day-table th.sticky-col { box-shadow: 1px 0 0 var(--border); }
+.table-wrap .day-table thead th:last-child { position: sticky; right: 0; z-index: 5; }
+/* Hàng chẵn tô nền mờ: cột cố định phải đặc để các cột cuộn qua không lộ chữ */
+.day-table tbody tr:nth-child(even) td.sticky-col, .day-table tbody tr:nth-child(even) td:last-child { background: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); }

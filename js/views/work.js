@@ -62,7 +62,7 @@ function cards(rows, work) {
 /* ---------- Biểu đồ ---------- */
 const progressChart = (rows) => html`
   <div class="chart"><div class="stack-list">${[...rows].sort((a, b) => b.pctDone - a.pctDone).map((r) =>
-    stackRow(r.name, [
+    stackRow(`${r.name} (${r.code})`, [
       { value: r.done, cls: 's2', label: 'Đã làm' }, { value: r.doing, cls: 's1', label: 'Đang làm' }, { value: r.todo, cls: 's4', label: 'Chưa làm' },
     ], pct(r.pctDone)))}</div>
     ${legend([{ cls: 's2', label: 'Đã làm' }, { cls: 's1', label: 'Đang làm' }, { cls: 's4', label: 'Chưa làm' }])}</div>`;
@@ -123,7 +123,7 @@ function sourcesChart(work, rows) {
   return html`
     <div class="chart"><div class="stack-list">${rows.map((r) => {
       const v = byCode.get(r.code) ?? [];
-      return stackRow(r.name, labels.map((l, i) => ({ value: v[i] ?? 0, cls: classes[i], label: SOURCE_SHORT(l) })), num(sum(v.slice(0, labels.length))));
+      return stackRow(`${r.name} (${r.code})`, labels.map((l, i) => ({ value: v[i] ?? 0, cls: classes[i], label: SOURCE_SHORT(l) })), num(sum(v.slice(0, labels.length))));
     })}</div>
     ${legend(labels.map((l, i) => ({ cls: classes[i], label: SOURCE_SHORT(l) })))}</div>`;
 }
@@ -165,19 +165,50 @@ function matrixTable(work, ui, selected) {
   const block = work[ui.matrix];
   if (!block) return html`<p class="muted">Chưa có dữ liệu.</p>`;
   const members = block.members.filter((m) => selected(m.code)).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-  const days = Array.from({ length: work.lastDay }, (_, i) => i);
+  // Hiện đủ các ngày trong tháng (theo số cột ngày của bảng), không cắt ở ngày cuối cùng đã có data.
+  const days = Array.from({ length: block.labels.filter((l) => typeof l === 'number').length || work.lastDay }, (_, i) => i);
+  // Các nhóm (Chăm sóc khách hàng SC Miền Nam / Miền Bắc / T15) không thuộc riêng ai nên chỉ hiện khi xem tất cả team.
+  const groups = ui.team === 'all' ? block.groups : [];
+  const all = [...members, ...groups];
   const reference = mean(members.flatMap((m) => days.map((d) => m.values[d])).filter((v) => v > 0));
   const heat = (v) => (info.invert && v > 0 ? heatClass(v, reference, { invert: true }) : '');
   const cell = (v, klass = '') => html`<td class="right num ${v ? klass : 'muted'}">${v ? num(v) : '·'}</td>`;
   return html`
     <div class="table-wrap"><table class="day-table">
       <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>${days.map((d) => html`<th scope="col" class="right">${d + 1}</th>`)}<th scope="col" class="right">Tổng</th></tr></thead>
-      <tbody>${members.map((m) => html`<tr class="static"><td class="sticky-col"><strong>${m.name}</strong></td>
-        ${days.map((d) => cell(m.values[d], heat(m.values[d])))}${cell(sum(days.map((d) => m.values[d])))}</tr>`)}</tbody>
-      <tfoot><tr><td class="sticky-col">Tổng</td>${days.map((d) => cell(sum(members.map((m) => m.values[d]))))}
-        ${cell(sum(members.flatMap((m) => days.map((d) => m.values[d]))))}</tr></tfoot>
+      <tbody>${members.map((m) => html`<tr class="static"><td class="sticky-col"><span class="person"><strong>${m.name}</strong><small>${m.code}</small></span></td>
+        ${days.map((d) => cell(m.values[d], heat(m.values[d])))}${cell(sum(days.map((d) => m.values[d])))}</tr>`)}
+        ${groups.map((g) => html`<tr class="static group-row"><td class="sticky-col"><span class="person"><strong>${g.name}</strong><small>Nhóm</small></span></td>
+          ${days.map((d) => cell(g.values[d]))}${cell(sum(days.map((d) => g.values[d])))}</tr>`)}</tbody>
+      <tfoot><tr><td class="sticky-col">Tổng</td>${days.map((d) => cell(sum(all.map((m) => m.values[d]))))}
+        ${cell(sum(all.flatMap((m) => days.map((d) => m.values[d]))))}</tr></tfoot>
     </table></div>
     ${info.invert ? heatLegend('trung bình các ô có data tồn', { invert: true }) : html`<p class="muted">Số data được chia cho mỗi người theo ngày.</p>`}`;
+}
+
+/** Bảng chia data: mỗi người được chia bao nhiêu data, từ nguồn nào (T15 · NA · OI) và đã xử lý tới đâu. */
+function divideTable(work, rows) {
+  const block = work.sources;
+  const labels = block ? block.labels.filter((l) => l !== 'Grand Total') : [];
+  const byCode = new Map((block?.members ?? []).map((m) => [m.code, m.values]));
+  const people = [...rows].sort((a, b) => b.total - a.total);
+  const fromSource = (r, i) => byCode.get(r.code)?.[i] ?? 0;
+  const col = (title) => html`<th scope="col" class="right">${title}</th>`;
+  const totals = (get) => sum(people.map(get));
+  return html`
+    <div class="toolbar"><h2 class="section-title">Bảng chia data</h2><p class="muted">Số data mỗi nhân sự được chia từ đầu tháng</p></div>
+    <div class="table-wrap"><table class="divide-table">
+      <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>${labels.map((l) => col(SOURCE_SHORT(l)))}${col('Tổng đã chia')}${col('Đã làm')}${col('Đang làm')}${col('Chưa làm')}${col('% hoàn thành')}</tr></thead>
+      <tbody>${people.map((r) => html`<tr class="static">
+        <td class="sticky-col"><span class="person"><strong>${r.name}</strong><small>${r.code}</small></span></td>
+        ${labels.map((_, i) => html`<td class="right num">${num(fromSource(r, i))}</td>`)}
+        <td class="right num strong">${num(r.total)}</td><td class="right num">${num(r.done)}</td><td class="right num">${num(r.doing)}</td><td class="right num">${num(r.todo)}</td>
+        <td class="right num">${pct(r.pctDone, 1)}</td></tr>`)}</tbody>
+      <tfoot><tr><td class="sticky-col"><strong>Tổng</strong></td>${labels.map((_, i) => html`<td class="right num">${num(totals((r) => fromSource(r, i)))}</td>`)}
+        <td class="right num strong">${num(totals((r) => r.total))}</td><td class="right num">${num(totals((r) => r.done))}</td><td class="right num">${num(totals((r) => r.doing))}</td><td class="right num">${num(totals((r) => r.todo))}</td>
+        <td class="right num">${pct(ratio(totals((r) => r.done), totals((r) => r.total)), 1)}</td></tr></tfoot>
+    </table></div>
+    ${block ? '' : html`<p class="muted">Chưa tìm thấy bảng chia data theo nguồn trong tab; hiển thị tổng theo tình trạng xử lý.</p>`}`;
 }
 
 const selector = (ui, people) => (code) => ui.team === 'all' || people.get(code)?.team === ui.team;
@@ -196,6 +227,7 @@ export function workView(work, ui, people, teams) {
       </div>
     </div>
     ${cards(rows, work)}
+    ${divideTable(work, rows)}
     <div class="charts">
       ${work.contact ? chartCard('Tình trạng kết nối', contactDonut(work.contact), 'Kết quả cuộc gọi của data đã làm, gộp các nhóm CSKH.') : ''}
       ${work.dataBySource ? chartCard('Nguồn data (T15 · NA · OI)', sourceDonut(work), 'Số data được chia theo nhóm CSKH từ đầu tháng.') : ''}

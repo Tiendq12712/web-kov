@@ -106,7 +106,7 @@ const talkRanking = (members, c) => {
     <ol class="rank">${rows.map((m, i) => html`
       <li class="rank__item rank__item--static">
         <span class="muted num">${i + 1}</span>
-        <span class="rank__name" title="${c.nameOf(m)}">${c.nameOf(m)}</span>
+        <span class="rank__name" title="${c.nameOf(m)} (${m.code})">${c.nameOf(m)} <small class="muted">${m.code}</small></span>
         ${bar(m.talk / max, { mark: (m.kpiTalk ?? 0) / max, tone: m.talkOk ? 'good' : 'bad' })}
         <strong class="num">${hm(m.talk)}</strong>
       </li>`)}</ol>`;
@@ -155,7 +155,7 @@ const hourHeatmap = (report, members, c) => {
     <div class="table-wrap"><table class="heat-table">
       <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>${report.hours.map((h) => html`<th scope="col">${h.replace('h', '')}</th>`)}</tr></thead>
       <tbody>${[...members].sort(byName(c)).map((m) => html`<tr class="static">
-        <td class="sticky-col">${c.nameOf(m)}</td>
+        <td class="sticky-col"><span class="person"><strong>${c.nameOf(m)}</strong><small>${m.code}</small></span></td>
         ${m.hourly.map((v) => html`<td class="num ${v ? heatClass(v, reference) : 'muted'}">${v ? num(v) : '·'}</td>`)}</tr>`)}</tbody>
     </table></div>
     ${heatLegend('trung bình các khung giờ có call')}`;
@@ -193,7 +193,7 @@ function dailyTable(report, ui, c) {
         ${days.map((d) => html`<th scope="col" class="right">${d}</th>`)}
         <th scope="col" class="right">Tổng</th><th scope="col" class="right">TB/ngày</th></tr></thead>
       <tbody>${members.map((m, r) => html`
-        <tr class="static"><td class="sticky-col"><strong>${c.nameOf(m)}</strong></td>
+        <tr class="static"><td class="sticky-col"><span class="person"><strong>${c.nameOf(m)}</strong><small>${m.code}</small></span></td>
           ${grid[r].map((v) => cell(v, heat(v, m)))}
           ${cell(present(grid[r]).length ? sum(grid[r]) : null)}${cell(avg(grid[r]), heat(avg(grid[r]), m))}</tr>`)}</tbody>
       <tfoot>

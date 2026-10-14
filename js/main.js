@@ -544,7 +544,8 @@ function authLost(message) {
 async function refreshSession() {
   refreshBar.textContent = 'Đang làm mới dữ liệu…';
   try {
-    await signIn({ resume: true });
+    // Thử cấp lại âm thầm trước (cửa sổ Google tự đóng ngay, không hiện giao diện); không được mới hiện cửa sổ thường.
+    try { await signIn({ resume: true, silent: true }); } catch { await signIn({ resume: true }); }
     clearCache();
     if (!(await authorize())) return;
     Object.assign(state.report, { data: null, error: '' });
