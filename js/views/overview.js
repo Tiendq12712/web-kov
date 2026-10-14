@@ -8,6 +8,7 @@ import { heatClass, alertClass, heatLegend, alertLegend, mean } from './heat.js'
 import { workdaysByCode } from '../report.js';
 import { findMember } from '../welcome.js';
 import { computeSla } from '../sla.js';
+import { todoCard } from './todo.js';
 
 const sum = (list, pick) => list.reduce((a, m) => a + (pick(m) ?? 0), 0);
 const ratio = (a, b) => (b ? a / b : 0);
@@ -341,7 +342,7 @@ function mySla(data, { member }) {
 
 function memberOverview(data, ui, report) {
   const mine = findMember(ui.me.email, data.teams, ui.me.name, ui.me.code);
-  return html`${updatedBanner(data.teams)}${mine ? html`<div class="grid">${myCard(mine, report, mySla(data, mine))}</div>` : ''}${memberTable(data, ui, report)}`;
+  return html`${updatedBanner(data.teams)}${ui.todo ? todoCard(ui.todo) : ''}${mine ? html`<div class="grid">${myCard(mine, report, mySla(data, mine))}</div>` : ''}${memberTable(data, ui, report)}`;
 }
 
 export function overviewView(data, ui, report) {
@@ -352,6 +353,7 @@ export function overviewView(data, ui, report) {
 
   return html`
     ${updatedBanner(data.teams)}
+    ${ui.todo ? todoCard(ui.todo) : ''}
     <div class="grid">${teamCard(all, { all: true })}${data.teams.map((t) => teamCard(t))}</div>
     <p class="muted overview-note">Bấm một team để xem chi tiết.</p>
     <div class="grid">${stats}</div>

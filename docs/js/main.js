@@ -1,4 +1,4 @@
-import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData } from './data.js';
+import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData, hasPbi, loadPbi } from './data.js';
 import { CONFIG } from './config.js';
 import { getSession, getRemembered, signIn, signOut, loadGis } from './auth.js';
 import { saveSnapshot, loadSnapshot, clearSnapshot } from './snapshot.js';
@@ -15,6 +15,10 @@ import { createSettings } from './settingsController.js';
 import { createChat } from './chatController.js';
 import { computeSla } from './sla.js';
 import { slaView } from './views/sla.js';
+import { cinfoView, DEFAULT_FILTERS } from './views/cinfo.js';
+import { trendView } from './views/trend.js';
+import { loadHistory, recordHistory, buildSnapshot } from './history.js';
+import { buildTodo } from './todo.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
 import { startTour, tourSeen } from './tour.js';
 import './mobileShell.js';
@@ -40,12 +44,18 @@ const state = {
   sort: { key: 'kpi', dir: 'desc' },
   report: { data: null, loading: false, error: '', region: 'all', weekMetric: 'calls', dayMetric: 'calls', query: '', sort: { key: 'talk', dir: 'desc' } },
   work: { team: 'all', matrix: 'backlogAll', query: '', sort: { key: 'pctDone', dir: 'desc' } },
+  cinfo: { data: null, loading: false, error: '', f: { ...DEFAULT_FILTERS } },   // báo cáo Customer Info (PBI) + bộ lọc
+  trend: { data: null, loading: false, error: '', metric: 'kpi', who: 'all' },   // xu hướng theo ngày (lịch sử đồng bộ)
+  todo: null,                // "Việc cần làm hôm nay" của trang Tổng quan
   accounts: [],              // danh sách tài khoản (để Admin/Quản trị chọn nhân sự trong tab Chia sẻ)
   me: null,                  // { email, role } — role: admin | manager | member
 };
 
 /** Ngày số liệu mới nhất trong các team (mốc tính tuổi data cho SLA). */
 const latestAsOf = (data) => data.teams.map((t) => t.asOf).sort().at(-1);
+
+/** Đầu số của người đang đăng nhập (ưu tiên cột Đầu số trong tab Tài khoản). */
+const myCode = () => state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code;
 
 const team = () => state.data?.teams.find((t) => t.id === state.tab);
 
@@ -62,6 +72,8 @@ const ICONS = {
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M18 14.5c2.2.6 3.5 2.4 3.5 5.5"/>',
   report: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
   chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
+  cinfo: '<circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/>',
+  trend: '<path d="M4 18l5-6 4 3 7-9"/><path d="M15 6h5v5"/>',
   sla: '<circle cx="12" cy="13" r="8"/><path d="M12 8v5l3 2M9 3h6"/>',
   work: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 15l2.5 2.5L16 13"/>',
 };
@@ -72,6 +84,8 @@ function renderTabs() {
   const tabs = [{ id: 'overview', name: 'Tổng quan' }, ...state.data.teams];
   if (state.data.work) tabs.push({ id: 'work', name: 'Theo dõi công việc', short: 'Công việc' });
   if (state.data.work?.backlogAll) tabs.push({ id: 'sla', name: 'SLA' });
+  if (hasPbi()) tabs.push({ id: 'cinfo', name: 'Customer Info', short: 'C-Info' });
+  if (state.me?.role !== 'member') tabs.push({ id: 'trend', name: 'Xu hướng' });   // chỉ Admin/Quản trị
   if (hasReport(state.month)) tabs.push({ id: 'report', name: 'Năng suất' });
   tabs.push({ id: 'chat', name: 'Chia sẻ' });
   const current = (t) => (t.id === state.tab ? html`aria-current="page"` : '');
@@ -174,10 +188,15 @@ const canSettings = () => canOpenSettings(state.me?.role);
 /** Trang đang mở -> { view, title }. */
 function currentPage() {
   const t = team();
+  if (state.tab === 'overview') {
+    state.todo = buildTodo({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, report: state.report.data, pbi: state.cinfo.data, unread: chat.unread() });
+  }
   const report = preloadReport();   // ngày công và năng suất lấy từ file năng suất, nên luôn tải nền
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
   if (state.tab === 'chat') return { view: renderChat(), title: 'Chia sẻ' };
+  if (state.tab === 'trend' && state.me.role !== 'member') return { view: lazyTab(state.trend, 'trend', loadHistory, (h) => trendView(h, state.trend, { manager: state.me.role !== 'member', code: myCode() })), title: 'Xu hướng' };
+  if (state.tab === 'cinfo') return { view: lazyTab(state.cinfo, 'cinfo', loadPbi, (d) => cinfoView(d, state.cinfo.f, { manager: state.me.role !== 'member', code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code })), title: 'Customer Info' };
   if (state.tab === 'sla') return { view: slaView(computeSla(state.data.work, latestAsOf(state.data), state.month), { manager: state.me.role !== 'member', code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code }), title: 'SLA' };
   if (state.tab === 'work') return { view: renderWork(), title: 'Theo dõi công việc' };
   if (t) return { view: teamView(t, state), title: t.name };
@@ -220,13 +239,14 @@ async function setMonth(ym, { boot = false } = {}) {
   els.month.value = ym;
   Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'report' && hasReport(ym)) || team();
+  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'report' && hasReport(ym)) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
 
 function setTab(tab) {
   state.tab = tab;
+  if (tab === 'trend') state.trend.error = '';
   if (tab === 'chat') chat.refresh({ silent: true });
   state.query = '';
   renderView();
@@ -270,6 +290,9 @@ document.addEventListener('click', (e) => {
     state.osort = { key, dir: state.osort.key === key && state.osort.dir === 'desc' ? 'asc' : 'desc' };
     return renderView();
   }
+  if (hit('[data-trend-metric]')) { state.trend.metric = hit('[data-trend-metric]').dataset.trendMetric; return renderView(); }
+  if (hit('[data-record-history]')) return recordHistoryNow();
+  if (hit('[data-cinfo-clear]')) { state.cinfo.f = { ...DEFAULT_FILTERS }; return renderView(); }
   if (hit('[data-clear-filters]')) { Object.assign(state, { filter: 'all', mstatus: 'all', mquery: '' }); return renderView(); }
   if (hit('[data-tview]')) {
     state.tview = hit('[data-tview]').dataset.tview;
@@ -314,6 +337,9 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', (e) => {
+  if (e.target.id === 'trend-who') { state.trend.who = e.target.value; return renderView(); }
+  const cinfoField = e.target.dataset?.cinfo;
+  if (cinfoField) { state.cinfo.f[cinfoField] = e.target.value || (e.target.type === 'date' ? '' : 'all'); return renderView(); }
   const id = e.target.id;
   if (id === 'member-team') { state.filter = e.target.value; return renderView(); }
   if (id === 'member-status') { state.mstatus = e.target.value; return renderView(); }
@@ -402,12 +428,31 @@ async function refreshMonths() {
   els.month.value = state.month;
 }
 
+/** Lưu ảnh chụp số liệu của ngày số liệu hiện tại vào tab Lịch sử (sau mỗi lần đồng bộ CRM hoặc khi quản lý bấm nút). */
+async function saveHistory() {
+  const pbi = hasPbi() ? await loadPbi().catch(() => null) : null;
+  const n = await recordHistory(buildSnapshot({ data: state.data, month: state.month, date: latestAsOf(state.data), pbi }));
+  Object.assign(state.trend, { data: null, error: '' });
+  return n;
+}
+async function recordHistoryNow() {
+  try { await saveHistory(); } catch (err) { state.trend.error = `Không lưu được lịch sử: ${err.message}`; }
+  renderView();
+}
+
+/** Tải sẵn dữ liệu Customer Info (nếu có) để "Việc cần làm" biết số act chưa dùng; vẽ lại Tổng quan khi có. */
+function preloadPbi() {
+  if (!hasPbi() || state.cinfo.data) return;
+  loadPbi().then((d) => { state.cinfo.data = d; if (state.tab === 'overview') renderView(); }).catch(() => {});
+}
+
 const settings = createSettings({
   getMe: () => state.me,
   getMonths: () => monthList,
   rerender: ({ keep = false } = {}) => { if (state.tab === 'settings' || !state.data) (keep ? withKeptInputs(renderView) : renderView()); },
   onAuthExpired: (message) => authLost(message),
   onLinksChanged: refreshMonths,
+  onHistory: saveHistory,
   onSynced: async () => { clearCache(); state.data = await loadMonth(state.month); },
 });
 
@@ -505,7 +550,7 @@ async function start() {
   setBoot('Đang xác thực tài khoản…', 1);
   try { await startApp(); } finally { setBoot(); }
   greet();
-  if (state.me && state.data) { chat.watch(); persistSnapshot(); }   // thăm dò tin mới + lưu bản dữ liệu hôm nay
+  if (state.me && state.data) { chat.watch(); persistSnapshot(); preloadPbi(); }   // thăm dò tin mới + lưu bản dữ liệu hôm nay
 }
 
 /** Thẻ chào mừng theo tiến độ của chính người đăng nhập; chỉ hiện một lần cho mỗi lần đăng nhập. */
@@ -575,9 +620,14 @@ async function refreshSession() {
   try {
     // Thử cấp lại âm thầm trước (cửa sổ Google tự đóng ngay, không hiện giao diện); không được mới hiện cửa sổ thường.
     try { await signIn({ resume: true, silent: true }); } catch { await signIn({ resume: true }); }
-    clearCache();
+    reloadMonths();   // đọc lại danh sách link (có thể vừa thêm link mới, ví dụ PBI) và xóa dữ liệu cũ
+    const months = await loadMonths();
+    fillMonths(months);
+    if (!months.some((m) => m.month === state.month)) state.month = months[0]?.month ?? state.month;
     if (!(await authorize())) return;
     Object.assign(state.report, { data: null, error: '' });
+    Object.assign(state.cinfo, { data: null, error: '' });
+    preloadPbi();
     state.data = await loadMonth(state.month);
     staleSession = false;
     syncLogout();
@@ -606,6 +656,7 @@ async function startFromSnapshot(snap) {
   } finally { setBoot(); }
   greet();
   armRefresh();
+  preloadPbi();
 }
 
 /** Mở lại web: còn token thì vào luôn; hết token mà vẫn trong ngày thì vào bằng dữ liệu đã lưu, không hiện màn hình đăng nhập. */

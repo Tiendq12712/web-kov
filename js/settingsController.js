@@ -16,7 +16,7 @@ const byId = (id) => document.getElementById(id);
  * Trang Thiết lập (Tài khoản, Cấu hình link, Đồng bộ CRM): trạng thái, thao tác và sự kiện.
  * `getMe()` trả về { email, role }; các callback giúp ứng dụng chính phản ứng khi dữ liệu đổi.
  */
-export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLinksChanged, onSynced }) {
+export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLinksChanged, onSynced, onHistory }) {
   const ui = {
     section: 'accounts', accounts: [], links: [], tasks: [], status: null, serverError: '',
     job: null, editing: null, error: '', busy: false, loaded: false, loading: false, me: null, months: [],
@@ -61,6 +61,8 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   async function stampSync() {
     try { await recordSyncTime(); await onSynced(); ui.job.lines.push('Đã ghi thời gian cập nhật báo cáo.'); }
     catch (err) { ui.job.lines.push(`Không ghi được thời gian cập nhật: ${err.message}`); }
+    try { const n = await onHistory(); ui.job.lines.push(`Đã lưu ảnh chụp số liệu hôm nay vào lịch sử (${n} nhân sự).`); }
+    catch (err) { ui.job.lines.push(`Không lưu được lịch sử số liệu: ${err.message}`); }
   }
 
   function resumeJob(jobId, kind = '') {

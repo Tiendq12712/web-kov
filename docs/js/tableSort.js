@@ -7,7 +7,11 @@ const FIRST_NUMBER = /^[-+]?\d[\d.]*(?:,\d+)?/;
 
 /** Giá trị để so sánh: số (kiểu Việt: 1.234,5), giờ phút "1h38"/"45p", hoặc chữ; ô trống luôn xếp cuối. */
 function valueOf(cell) {
-  const t = (cell?.dataset.sort ?? cell?.textContent ?? '').trim();
+  if (cell?.dataset.sort !== undefined) {   // giá trị sắp xếp ghi sẵn (số thập phân dạng 0.12 hoặc chuỗi)
+    const v = cell.dataset.sort.trim();
+    return v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : v;
+  }
+  const t = (cell?.textContent ?? '').trim();
   if (!t || t === '—' || t === '·' || t === '✓') return t === '✓' ? 0 : null;
   const hm = /^(\d+)h(\d{2})?$/.exec(t);
   if (hm) return Number(hm[1]) * 60 + Number(hm[2] ?? 0);

@@ -733,3 +733,52 @@ table.sortable thead th[colspan] { cursor: default; }
 table.sortable thead th:hover { color: var(--text); }
 table.sortable thead th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; color: var(--accent); }
 table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; color: var(--accent); }
+
+/* Báo cáo Customer Info (PBI) */
+.cinfo-filters .filters { align-items: flex-end; }
+.filter__range { display: flex; gap: 6px; } .filter__range .search { min-width: 0; width: 138px; height: 36px; }
+.cinfo-top { display: grid; grid-template-columns: 1fr minmax(260px, 340px); gap: 16px; align-items: stretch; }
+.cinfo-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; padding: 0; overflow: hidden; }
+.cinfo-kpi { padding: 14px 10px; text-align: center; border-right: 1px solid var(--border); display: grid; align-content: center; gap: 6px; }
+.cinfo-kpi:last-child { border-right: 0; }
+.cinfo-kpi h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.cinfo-kpi__v { margin: 0; font-size: 2.4rem; font-weight: 800; line-height: 1; }
+.cinfo-kpi__v.is-bad { color: var(--bad); } .cinfo-kpi__v.is-good { color: var(--good); }
+.cinfo-gauge { text-align: center; } .cinfo-gauge .card__title { text-align: center; }
+.gauge { width: 100%; max-width: 280px; margin: 0 auto; }
+.gauge__track { fill: none; stroke: var(--surface-2); stroke-width: 22; stroke-linecap: butt; }
+.gauge__fill { fill: none; stroke-width: 22; }
+.gauge__fill--good { stroke: var(--good-fill); } .gauge__fill--warn { stroke: var(--warn-fill); } .gauge__fill--bad { stroke: var(--bad-fill); }
+.gauge__target { stroke: var(--text); stroke-width: 3; }
+.gauge__value { font-size: 20px; font-weight: 800; fill: var(--text); } .gauge__min, .gauge__max { font-size: 10px; fill: var(--muted); }
+.cinfo-table th, .cinfo-table td { padding: 8px 12px; white-space: nowrap; text-align: center; }
+.cinfo-table td.sticky-col { text-align: left; }
+.cinfo-table tfoot td { border-top: 2px solid var(--border); background: var(--surface-2); font-weight: 700; }
+.cinfo-pct { font-weight: 700; } .cinfo-pct--good { color: var(--good); } .cinfo-pct--warn { color: var(--warn); } .cinfo-pct--bad { color: var(--bad); }
+@media (max-width: 760px) { .cinfo-top { grid-template-columns: 1fr; } .cinfo-kpis { grid-template-columns: repeat(2, 1fr); } .cinfo-kpi:nth-child(2) { border-right: 0; } .cinfo-kpi:nth-child(-n+2) { border-bottom: 1px solid var(--border); } }
+.cinfo-kpi__p { margin: 0; font-size: 13px; font-weight: 700; color: var(--muted); } .cinfo-kpi__p span { font-weight: 500; font-size: 11.5px; }
+.cinfo-table td strong { display: block; } .cinfo-rate { display: block; font-size: 11px; color: var(--muted); }
+/* Khối chỉ số không kéo giãn theo chiều cao đồng hồ (tránh khoảng trống) */
+.cinfo-top { align-items: start; }
+.cinfo-gauge .gauge { max-width: 230px; }
+/* 4 chỉ số xếp 2×2 để cao ngang đồng hồ: không còn khoảng trống */
+.cinfo-top { align-items: stretch; }
+.cinfo-kpis { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 1fr; }
+.cinfo-kpi { border-right: 0; border-bottom: 0; }
+.cinfo-kpi:nth-child(odd) { border-right: 1px solid var(--border); }
+.cinfo-kpi:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+.cinfo-gauge { display: grid; align-content: center; justify-items: center; }
+.cinfo-gauge .gauge { max-width: 260px; }
+
+/* Việc cần làm hôm nay */
+.todo__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.todo__item { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); border-left-width: 4px; background: var(--surface); }
+.todo__item--bad { border-left-color: var(--bad); background: color-mix(in srgb, var(--bad-soft) 55%, var(--surface)); }
+.todo__item--warn { border-left-color: var(--warn-fill); background: color-mix(in srgb, var(--warn-soft) 55%, var(--surface)); }
+.todo__item--info { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); }
+.todo__text { display: grid; min-width: 0; } .todo__text small { color: var(--muted); }
+.todo__go { padding: 6px 14px; }
+
+/* Xu hướng theo ngày */
+.trend-table th, .trend-table td { padding: 8px 14px; white-space: nowrap; text-align: center; } .trend-table td.strong { font-weight: 700; } .trend-table td.sticky-col { text-align: left; }
+.trend-delta { font-weight: 700; } .trend-delta.is-good { color: var(--good); } .trend-delta.is-bad { color: var(--bad); }
