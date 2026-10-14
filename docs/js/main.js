@@ -19,6 +19,8 @@ import { cinfoView, DEFAULT_FILTERS } from './views/cinfo.js';
 import { trendView } from './views/trend.js';
 import { loadHistory, recordHistory, buildSnapshot } from './history.js';
 import { buildTodo } from './todo.js';
+import { coachFor } from './coach.js';
+import { coachFloat } from './views/coach.js';
 import { libraryView, libraryListView } from './views/library.js';
 import { summarizeMonth } from './compare.js';
 import { compareView } from './views/compare.js';
@@ -51,6 +53,8 @@ const state = {
   trend: { data: null, loading: false, error: '', metric: 'kpi', who: 'all' },   // xu hướng theo ngày (lịch sử đồng bộ)
   compare: { a: null, b: null, key: '', data: null, loading: false, error: '' },   // so sánh hai tháng (quản lý)
   library: { data: null, loading: false, error: '', cat: 'all', q: '' },   // thư viện tài liệu (quy trình, chính sách, giải trình…)
+  coach: null, coachBump: 0,   // nhân vật Coach KPI nổi ở góc màn hình
+  coachPref: readCoachPref(),  // { side: 'left' | 'right', open }
   todo: null,                // "Việc cần làm hôm nay" của trang Tổng quan
   accounts: [],              // danh sách tài khoản (để Admin/Quản trị chọn nhân sự trong tab Chia sẻ)
   me: null,                  // { email, role } — role: admin | manager | member
@@ -224,6 +228,19 @@ function monthBar() {
     <select id="month" class="select">${monthList.map((m) => html`<option value="${m.month}" ${m.month === state.month ? 'selected' : ''}>${monthLabel(m.month)}</option>`)}</select></div>`;
 }
 
+function readCoachPref() {
+  try { return { side: 'right', open: true, ...JSON.parse(localStorage.getItem('kpi.coach')) }; } catch { return { side: 'right', open: true }; }
+}
+const saveCoachPref = () => { try { localStorage.setItem('kpi.coach', JSON.stringify(state.coachPref)); } catch {} };
+
+/** Nhân vật nổi ở góc: hiện ở các tab xem số liệu; ẩn ở Chia sẻ/Thiết lập (tránh che ô soạn tin). */
+function renderCoach() {
+  const el = $('coach');
+  const show = CONFIG.coachEnabled && state.me && state.data && !['chat', 'settings'].includes(state.tab);
+  state.coach = show ? coachFor({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, bump: state.coachBump }) : null;
+  mount(el, state.coach ? coachFloat(state.coach, state.coachPref) : html``);
+}
+
 function renderView() {
   if (!state.data) {   // chưa có báo cáo nào: chỉ còn trang Thiết lập (dành cho Admin / Quản trị)
     els.tabs.replaceChildren();
@@ -237,6 +254,7 @@ function renderView() {
   mount(els.view, html`${monthly ? monthBar() : ''}${page.view}`);
   renderTabs();
   applyTableSorts(els.view);
+  renderCoach();
   baseTitle = monthly ? `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE` : `${page.title} · Report SC ONLINE`;
   applyTitle();
   writeHash();
@@ -311,6 +329,15 @@ document.addEventListener('click', (e) => {
     state.osort = { key, dir: state.osort.key === key && state.osort.dir === 'desc' ? 'asc' : 'desc' };
     return renderView();
   }
+  if (hit('[data-coach-slow]')) {   // quản lý: về Tổng quan, lọc "Chậm" và cuộn tới bảng nhân sự
+    Object.assign(state, { filter: 'all', mstatus: 'bad', mquery: '' });
+    if (state.tab !== 'overview') setTab('overview'); else renderView();
+    $('member-rows')?.closest('section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (hit('[data-coach-next]')) { state.coachBump += 1; return renderCoach(); }
+  if (hit('[data-coach-toggle]')) { state.coachPref.open = !state.coachPref.open; saveCoachPref(); return renderCoach(); }
+  if (hit('[data-coach-side]')) { state.coachPref.side = state.coachPref.side === 'right' ? 'left' : 'right'; saveCoachPref(); return renderCoach(); }
   if (hit('[data-lib-cat]')) { state.library.cat = hit('[data-lib-cat]').dataset.libCat; return renderView(); }
   if (hit('[data-trend-metric]')) { state.trend.metric = hit('[data-trend-metric]').dataset.trendMetric; return renderView(); }
   if (hit('[data-record-history]')) return recordHistoryNow();
