@@ -325,7 +325,7 @@ function myCard({ team, member: m }, report, sla) {
         <dt>Add-on</dt><dd class="num">${rateCell(m.addon)}</dd>
         <dt>Act đã làm</dt><dd class="num">${num(m.extra.actDone)}/${num(m.extra.assigned)}</dd>
         ${workdays != null ? html`<dt>Ngày công</dt><dd class="num">${num(workdays)}</dd>` : ''}
-        ${sla ? html`<dt>Data trễ SLA</dt><dd class="num ${sla.late ? 'is-bad' : ''}">${num(sla.late)}</dd><dt>Data sắp trễ SLA</dt><dd class="num ${sla.soon ? 'is-warn' : ''}">${num(sla.soon)}</dd>` : ''}
+        ${sla ? html`<dt>Data trễ SLA</dt><dd class="num ${sla.late ? 'is-bad' : ''}">${num(sla.late)} <span class="muted">(${pct(ratio(sla.late, sla.total), 1)})</span></dd><dt>Data sắp trễ SLA</dt><dd class="num ${sla.soon ? 'is-warn' : ''}">${num(sla.soon)} <span class="muted">(${pct(ratio(sla.soon, sla.total), 1)})</span></dd>` : ''}
       </dl>
       ${sla ? html`<button class="link-btn" type="button" data-tab="sla">Xem chi tiết SLA →</button>` : ''}
       ${hasSheet ? html`<button class="btn btn--ghost card__action" type="button" data-timesheet="${team.id}:${m.code}">Xem chi tiết công</button>` : ''}

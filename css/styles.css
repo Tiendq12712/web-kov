@@ -719,3 +719,10 @@ td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
 .sla-cell--soon { background: color-mix(in srgb, var(--warn-soft) 80%, transparent); color: var(--warn); font-weight: 700; }
 .sla-matrix thead th { text-align: right; } .sla-matrix thead th.sticky-col { text-align: left; }
 .sla-left { font-size: 11px; font-weight: 600; }
+.sla-rate { font-size: .55em; font-weight: 700; padding: 2px 8px; border-radius: 99px; vertical-align: middle; background: color-mix(in srgb, currentColor 14%, transparent); }
+.sla-pct--bad { color: var(--bad); font-weight: 600; } .sla-pct--warn { color: var(--warn); font-weight: 600; }
+.welcome__sla em { display: block; font-style: normal; font-size: .75rem; color: var(--muted); }
+
+/* Tiêu đề cột của mọi bảng căn giữa */
+table thead th, table thead th.right, table thead th.sticky-col, .sla-matrix thead th, .sla-matrix thead th.sticky-col { text-align: center; }
+table thead th button { justify-content: center; text-align: center; }
