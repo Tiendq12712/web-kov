@@ -43,6 +43,37 @@ const accountRow = (a, i, ui) => {
       : html`<span class="muted" title="${a.role === 'admin' ? 'Admin cố định, không thay đổi được' : 'Bạn không có quyền sửa tài khoản này'}">🔒 Cố định</span>`}</td></tr>`;
 };
 
+const ACCESS_CELL = {
+  ok: html`<span class="badge badge--good">Có quyền</span>`, low: html`<span class="badge badge--warn">Cần quyền Chỉnh sửa</span>`,
+  group: html`<span class="badge badge--neutral" title="Có nhóm được chia sẻ, không biết email có trong nhóm không">Qua nhóm?</span>`,
+  missing: html`<span class="badge badge--bad">Chưa chia sẻ</span>`, unknown: html`<span class="muted">Không kiểm tra được</span>`,
+};
+
+/** Admin: nút kiểm tra quyền Sheet và kết quả (email nào thiếu quyền ở Sheet nào). */
+const accessCard = (ui) => {
+  const a = ui.access;
+  const r = a.result;
+  const needFix = r ? r.problems.map((p) => p.email) : [];
+  return html`
+    <section class="card">
+      <div class="card__head"><h3 class="card__title">Kiểm tra quyền Sheet</h3>
+        <button class="btn" type="button" data-act="access-check" ${a.loading ? 'disabled' : ''}>${a.loading ? 'Đang kiểm tra…' : 'Kiểm tra ngay'}</button></div>
+      <p class="muted">Xem email nào trong danh sách tài khoản <strong>chưa được chia sẻ</strong> các Google Sheet báo cáo (KPI, Năng suất, PBI, Sheet cấu hình, Sheet chat). Cần là người có quyền Chỉnh sửa các Sheet đó; lần đầu Google sẽ hỏi quyền xem thông tin chia sẻ.</p>
+      ${a.error ? html`<p class="notice" role="alert">${a.error}</p>` : ''}
+      ${r ? html`
+        ${r.sheets.filter((s) => s.error).map((s) => html`<p class="notice" role="alert">${s.label}: ${s.error}</p>`)}
+        ${needFix.length ? html`<p class="notice" role="status"><strong>${needFix.length}</strong> tài khoản đang thiếu quyền.
+          <button class="link-btn" type="button" data-act="access-copy" data-key="${needFix.join(',')}">Sao chép danh sách email</button>${a.copied ? ' ✓ Đã sao chép' : ''}</p>`
+          : html`<p class="notice notice--good">Tất cả tài khoản đều có quyền với các Sheet đã kiểm tra.</p>`}
+        <div class="table-wrap"><table class="sortable access-table">
+          <thead><tr><th class="sticky-col">Tài khoản</th>${r.sheets.map((s) => html`<th title="${s.need === 'writer' ? 'Cần quyền Chỉnh sửa' : 'Cần quyền Xem'}">${s.label}</th>`)}</tr></thead>
+          <tbody>${[...r.rows].sort((x, y) => Number(r.problems.includes(y)) - Number(r.problems.includes(x))).map((row) => html`<tr class="static">
+            <td class="sticky-col"><span class="person"><strong>${row.name || row.email.split('@')[0]}</strong><small>${row.email}</small></span></td>
+            ${r.sheets.map((s) => html`<td>${ACCESS_CELL[row.cells[s.key]]}</td>`)}</tr>`)}</tbody>
+        </table></div>` : ''}
+    </section>`;
+};
+
 const accountsSection = (ui) => html`
   <section class="card">
     <div class="card__head"><h3 class="card__title">Danh sách tài khoản (${ui.accounts.length})</h3></div>
@@ -52,7 +83,8 @@ const accountsSection = (ui) => html`
     <div class="table-wrap"><table>
       <thead><tr><th>STT</th><th>Email</th><th>Tên/Biệt danh</th><th>Giới tính</th><th>Đầu số</th><th>Phân quyền</th><th>Mô tả quyền</th><th class="right">Thao tác</th></tr></thead>
       <tbody>${ui.accounts.map((a, i) => accountRow(a, i, ui))}</tbody></table></div>
-  </section>`;
+  </section>
+  ${ui.me.role === 'admin' ? accessCard(ui) : ''}`;
 
 /* ---------- Cấu hình link báo cáo ---------- */
 const linkForm = (ui, item, index) => html`

@@ -241,7 +241,7 @@ td.right .rate { justify-items: center; }
   transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
 .card--accent { border-color: var(--accent); box-shadow: 0 10px 30px -16px var(--glow); }
-.card--link:hover { border-color: var(--accent); box-shadow: 0 12px 30px -14px var(--glow); transform: translateY(-2px); }
+.card--link:hover { border-color: var(--accent); box-shadow: 0 12px 30px -14px var(--glow); }
 
 /* Vạch màu trên đầu mỗi thẻ số liệu, đổi tông theo thứ tự */
 .grid > .card { position: relative; overflow: hidden; }
@@ -297,9 +297,9 @@ tbody tr:hover .sticky-col { background: var(--accent-soft); }
 .table-wrap td.num { white-space: nowrap; }
 
 /* ---------- Nút Thiết lập / Đăng xuất dễ nhận biết ---------- */
-.pill { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 99px; border: 1px solid transparent; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; transition: transform .15s ease, box-shadow .2s ease, background .2s ease, color .2s ease; }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 99px; border: 1px solid transparent; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; transition: box-shadow .2s ease, background .2s ease, color .2s ease, filter .2s ease; }
 .pill[hidden] { display: none; }
-.pill:hover { transform: translateY(-1px); }
+.pill:hover { filter: brightness(1.08); }
 .pill--primary { color: #fff; background: linear-gradient(135deg, var(--btn), color-mix(in srgb, var(--btn) 55%, var(--c2))); box-shadow: 0 6px 16px -8px var(--glow); }
 .pill--primary:hover { box-shadow: 0 8px 20px -8px var(--glow); }
 .pill--danger { color: var(--bad); background: var(--bad-soft); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
@@ -782,3 +782,17 @@ table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-s
 /* Xu hướng theo ngày */
 .trend-table th, .trend-table td { padding: 8px 14px; white-space: nowrap; text-align: center; } .trend-table td.strong { font-weight: 700; } .trend-table td.sticky-col { text-align: left; }
 .trend-delta { font-weight: 700; } .trend-delta.is-good { color: var(--good); } .trend-delta.is-bad { color: var(--bad); }
+
+/* Ô bấm được: không dịch chuyển khi rê chuột (dịch chuyển làm con trỏ rời khỏi ô rồi lại vào => nhấp nháy) */
+.card--link, .card--link:hover, .pill, .pill:hover { transform: none; }
+
+/* So sánh hai tháng */
+.compare-table th, .compare-table td { padding: 8px 14px; white-space: nowrap; text-align: center; }
+.compare-table td.sticky-col { text-align: left; } .compare-table td.strong { font-weight: 700; }
+.compare-group td { background: var(--surface-2); font-weight: 700; color: var(--accent); text-align: left; }
+.access-table th, .access-table td { padding: 8px 12px; white-space: nowrap; text-align: center; } .access-table td.sticky-col { text-align: left; }
+
+/* Ô chọn tháng nằm trong tab */
+.monthbar { display: flex; align-items: center; gap: 10px; }
+.monthbar label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.monthbar .select { height: 36px; min-width: 150px; font-weight: 600; }

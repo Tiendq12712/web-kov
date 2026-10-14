@@ -19,13 +19,15 @@ import { cinfoView, DEFAULT_FILTERS } from './views/cinfo.js';
 import { trendView } from './views/trend.js';
 import { loadHistory, recordHistory, buildSnapshot } from './history.js';
 import { buildTodo } from './todo.js';
+import { summarizeMonth } from './compare.js';
+import { compareView } from './views/compare.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
 import { startTour, tourSeen } from './tour.js';
 import './mobileShell.js';
 import { applyTableSorts } from './tableSort.js';
 
 const $ = (id) => document.getElementById(id);
-const els = { view: $('view'), tabs: $('tabs'), month: $('month'), detail: $('detail'), bottomNav: $('bottom-nav'), logout: $('logout'), welcome: $('welcome') };
+const els = { view: $('view'), tabs: $('tabs'), detail: $('detail'), bottomNav: $('bottom-nav'), logout: $('logout'), welcome: $('welcome') };
 
 /** Lưu lựa chọn giao diện của riêng trình duyệt này; lỗi (chế độ riêng tư…) thì dùng mặc định. */
 function readPref(key, fallback) {
@@ -46,6 +48,7 @@ const state = {
   work: { team: 'all', matrix: 'backlogAll', query: '', sort: { key: 'pctDone', dir: 'desc' } },
   cinfo: { data: null, loading: false, error: '', f: { ...DEFAULT_FILTERS } },   // báo cáo Customer Info (PBI) + bộ lọc
   trend: { data: null, loading: false, error: '', metric: 'kpi', who: 'all' },   // xu hướng theo ngày (lịch sử đồng bộ)
+  compare: { a: null, b: null, key: '', data: null, loading: false, error: '' },   // so sánh hai tháng (quản lý)
   todo: null,                // "Việc cần làm hôm nay" của trang Tổng quan
   accounts: [],              // danh sách tài khoản (để Admin/Quản trị chọn nhân sự trong tab Chia sẻ)
   me: null,                  // { email, role } — role: admin | manager | member
@@ -73,6 +76,7 @@ const ICONS = {
   report: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
   chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
   cinfo: '<circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/>',
+  compare: '<path d="M7 4v16M17 4v16M3 9h8M13 15h8"/>',
   trend: '<path d="M4 18l5-6 4 3 7-9"/><path d="M15 6h5v5"/>',
   sla: '<circle cx="12" cy="13" r="8"/><path d="M12 8v5l3 2M9 3h6"/>',
   work: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 15l2.5 2.5L16 13"/>',
@@ -87,6 +91,7 @@ function renderTabs() {
   if (hasPbi()) tabs.push({ id: 'cinfo', name: 'Customer Info', short: 'C-Info' });
   if (state.me?.role !== 'member') tabs.push({ id: 'trend', name: 'Xu hướng' });   // chỉ Admin/Quản trị
   if (hasReport(state.month)) tabs.push({ id: 'report', name: 'Năng suất' });
+  if (state.me?.role !== 'member' && monthList.length > 1) tabs.push({ id: 'compare', name: 'So sánh tháng', short: 'So sánh' });
   tabs.push({ id: 'chat', name: 'Chia sẻ' });
   const current = (t) => (t.id === state.tab ? html`aria-current="page"` : '');
   const unread = state.me ? chat.unread() : 0;
@@ -195,12 +200,23 @@ function currentPage() {
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
   if (state.tab === 'chat') return { view: renderChat(), title: 'Chia sẻ' };
+  if (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) return { view: renderCompare(), title: 'So sánh tháng' };
   if (state.tab === 'trend' && state.me.role !== 'member') return { view: lazyTab(state.trend, 'trend', loadHistory, (h) => trendView(h, state.trend, { manager: state.me.role !== 'member', code: myCode() })), title: 'Xu hướng' };
   if (state.tab === 'cinfo') return { view: lazyTab(state.cinfo, 'cinfo', loadPbi, (d) => cinfoView(d, state.cinfo.f, { manager: state.me.role !== 'member', code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code })), title: 'Customer Info' };
   if (state.tab === 'sla') return { view: slaView(computeSla(state.data.work, latestAsOf(state.data), state.month), { manager: state.me.role !== 'member', code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code }), title: 'SLA' };
   if (state.tab === 'work') return { view: renderWork(), title: 'Theo dõi công việc' };
   if (t) return { view: teamView(t, state), title: t.name };
   return { view: overviewView(state.data, state, report), title: 'Tổng quan' };
+}
+
+/** Tab phụ thuộc vào tháng đang xem (Tổng quan, các team, Công việc, SLA, Năng suất) mới có ô chọn tháng; các tab khác (Customer Info, Xu hướng, So sánh, Chia sẻ, Thiết lập) thì không. */
+const isMonthly = (tab) => ['overview', 'work', 'sla', 'report'].includes(tab) || Boolean(state.data?.teams.some((t) => t.id === tab));
+
+/** Ô chọn tháng nằm trong nội dung của tab (không đặt ở thanh trên cùng). */
+function monthBar() {
+  if (!monthList.length) return '';
+  return html`<div class="monthbar"><label for="month">Tháng báo cáo</label>
+    <select id="month" class="select">${monthList.map((m) => html`<option value="${m.month}" ${m.month === state.month ? 'selected' : ''}>${monthLabel(m.month)}</option>`)}</select></div>`;
 }
 
 function renderView() {
@@ -212,10 +228,11 @@ function renderView() {
     return;
   }
   const page = currentPage();
-  mount(els.view, page.view);
+  const monthly = isMonthly(state.tab);
+  mount(els.view, html`${monthly ? monthBar() : ''}${page.view}`);
   renderTabs();
   applyTableSorts(els.view);
-  baseTitle = `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE`;
+  baseTitle = monthly ? `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE` : `${page.title} · Report SC ONLINE`;
   applyTitle();
   writeHash();
   if (state.tab === 'chat') { const msgs = $('chat-messages'); if (msgs) msgs.scrollTop = msgs.scrollHeight; }
@@ -223,7 +240,7 @@ function renderView() {
 
 async function setMonth(ym, { boot = false } = {}) {
   state.month = ym;
-  if (!boot) mount(els.view, html`<p class="muted" role="status">Đang tải dữ liệu từ Google Sheet…</p>`);
+  if (!boot) mount(els.view, html`${isMonthly(state.tab) ? monthBar() : ''}<p class="muted" role="status">Đang tải dữ liệu từ Google Sheet…</p>`);
   let report = null;
   try {
     // Lúc khởi động: tải song song KPI + năng suất để hiện đủ một lần, không nhảy số.
@@ -236,10 +253,9 @@ async function setMonth(ym, { boot = false } = {}) {
   } catch (err) {
     return err.code === 'auth' ? authLost(err.message) : showError(err.message);
   }
-  els.month.value = ym;
   Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'report' && hasReport(ym)) || team();
+  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -337,7 +353,9 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', (e) => {
+  if (e.target.id === 'compare-a' || e.target.id === 'compare-b') { state.compare[e.target.id === 'compare-a' ? 'a' : 'b'] = e.target.value; return renderView(); }
   if (e.target.id === 'trend-who') { state.trend.who = e.target.value; return renderView(); }
+  if (e.target.id === 'month') return setMonth(e.target.value);
   const cinfoField = e.target.dataset?.cinfo;
   if (cinfoField) { state.cinfo.f[cinfoField] = e.target.value || (e.target.type === 'date' ? '' : 'all'); return renderView(); }
   const id = e.target.id;
@@ -400,7 +418,6 @@ els.welcome.addEventListener('click', (e) => {
 });
 $('help').addEventListener('click', startTour);
 
-els.month.addEventListener('change', () => setMonth(els.month.value));
 
 $('theme').addEventListener('click', () => {
   const root = document.documentElement;
@@ -413,7 +430,6 @@ $('theme').addEventListener('click', () => {
 let monthList = [];   // các tháng nhận được từ danh sách link (để trang Thiết lập hiển thị)
 function fillMonths(months) {
   monthList = months;
-  mount(els.month, html`${months.map((m) => html`<option value="${m.month}">${monthLabel(m.month)}</option>`)}`);
 }
 
 /** Link báo cáo vừa đổi: dựng lại danh sách tháng, giữ tháng đang xem nếu còn. */
@@ -422,10 +438,37 @@ async function refreshMonths() {
   const months = await loadMonths();
   fillMonths(months);
   if (!months.length) { state.data = null; return; }
-  if (months.some((m) => m.month === state.month)) { els.month.value = state.month; return; }
+  if (months.some((m) => m.month === state.month)) return;
   state.month = months[0].month;
   state.data = await loadMonth(state.month);
-  els.month.value = state.month;
+}
+
+/** Tải và tóm tắt hai tháng để so sánh (dùng lại bộ nhớ đệm của từng tháng). */
+async function loadCompare(a, b) {
+  const one = async (ym) => {
+    const data = await loadMonth(ym);
+    const report = hasReport(ym) ? await loadReport(ym).catch(() => null) : null;
+    return summarizeMonth(ym, data, report);
+  };
+  const [sa, sb] = await Promise.all([one(a), one(b)]);
+  return { a: sa, b: sb };
+}
+
+function renderCompare() {
+  const c = state.compare;
+  c.a ??= monthList[0].month;
+  c.b ??= monthList[1].month;
+  const key = `${c.a}|${c.b}`;
+  if (c.key !== key) Object.assign(c, { key, data: null, error: '', loading: false });
+  if (c.a !== c.b && !c.data && !c.loading && !c.error) {
+    c.loading = true;
+    loadCompare(c.a, c.b)
+      .then((d) => { if (c.key === key) c.data = d; })
+      .catch((err) => { if (err.code === 'auth') authLost(err.message); else c.error = err.message; })
+      .finally(() => { c.loading = false; if (state.tab === 'compare' && c.key === key) renderView(); });
+  }
+  if (c.error) return html`<p class="notice" role="alert">${c.error}</p>`;
+  return compareView({ months: monthList, a: c.a, b: c.b, data: c.data });
 }
 
 /** Lưu ảnh chụp số liệu của ngày số liệu hiện tại vào tab Lịch sử (sau mỗi lần đồng bộ CRM hoặc khi quản lý bấm nút). */
@@ -627,6 +670,7 @@ async function refreshSession() {
     if (!(await authorize())) return;
     Object.assign(state.report, { data: null, error: '' });
     Object.assign(state.cinfo, { data: null, error: '' });
+    Object.assign(state.compare, { data: null, error: '', key: '' });
     preloadPbi();
     state.data = await loadMonth(state.month);
     staleSession = false;

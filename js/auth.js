@@ -109,7 +109,20 @@ export async function getWriteToken() {
   return token;
 }
 
+const DRIVE_META = 'https://www.googleapis.com/auth/drive.metadata.readonly';
+let driveGrant = null;   // token chỉ-đọc-siêu-dữ-liệu Drive để kiểm tra quyền chia sẻ; giữ trong bộ nhớ
+
+/** Token xem danh sách quyền chia sẻ của file (Drive metadata, chỉ đọc). Cần thao tác bấm của người dùng để Google hiện cửa sổ cấp quyền. */
+export async function getDriveToken() {
+  if (driveGrant && driveGrant.expiresAt - EXPIRY_MARGIN_MS > Date.now()) return driveGrant.token;
+  await loadGis();
+  const { access_token: token, expires_in: seconds } = await requestToken({ scope: DRIVE_META, login_hint: session?.email });
+  driveGrant = { token, expiresAt: Date.now() + seconds * 1000 };
+  return token;
+}
+
 export function signOut() {
+  driveGrant = null;
   rememberWrite(false);
   if (session && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(session.token);
   writeSession(null);

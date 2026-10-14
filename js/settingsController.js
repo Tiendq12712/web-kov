@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { html } from './dom.js';
 import { sheetId } from './sheet.js';
 import { getWriteToken } from './auth.js';
+import { checkAccess } from './access.js';
 import { recordSyncTime } from './syncTime.js';
 import { crmServer, callServer, loadTasks, mutateTasks, loadCallConfig, saveCallConfig, splitAgents, resolveRange } from './crm.js';
 import { loadAccounts, addAccount, updateAccount, removeAccount, loadLinks, addLink, updateLink, removeLink } from './directory.js';
@@ -19,6 +20,7 @@ const byId = (id) => document.getElementById(id);
 export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLinksChanged, onSynced, onHistory }) {
   const ui = {
     section: 'accounts', accounts: [], links: [], tasks: [], status: null, serverError: '',
+    access: { loading: false, error: '', result: null },
     job: null, editing: null, error: '', busy: false, loaded: false, loading: false, me: null, months: [],
     call: { gsheet_url: '', tab_name: '', agents: '', cuser: '', date_mode: 'month_to_yesterday', date_from: '', date_to: '' },
   };
@@ -181,6 +183,33 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     'account-delete': remove((e) => `Xóa tài khoản ${e}?`, (e) => async () => { ui.accounts = await removeAccount(getMe().role, e); }),
     'link-edit': edit('link'),
     'link-delete': remove((i) => `Xóa link "${ui.links[i]?.info}"?`, (i) => async () => { ui.links = await removeLink(Number(i)); await onLinksChanged(); }),
+    /** Admin: kiểm tra email nào chưa được chia sẻ các Google Sheet báo cáo (dùng Drive API, cần cho phép một lần). */
+    'access-check': async () => {
+      ui.access = { loading: true, error: '', result: null };
+      rerender();
+      try {
+        const wanted = [
+          ...ui.links.map((l, i) => ({ key: `l${i}`, label: l.info || `Link ${i + 1}`, id: l.id, need: 'reader' })),
+          { key: 'cfg', label: 'Sheet cấu hình', id: CONFIG.configSheet, need: 'reader' },
+          { key: 'chat', label: 'Sheet chat', id: CONFIG.chatSheet, need: 'writer' },
+        ];
+        const byId = new Map();   // cùng một Sheet xuất hiện nhiều lần thì gộp, lấy mức quyền cao nhất cần có
+        for (const s of wanted) {
+          const prev = byId.get(s.id);
+          byId.set(s.id, prev ? { ...prev, label: `${prev.label} / ${s.label}`, need: prev.need === 'writer' || s.need === 'writer' ? 'writer' : 'reader' } : s);
+        }
+        ui.access.result = await checkAccess({ accounts: ui.accounts, sheets: [...byId.values()] });
+      } catch (err) {
+        if (err.code === 'auth') return onAuthExpired(err.message);
+        ui.access.error = err.message;
+      }
+      ui.access.loading = false;
+      rerender();
+    },
+    'access-copy': async (emails) => {
+      try { await navigator.clipboard.writeText(emails.split(',').join('\n')); ui.access.copied = true; } catch { ui.access.error = 'Không sao chép được, hãy chọn và chép thủ công'; }
+      rerender();
+    },
     'task-edit': edit('task'),
     'task-delete': remove((i) => `Xóa tác vụ "${ui.tasks[i]?.tab_name || 'này'}"?`, (i) => async () => {
       ui.tasks = await mutateTasks((list) => list.filter((_, k) => k !== Number(i)));
