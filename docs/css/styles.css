@@ -1,13 +1,13 @@
 /* ---------- Tokens ---------- */
 :root {
-  --bg: #f4f8ff; --surface: #ffffff; --surface-2: #eef3fb; --border: #e1e9f5;
-  --text: #1b2433; --muted: #66758c;
-  --accent: #3f7bf0; --accent-soft: #e6f0ff; --btn: #4c8dff;
-  --good: #0f9d77; --good-soft: #daf6ec; --good-fill: #4ddbb0;
-  --warn: #c77a06; --warn-soft: #fff1d2; --warn-fill: #ffcb5c;
-  --bad: #d9455f;  --bad-soft: #ffe4e9;  --bad-fill: #ff8fa3;
-  --c1: #6aa6ff; --c2: #4fd8b4; --c3: #ffc261; --c4: #cdd7e8;
-  --shadow: 0 2px 12px rgb(76 141 255 / .08);
+  --bg: #eef1f6; --surface: #ffffff; --surface-2: #f3f5f9; --border: #d3d9e4;
+  --text: #0f172a; --muted: #475569;
+  --accent: #2563eb; --accent-soft: #e3ecff; --btn: #2563eb;
+  --good: #087f5b; --good-soft: #d3f4e6; --good-fill: #12b886;
+  --warn: #b45309; --warn-soft: #fdecc8; --warn-fill: #f59f00;
+  --bad: #c92a2a;  --bad-soft: #fde0e0;  --bad-fill: #f05252;
+  --c1: #3b82f6; --c2: #12b886; --c3: #f59f00; --c4: #cbd5e1;
+  --shadow: 0 1px 2px rgb(15 23 42 / .06), 0 2px 8px -2px rgb(15 23 42 / .08);
   --radius: 14px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -503,3 +503,59 @@ a.brand, a.brand:hover, a.brand:visited, a.brand:focus, a.brand *, a.brand:hover
 .rate small { font-size: 11px; opacity: .85; }
 .cell-bar > :first-child:not(.rate) { font-size: 15px; font-weight: 700; }
 td.num .cell-bar .rate, td .cell-bar .rate { justify-items: center; }
+
+/* ---------- Giao diện sáng: màu đậm, rõ nét; bỏ ánh sáng/chuyển sắc dành cho nền tối ---------- */
+:root[data-theme="light"] body { background: var(--bg); }
+:root[data-theme="light"] .card { background: var(--surface); border-color: var(--border); box-shadow: var(--shadow); }
+:root[data-theme="light"] .card--accent { background: var(--surface); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+:root[data-theme="light"] .card--link:hover { border-color: var(--accent); box-shadow: 0 6px 16px -6px rgb(15 23 42 / .22); transform: none; }
+:root[data-theme="light"] .card--accent .big, :root[data-theme="light"] .card--link .big { background: none; color: var(--text); -webkit-text-fill-color: currentColor; }
+:root[data-theme="light"] .bar__fill { background: var(--c1); box-shadow: none; }
+:root[data-theme="light"] .bar--good .bar__fill { background: var(--good-fill); box-shadow: none; }
+:root[data-theme="light"] .bar--warn .bar__fill { background: var(--warn-fill); box-shadow: none; }
+:root[data-theme="light"] .bar--bad .bar__fill { background: var(--bad-fill); box-shadow: none; }
+:root[data-theme="light"] .btn, :root[data-theme="light"] .chip[aria-pressed="true"] { background: var(--btn); color: #fff; }
+:root[data-theme="light"] .btn:hover:not(:disabled), :root[data-theme="light"] .chip[aria-pressed="true"] { box-shadow: none; }
+:root[data-theme="light"] .btn:hover:not(:disabled) { filter: brightness(1.08); }
+:root[data-theme="light"] .pill--primary, :root[data-theme="light"] .pill--primary:hover { background: var(--btn); box-shadow: none; }
+:root[data-theme="light"] .tab[aria-current="page"] { background: transparent; box-shadow: 0 2px 0 var(--accent); color: var(--accent); }
+:root[data-theme="light"] .topbar { box-shadow: 0 1px 0 var(--border); }
+:root[data-theme="light"] thead th { background: var(--surface-2); }
+:root[data-theme="light"] tbody tr:hover { background: #eaf0fb; }
+:root[data-theme="light"] .chart rect.s1, :root[data-theme="light"] .chart rect.s2, :root[data-theme="light"] .chart rect.s3, :root[data-theme="light"] .chart .line.s1, :root[data-theme="light"] .chart .line.s2, :root[data-theme="light"] .chart .line.s3, :root[data-theme="light"] .donut__arc.s1, :root[data-theme="light"] .donut__arc.s2, :root[data-theme="light"] .donut__arc.s3 { filter: none; }
+:root[data-theme="light"] .stack__seg { background-image: none; }
+:root[data-theme="light"] .drawer { background: var(--surface); }
+:root[data-theme="light"] .welcome__card { box-shadow: 0 24px 60px -24px rgb(15 23 42 / .35); }
+:root[data-theme="light"] .boot { background: var(--bg); }
+:root[data-theme="light"] .boot__title { background: none; color: var(--accent); -webkit-text-fill-color: currentColor; }
+:root[data-theme="light"] .boot__arc { filter: none; }
+:root[data-theme="light"] .boot__bar span { background: var(--accent); }
+:root[data-theme="light"] .grid > .card::before { opacity: 1; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) body { background: var(--bg); }
+  :root:not([data-theme]) .card { background: var(--surface); border-color: var(--border); box-shadow: var(--shadow); }
+  :root:not([data-theme]) .card--accent { background: var(--surface); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+  :root:not([data-theme]) .card--link:hover { border-color: var(--accent); box-shadow: 0 6px 16px -6px rgb(15 23 42 / .22); transform: none; }
+  :root:not([data-theme]) .card--accent .big, :root:not([data-theme]) .card--link .big { background: none; color: var(--text); -webkit-text-fill-color: currentColor; }
+  :root:not([data-theme]) .bar__fill { background: var(--c1); box-shadow: none; }
+  :root:not([data-theme]) .bar--good .bar__fill { background: var(--good-fill); box-shadow: none; }
+  :root:not([data-theme]) .bar--warn .bar__fill { background: var(--warn-fill); box-shadow: none; }
+  :root:not([data-theme]) .bar--bad .bar__fill { background: var(--bad-fill); box-shadow: none; }
+  :root:not([data-theme]) .btn, :root:not([data-theme]) .chip[aria-pressed="true"] { background: var(--btn); color: #fff; }
+  :root:not([data-theme]) .btn:hover:not(:disabled), :root:not([data-theme]) .chip[aria-pressed="true"] { box-shadow: none; }
+  :root:not([data-theme]) .btn:hover:not(:disabled) { filter: brightness(1.08); }
+  :root:not([data-theme]) .pill--primary, :root:not([data-theme]) .pill--primary:hover { background: var(--btn); box-shadow: none; }
+  :root:not([data-theme]) .tab[aria-current="page"] { background: transparent; box-shadow: 0 2px 0 var(--accent); color: var(--accent); }
+  :root:not([data-theme]) .topbar { box-shadow: 0 1px 0 var(--border); }
+  :root:not([data-theme]) thead th { background: var(--surface-2); }
+  :root:not([data-theme]) tbody tr:hover { background: #eaf0fb; }
+  :root:not([data-theme]) .chart rect.s1, :root:not([data-theme]) .chart rect.s2, :root:not([data-theme]) .chart rect.s3, :root:not([data-theme]) .chart .line.s1, :root:not([data-theme]) .chart .line.s2, :root:not([data-theme]) .chart .line.s3, :root:not([data-theme]) .donut__arc.s1, :root:not([data-theme]) .donut__arc.s2, :root:not([data-theme]) .donut__arc.s3 { filter: none; }
+  :root:not([data-theme]) .stack__seg { background-image: none; }
+  :root:not([data-theme]) .drawer { background: var(--surface); }
+  :root:not([data-theme]) .welcome__card { box-shadow: 0 24px 60px -24px rgb(15 23 42 / .35); }
+  :root:not([data-theme]) .boot { background: var(--bg); }
+  :root:not([data-theme]) .boot__title { background: none; color: var(--accent); -webkit-text-fill-color: currentColor; }
+  :root:not([data-theme]) .boot__arc { filter: none; }
+  :root:not([data-theme]) .boot__bar span { background: var(--accent); }
+  :root:not([data-theme]) .grid > .card::before { opacity: 1; }
+}
