@@ -478,3 +478,12 @@ html, body { max-width: 100%; overflow-x: clip; }
 .ptr.is-ready { color: var(--accent); border-color: var(--accent); }
 .ptr.is-loading .ptr__icon { animation: boot-spin 1s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .topbar, .bottom-nav { transition: none; } .ptr.is-loading .ptr__icon { animation: none; } }
+
+/* Thông số ở Tổng quan: nhỏ gọn hơn */
+.grid { gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
+.grid > .card { padding: 13px 14px; gap: 8px; }
+.grid > .card .big { font-size: 24px; }
+.grid > .card .card__title { font-size: 13px; }
+.grid > .card .kv { font-size: 13px; gap: 3px 10px; }
+.grid > .card .muted { font-size: 12.5px; }
+@media (max-width: 640px) { .grid > .card .big { font-size: 22px; } }
