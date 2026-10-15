@@ -28,6 +28,8 @@ import { compareView } from './views/compare.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
 import { startTour, tourSeen } from './tour.js';
 import { openGuide } from './guide.js';
+import { decorateTables, handleExportClick } from './export.js';
+import { initTips } from './tip.js';
 import './mobileShell.js';
 import { applyTableSorts } from './tableSort.js';
 
@@ -372,14 +374,30 @@ function openMember(ref, { timesheet = false } = {}) {
   }
 }
 
-function openReportMember(code) {
+function openReportMember(code, { timesheet = false } = {}) {
   mount(els.detail, reportDetailView(state.report.data, code, kpiNames()));
   els.detail.showModal();
+  if (timesheet) {   // mở sẵn bảng công của nhân sự
+    const sheet = els.detail.querySelector('details.timesheet');
+    if (sheet) { sheet.open = true; sheet.scrollIntoView({ block: 'start' }); }
+  }
 }
+
+/* ---------- Nút xuất Excel/PDF cho mọi bảng (gắn lại mỗi khi nội dung đổi) ---------- */
+let exportQueued = false;
+const exportObserver = new MutationObserver(() => {
+  if (exportQueued) return;
+  exportQueued = true;
+  setTimeout(() => { exportQueued = false; decorateTables(els.view); decorateTables(els.detail); }, 60);
+});
+initTips();
+exportObserver.observe(els.view, { childList: true, subtree: true });
+exportObserver.observe(els.detail, { childList: true, subtree: true });
 
 /* ---------- Sự kiện (ủy quyền, không gắn từng phần tử) ---------- */
 document.addEventListener('click', (e) => {
   const hit = (sel) => e.target.closest(sel);
+  if (handleExportClick(e)) return;
   if (hit('[data-close]') || e.target === els.detail) return els.detail.close();
   if (hit('[data-tab]')) { e.preventDefault(); els.detail.close(); return setTab(hit('[data-tab]').dataset.tab); }
   if (hit('[data-timesheet]')) return openMember(hit('[data-timesheet]').dataset.timesheet, { timesheet: true });
@@ -426,7 +444,7 @@ document.addEventListener('keydown', (e) => {
   const row = e.target.closest?.('tr[data-member], tr[data-rmember]');
   if (!row || (e.key !== 'Enter' && e.key !== ' ')) return;
   e.preventDefault();
-  if (row.dataset.rmember) openReportMember(row.dataset.rmember); else openMember(row.dataset.member);
+  if (row.dataset.rmember) openReportMember(row.dataset.rmember, { timesheet: Boolean(row.closest('.work-table')) }); else openMember(row.dataset.member);
 });
 
 // Tìm kiếm chỉ vẽ lại phần thân bảng để giữ focus và tránh render thừa.
@@ -496,7 +514,7 @@ document.addEventListener('click', (e) => {
     state.report.sort = { key, dir: sort.key === key && sort.dir === 'desc' ? 'asc' : 'desc' };
     return renderView();
   }
-  if (hit('[data-rmember]')) openReportMember(hit('[data-rmember]').dataset.rmember);
+  if (hit('[data-rmember]')) openReportMember(hit('[data-rmember]').dataset.rmember, { timesheet: Boolean(hit('[data-rmember]').closest('.work-table')) });
 });
 
 document.addEventListener('submit', (e) => {

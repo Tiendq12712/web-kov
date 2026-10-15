@@ -205,6 +205,39 @@ function dailyTable(report, ui, c) {
     ${heatLegend(ui.dayMetric === 'talk' ? 'chỉ tiêu talktime của từng người' : 'trung bình các ô trong bảng')}`;
 }
 
+/* ---------- Bảng tổng công trong tháng: nhân sự bên trái, cột là ngày 1 → cuối tháng ---------- */
+export function workdayTable(report, ui, c) {
+  const [y, mo] = (report.month ?? '').split('-').map(Number);
+  if (!y || !mo) return '';
+  const members = [...inRegion(report, ui.region)].filter((m) => report.timesheets?.[m.code]?.rows.length).sort(byName(c));
+  if (!members.length) return '';
+  const dim = new Date(y, mo, 0).getDate();
+  const days = Array.from({ length: dim }, (_, i) => i + 1);
+  const WD = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const sunday = (d) => new Date(y, mo - 1, d).getDay() === 0;
+  const markOf = (m, d) => report.timesheets[m.code].rows.find((r) => r.day === d);
+  const totalOf = (m) => { const t = report.timesheets[m.code]; return t.total ?? t.rows.reduce((a, r) => a + r.weight, 0); };
+  const dayTotal = (d) => members.reduce((a, m) => a + (markOf(m, d)?.weight ?? 0), 0);
+  const cell = (m, d) => {
+    const r = markOf(m, d);
+    const cls = `wk ${sunday(d) ? 'wk--off' : ''} ${r?.weight === 1 ? 'wk--x' : r?.weight ? 'wk--h' : ''} ${r?.note ? 'wk--note' : ''}`;
+    return html`<td class="${cls}" ${r?.note ? html`data-note="${r.note}" data-who="${c.nameOf(m)} · ${d}/${mo}"` : ''}>${r?.weight === 1 ? 'X' : r?.weight ? 'X/2' : ''}</td>`;
+  };
+  return html`
+    <div class="toolbar"><h2 class="section-title">Bảng tổng công tháng ${mo}/${y}</h2>
+      <p class="muted"><strong>X</strong> = 1 ngày · <strong>X/2</strong> = nửa ngày · ô trống = không tính công · rê chuột vào ô có chấm góc để xem ghi chú · bấm vào nhân sự để xem chi tiết công</p></div>
+    <div class="table-wrap"><table class="day-table work-table">
+      <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>
+        ${days.map((d) => html`<th scope="col" class="wk ${sunday(d) ? 'wk--off' : ''}">${d}<small>${WD[new Date(y, mo - 1, d).getDay()]}</small></th>`)}
+        <th scope="col" class="right sticky-end">Tổng công</th></tr></thead>
+      <tbody>${members.map((m) => html`
+        <tr class="clickable" data-rmember="${m.code}" tabindex="0"><td class="sticky-col"><span class="person"><strong>${c.nameOf(m)}</strong><small>${m.code}</small></span></td>
+          ${days.map((d) => cell(m, d))}<td class="right num strong sticky-end">${num(totalOf(m))}</td></tr>`)}</tbody>
+      <tfoot><tr><td class="sticky-col">Tổng công trong ngày</td>${days.map((d) => html`<td class="wk num ${sunday(d) ? 'wk--off' : ''}">${dayTotal(d) ? num(dayTotal(d)) : ''}</td>`)}
+        <td class="right num strong sticky-end">${num(members.reduce((a, m) => a + totalOf(m), 0))}</td></tr></tfoot>
+    </table></div>`;
+}
+
 /* ---------- Trang báo cáo ---------- */
 export function reportView(report, ui, names) {
   const c = context(report, names);
@@ -232,6 +265,7 @@ export function reportView(report, ui, names) {
           html`<option value="${k}" ${k === ui.weekMetric ? 'selected' : ''}>${m.label}</option>`)}</select></div>
       ${weekChart(report, ui.region, ui.weekMetric)}`)}
     ${dailyTable(report, ui, c)}
+    ${workdayTable(report, ui, c)}
     <div class="toolbar">
       <h2 class="section-title">Chi tiết nhân sự</h2>
       <input class="search" id="report-search" type="search" placeholder="Tìm theo tên hoặc mã…" value="${ui.query}" aria-label="Tìm nhân sự" autocomplete="off">

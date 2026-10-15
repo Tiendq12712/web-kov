@@ -1020,3 +1020,46 @@ table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-s
 .charts { display: block; column-width: 340px; column-gap: 16px; }
 .charts > * { break-inside: avoid; margin: 0 0 16px; width: 100%; box-sizing: border-box; }
 @media (max-width: 640px) { .charts { column-width: auto; columns: 1; } }
+
+/* Bảng tổng công tháng: ô nhỏ gọn, X xanh, X/2 vàng, Chủ nhật nền nhạt */
+.work-table th.wk, .work-table td.wk { text-align: center; padding: 7px 4px; min-width: 30px; font-size: 13px; }
+.work-table th.wk small { display: block; font-size: 10px; font-weight: 500; opacity: .75; }
+.work-table td.wk--x { color: var(--good); font-weight: 800; }
+.work-table td.wk--h { color: var(--warn); font-weight: 800; }
+.work-table th.wk--off, .work-table td.wk--off { background: color-mix(in srgb, var(--muted) 12%, var(--surface)); }
+.work-table tbody tr:nth-child(even) td.wk--off { background: color-mix(in srgb, var(--muted) 16%, var(--surface)); }
+.work-table th.wk, .work-table td.wk { min-width: 34px; }
+.work-table td.wk--h { font-size: 10.5px; letter-spacing: -.3px; }
+
+/* Nút xuất bảng ra Excel / PDF */
+.export-bar { display: flex; justify-content: flex-end; gap: 6px; margin: 6px 0 4px; }
+.export-btn { font: inherit; font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--muted); cursor: pointer; }
+.export-btn:hover { color: var(--text); background: var(--accent-soft); border-color: var(--accent); }
+@media print { .export-bar { display: none; } }
+.export-bar--inline { margin: 0 0 0 auto; align-self: center; flex: none; }
+.toolbar > .export-bar--inline, .card__head > .export-bar--inline { margin-left: auto; }
+.filters > .export-bar--inline { margin-left: auto; align-self: flex-end; }
+
+/* Ô có ghi chú: chấm nhỏ ở góc + chú thích nổi khi rê chuột */
+td.wk--note { position: relative; cursor: help; }
+td.wk--note::after { content: ""; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.tip { position: fixed; z-index: 120; max-width: min(300px, calc(100vw - 16px)); padding: 8px 11px; border-radius: 10px; background: var(--surface); color: var(--text); border: 1px solid var(--accent); box-shadow: 0 12px 28px -10px rgb(0 0 0 / .55); font-size: 13.5px; line-height: 1.45; pointer-events: none; }
+.tip small { display: block; margin-bottom: 2px; color: var(--muted); font-size: 11.5px; }
+
+/* Nút xuất gọn: một nút "⬇ Xuất" mở menu Excel / PDF, nằm trong hàng tiêu đề của bảng */
+.export-bar { position: relative; }
+.export-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 40; min-width: 140px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 14px 30px -12px rgb(0 0 0 / .5); }
+.export-menu[hidden] { display: none; }
+.export-menu button { display: block; width: 100%; text-align: left; font: inherit; font-size: 13.5px; padding: 7px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text); cursor: pointer; }
+.export-menu button:hover { background: var(--accent-soft); color: var(--accent); }
+.export-btn { padding: 3px 9px; }
+summary > .export-bar--inline { float: right; margin: -2px 0 0; }
+summary > .export-bar--inline { margin-left: auto; float: none; }
+details.timesheet > summary { display: flex; align-items: center; gap: 10px; }
+
+/* Thanh tiêu đề có nút Xuất: [Tiêu đề] [⬇ Xuất] ở hàng trên, ghi chú nằm hàng dưới */
+.toolbar:has(> .export-bar--inline) { flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 4px 12px; }
+.toolbar:has(> .export-bar--inline) > :first-child { order: 1; flex: none; }
+.toolbar:has(> .export-bar--inline) > .export-bar--inline { order: 2; margin: 0; }
+.toolbar:has(> .export-bar--inline) > .muted { order: 3; flex: 1 0 100%; margin: 0; text-align: left; }
+.card__head:has(> .export-bar--inline) { flex-wrap: nowrap; align-items: center; gap: 12px; }
