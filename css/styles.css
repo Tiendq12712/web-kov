@@ -1015,3 +1015,8 @@ table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-s
 .timesheet__table tfoot td { border-top: 2px solid var(--border); }
 .timesheet__table th:nth-child(4), .timesheet__table td.timesheet__note { width: 140px; max-width: 140px; }
 .timesheet__sum.talk-ok { color: var(--good); } .timesheet__sum.talk-bad { color: var(--bad); }
+
+/* Các thẻ biểu đồ xếp theo cột (masonry): thẻ ngắn không bị kéo giãn, không còn khoảng trống cạnh thẻ dài */
+.charts { display: block; column-width: 340px; column-gap: 16px; }
+.charts > * { break-inside: avoid; margin: 0 0 16px; width: 100%; box-sizing: border-box; }
+@media (max-width: 640px) { .charts { column-width: auto; columns: 1; } }
