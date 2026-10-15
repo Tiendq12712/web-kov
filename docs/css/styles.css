@@ -1006,3 +1006,12 @@ table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-s
   .guide__toc { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 8px; } .guide__toc a { white-space: nowrap; }
   .guide__body { padding: 4px 16px 40px; }
 }
+
+/* Talktime theo ngày: đạt chỉ tiêu xanh, chưa đạt đỏ */
+.timesheet__table td.talk-ok, strong.talk-ok { color: var(--good); font-weight: 700; }
+.timesheet__table td.talk-bad, strong.talk-bad { color: var(--bad); font-weight: 700; }
+.timesheet__note { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timesheet__sum { margin: 10px 0 4px; font-size: 14.5px; font-weight: 600; }
+.timesheet__table tfoot td { border-top: 2px solid var(--border); }
+.timesheet__table th:nth-child(4), .timesheet__table td.timesheet__note { width: 140px; max-width: 140px; }
+.timesheet__sum.talk-ok { color: var(--good); } .timesheet__sum.talk-bad { color: var(--bad); }

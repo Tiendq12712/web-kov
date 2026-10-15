@@ -48,7 +48,7 @@ export function detailView(team, m, workdays, report) {
           <div class="card__head"><h3 class="card__title">Talk time</h3>${passBadge(m.talk.pass)}</div>
           <dl class="kv"><dt>Thực đạt</dt><dd class="num">${hm(m.talk.actual)}</dd><dt>Mục tiêu</dt><dd class="num">${hm(m.talk.target)}</dd></dl>
         </section>` : ''}
-      ${timesheetView(report, m.code)}
+      ${timesheetView(report, m.code, m.talk?.target)}
       <dl class="kv card">${extras.map(([k, label, fmt]) => html`<dt>${label}</dt><dd class="num">${fmt(extra[k])}</dd>`)}</dl>
     </div>`;
 }
