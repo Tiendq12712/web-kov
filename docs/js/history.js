@@ -29,7 +29,7 @@ export async function loadHistory() {
 
 /** Ảnh chụp của ngày `date` từ dữ liệu đang hiển thị (KPI + SLA + Customer Info nếu có). */
 export function buildSnapshot({ data, month, date, pbi }) {
-  const sla = computeSla(data.work, date, month);
+  const sla = computeSla(data.work, date, month, { live: false });
   const slaBy = new Map((sla?.rows ?? []).map((r) => [r.code, r]));
   const cinfo = new Map();
   for (const a of pbi?.acts ?? []) {

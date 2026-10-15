@@ -15,16 +15,23 @@ export const slaStatus = (age) => (age > SLA_DAYS ? 'late' : age >= SLA_DAYS - W
 
 export const STATUS_LABELS = { late: 'Đã trễ SLA', soon: 'Sắp trễ SLA', ok: 'Trong hạn' };
 
+/** Tuổi lô tính đến hôm nay (giờ máy) nếu đang xem tháng hiện tại và số liệu cũ hơn hôm nay; số liệu chưa kịp đồng bộ thì hạn vẫn chạy theo lịch. */
+const effectiveNow = (asOf, month, live) => {
+  if (!live) return asOf;
+  const t = new Date(), iso = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+  return iso.slice(0, 7) === month && iso > asOf ? iso : asOf;
+};
+
 /**
  * @param work   dữ liệu tab công việc (cần `backlogAll`)
  * @param asOf   ngày số liệu, 'YYYY-MM-DD'
  * @param month  tháng của báo cáo, 'YYYY-MM'
  * @returns { asOf, rows, totals, buckets } hoặc null nếu thiếu bảng tồn
  */
-export function computeSla(work, asOf, month) {
+export function computeSla(work, asOf, month, { live = true } = {}) {
   const block = work?.backlogAll;
   if (!block || !asOf) return null;
-  const now = toDate(asOf);
+  const nowIso = effectiveNow(asOf, month, live), now = toDate(nowIso);
   const dayCols = block.labels.map((l, i) => [l, i]).filter(([l]) => typeof l === 'number');
   // Tổng data được chia trong tháng của từng người: mẫu số của các tỉ lệ (không có thì tạm tính trên tổng data tồn).
   const assignedCols = work.assigned ? work.assigned.labels.map((l, i) => [l, i]).filter(([l]) => typeof l === 'number').map(([, i]) => i) : [];
@@ -47,7 +54,7 @@ export function computeSla(work, asOf, month) {
   totals.base = rows.reduce((a, r) => a + r.base, 0);
   const ranges = [['0–2 ngày', 0, 2], ['3–4 ngày', 3, 4], [`5–${SLA_DAYS} ngày`, 5, SLA_DAYS], [`Trên ${SLA_DAYS} ngày`, SLA_DAYS + 1, Infinity]];
   const buckets = ranges.map(([label, lo, hi]) => ({ label, status: slaStatus(lo), count: sum(rows.flatMap((r) => r.batches.filter((b) => b.age >= lo && b.age <= hi).map((b) => b.count))) }));
-  return { asOf, rows, totals, buckets, days: dayRows(rows) };
+  return { asOf, now: nowIso, rows, totals, buckets, days: dayRows(rows) };
 }
 
 /** Gộp theo ngày chia các lô đã trễ hoặc sắp trễ (mọi nhân sự): lô cũ nhất ở trên. */

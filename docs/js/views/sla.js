@@ -37,7 +37,7 @@ function dayDetail(sla) {
   const people = sla.rows.filter((r) => r.late + r.soon > 0).sort((a, b) => b.late - a.late || b.soon - a.soon);
   const cell = (p, d) => { const n = p.batches.find((b) => b.day === d.day && b.status !== 'ok')?.count; return n ? html`<td class="right num sla-cell sla-cell--${d.status}">${num(n)}</td>` : html`<td class="right muted">·</td>`; };
   return html`
-    <div class="toolbar"><h2 class="section-title">Chi tiết data trễ và sắp trễ theo ngày</h2><p class="muted">Lô cũ nhất ở trên · tính đến ${dm(sla.asOf)}</p></div>
+    <div class="toolbar"><h2 class="section-title">Chi tiết data trễ và sắp trễ theo ngày</h2><p class="muted">Lô cũ nhất ở trên · tính đến ${dm(sla.now)}</p></div>
     <div class="table-wrap"><table class="sla-table sortable">
       <thead><tr><th>Ngày chia</th><th>Hạn xử lý</th><th>Thời gian còn lại</th><th class="right">SL data tồn</th><th class="right">Tỉ lệ</th><th class="right">Số người giữ</th><th>Tình trạng</th></tr></thead>
       <tbody>${sla.days.map((d) => html`<tr class="static sla-row sla-row--${d.status}">
@@ -96,7 +96,7 @@ const explain = html`<p class="muted">SLA xử lý data ONL là <strong>${SLA_DA
  */
 export function slaView(sla, { manager, code }) {
   if (!sla) return html`<p class="notice">Chưa có bảng tồn theo ngày trong tab công việc nên chưa thống kê được SLA.</p>`;
-  const asOfNote = html`<p class="muted">Số liệu tính đến <strong>${dm(sla.asOf)}</strong>.</p>`;
+  const asOfNote = html`<p class="muted">Hạn tính đến <strong>${dm(sla.now)}</strong>${sla.now !== sla.asOf ? html` · số liệu đồng bộ ngày ${dm(sla.asOf)}` : ''}.</p>`;
   if (manager) {
     return html`
       <div class="toolbar"><h2 class="section-title">Báo cáo SLA data ONL</h2>${asOfNote}</div>
@@ -110,5 +110,5 @@ export function slaView(sla, { manager, code }) {
   return html`
     <div class="toolbar"><h2 class="section-title">SLA data của bạn</h2>${asOfNote}</div>
     ${explain}${cards(mine)}
-    <section class="card"><h3 class="card__title">Data còn tồn theo ngày chia</h3>${batchTable(mine.batches, sla.asOf)}</section>`;
+    <section class="card"><h3 class="card__title">Data còn tồn theo ngày chia</h3>${batchTable(mine.batches, sla.now)}</section>`;
 }
