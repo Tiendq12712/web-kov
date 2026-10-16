@@ -133,12 +133,16 @@ const tabsOf = async (links, kind) => (await Promise.all(links.filter((l) => l.k
  */
 export async function resolveMonths(links) {
   const [kpiTabs, productivityTabs] = await Promise.all([tabsOf(links, 'kpi'), tabsOf(links, 'productivity')]);
-  const monthTabs = kpiTabs.filter((t) => monthFromText(t.tab));
+  // File KPI có thể chia mỗi tháng 2 tab: "KPI T10" (bảng KPI) và "Data T10" (chi tiết dữ liệu); tab Data không phải bảng KPI.
+  const isDetail = (t) => /^(data|chi tiet)/.test(plain(t.tab));
+  const monthTabs = kpiTabs.filter((t) => monthFromText(t.tab) && !isDetail(t));
+  const detailTabs = kpiTabs.filter((t) => monthFromText(t.tab) && isDetail(t));
 
   const entries = await Promise.all(monthTabs.map(async (t) => {
     const month = (await yearFromTitle(t, t.tab)) ?? monthFromText(t.tab);
-    const productivity = productivityTabs.find((p) => sameName(p.tab, t.tab)) ?? null;
-    return { month, kpi: t, productivity };
+    const productivity = productivityTabs.find((p) => sameName(p.tab, t.tab)) ?? productivityTabs.find((p) => monthFromText(p.tab) === monthFromText(t.tab)) ?? null;   // "KPI T10" ghép với "T10"
+    const detail = detailTabs.find((d) => d.id === t.id && monthFromText(d.tab) === monthFromText(t.tab)) ?? null;
+    return { month, kpi: t, productivity, detail };
   }));
   const byMonth = new Map(entries.map((e) => [e.month, e]));   // trùng tháng: dòng sau thay dòng trước
   return [...byMonth.values()].sort((a, b) => b.month.localeCompare(a.month));

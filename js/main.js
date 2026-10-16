@@ -1,4 +1,4 @@
-import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData, hasPbi, loadPbi, hasLibrary, loadLibrary, hasHr, loadHr } from './data.js';
+import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData, hasPbi, loadPbi, hasLibrary, loadLibrary, hasHr, loadHr, hasCalls, loadCalls } from './data.js';
 import { CONFIG } from './config.js';
 import { getSession, getRemembered, signIn, signOut, loadGis } from './auth.js';
 import { saveSnapshot, loadSnapshot, clearSnapshot } from './snapshot.js';
@@ -10,6 +10,8 @@ import { teamView, rowsView } from './views/team.js';
 import { detailView } from './views/detail.js';
 import { workView, workRowsView } from './views/work.js';
 import { reportView, reportRowsView, reportDetailView } from './views/report.js';
+import { connectView } from './views/connect.js';
+import { connectCallsView } from './views/connectCalls.js';
 import { workdaysByCode } from './report.js';
 import { createSettings } from './settingsController.js';
 import { createChat } from './chatController.js';
@@ -56,6 +58,8 @@ const state = {
   cinfo: { data: null, loading: false, error: '', f: { ...DEFAULT_FILTERS } },   // báo cáo Customer Info (PBI) + bộ lọc
   trend: { data: null, loading: false, error: '', metric: 'kpi', who: 'all' },   // xu hướng theo ngày (lịch sử đồng bộ)
   compare: { a: null, b: null, key: '', data: null, loading: false, error: '' },   // so sánh hai tháng (quản lý)
+  connect: { region: 'all', shortSec: 30, longSec: 180, view: 'month' },   // phân tích chất lượng call kết nối (dùng chung dữ liệu năng suất)
+  calls: { data: null, loading: false, error: '' },   // từng cuộc gọi (Sheet "Dữ liệu call")
   hr: { data: null, loading: false, error: '', q: '', region: 'all' },   // nhân sự và phép năm
   library: { data: null, loading: false, error: '', cat: 'all', q: '' },   // thư viện tài liệu (quy trình, chính sách, giải trình…)
   coach: null, coachBump: 0,   // nhân vật Coach KPI nổi ở góc màn hình
@@ -83,6 +87,7 @@ const writeHash = () => history.replaceState(null, '', `#/${state.month}/${state
 /* ---------- Render ---------- */
 const ICONS = {
   overview: '<rect x="3.5" y="3.5" width="7" height="9" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.8"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.8"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.8"/>',
+  connect: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
   hr: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>',
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M18 14.5c2.2.6 3.5 2.4 3.5 5.5"/>',
   report: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
@@ -112,6 +117,7 @@ function buildNav() {
   if (hasHr()) reports.push(item('hr', 'Phép năm', 'Phép năm', 'Nhân sự và phép năm 2026'));
   const analysis = [];
   if (manager) analysis.push(item('trend', 'Xu hướng', 'Xu hướng', 'Biến động theo ngày'));
+  if (manager && (hasCalls() || hasReport(state.month))) analysis.push(item('connect', 'Chất lượng kết nối', 'Kết nối', 'Tỉ lệ kết nối và call đàm thoại ngắn'));
   if (manager && monthList.length > 1) analysis.push(item('compare', 'So sánh tháng', 'So sánh', 'Đặt hai tháng cạnh nhau'));
   return [item('overview', 'Tổng quan'), group('team', 'Team', 'team', teams), group('report', 'Báo cáo', 'report', reports), group('analysis', 'Phân tích', 'trend', analysis),
     hasLibrary() ? item('library', 'Thư viện') : null, item('chat', 'Chia sẻ')].filter(Boolean);
@@ -273,6 +279,12 @@ function currentPage() {
   const report = preloadReport();   // ngày công và năng suất lấy từ file năng suất, nên luôn tải nền
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
+  if (state.tab === 'connect' && state.me.role !== 'member') {
+    const view = hasCalls()
+      ? lazyTab(state.calls, 'connect', loadCalls, (data) => connectCallsView(data, state.connect, state.month, kpiNames()))
+      : lazyTab(state.report, 'connect', loadReport, (data) => connectView(data, state.connect, kpiNames()));
+    return { view, title: 'Chất lượng kết nối' };
+  }
   if (state.tab === 'chat') return { view: renderChat(), title: 'Chia sẻ' };
   if (state.tab === 'hr' && hasHr()) return { view: lazyTab(state.hr, 'hr', loadHr, (d) => hrView(d, state.hr, { manager: state.me.role !== 'member', code: myCode() })), title: 'Phép năm' };
   if (state.tab === 'library' && hasLibrary()) return { view: lazyTab(state.library, 'library', loadLibrary, (d) => libraryView(d, state.library)), title: 'Thư viện' };
@@ -286,7 +298,7 @@ function currentPage() {
 }
 
 /** Tab phụ thuộc vào tháng đang xem (Tổng quan, các team, Công việc, SLA, Năng suất) mới có ô chọn tháng; các tab khác (Customer Info, Xu hướng, So sánh, Chia sẻ, Thiết lập) thì không. */
-const isMonthly = (tab) => ['overview', 'work', 'sla', 'report'].includes(tab) || Boolean(state.data?.teams.some((t) => t.id === tab));
+const isMonthly = (tab) => ['overview', 'work', 'sla', 'report'].includes(tab) || (tab === 'connect' && !hasCalls()) || Boolean(state.data?.teams.some((t) => t.id === tab));
 
 /** Ô chọn tháng nằm trong nội dung của tab (không đặt ở thanh trên cùng). */
 function monthBar() {
@@ -345,7 +357,7 @@ async function setMonth(ym, { boot = false } = {}) {
   }
   Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || team();
+  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -477,6 +489,8 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', (e) => {
+  if (e.target.id === 'connect-month') { state.connect.month = e.target.value; return renderView(); }
+  if (e.target.id === 'connect-short' || e.target.id === 'connect-long') { state.connect[e.target.id === 'connect-short' ? 'shortSec' : 'longSec'] = Number(e.target.value); return renderView(); }
   if (e.target.id === 'hr-region') { state.hr.region = e.target.value; return renderView(); }
   if (e.target.id === 'compare-a' || e.target.id === 'compare-b') { state.compare[e.target.id === 'compare-a' ? 'a' : 'b'] = e.target.value; return renderView(); }
   if (e.target.id === 'trend-who') { state.trend.who = e.target.value; return renderView(); }
@@ -507,6 +521,8 @@ document.addEventListener('click', (e) => {
     state.work.sort = { key, dir: sort.key === key && sort.dir === 'desc' ? 'asc' : 'desc' };
     return renderView();
   }
+  if (hit('[data-cview]')) { state.connect.view = hit('[data-cview]').dataset.cview; return renderView(); }
+  if (hit('[data-cregion]')) { state.connect.region = hit('[data-cregion]').dataset.cregion; return renderView(); }
   if (hit('[data-daymetric]')) { state.report.dayMetric = hit('[data-daymetric]').dataset.daymetric; return renderView(); }
   if (hit('[data-rsort]')) {
     const key = hit('[data-rsort]').dataset.rsort;
@@ -804,6 +820,7 @@ async function refreshSession() {
     Object.assign(state.cinfo, { data: null, error: '' });
     Object.assign(state.library, { data: null, error: '' });
     Object.assign(state.hr, { data: null, error: '' });
+    Object.assign(state.calls, { data: null, error: '' });
     Object.assign(state.compare, { data: null, error: '', key: '' });
     preloadPbi();
     state.data = await loadMonth(state.month);

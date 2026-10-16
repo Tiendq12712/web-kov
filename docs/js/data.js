@@ -7,6 +7,7 @@ import { tryParseWork } from './work.js';
 import { loadLinks, resolveMonths } from './directory.js';
 import { loadSyncTime, applySyncTime } from './syncTime.js';
 import { parsePbi } from './pbi.js';
+import { parseCalls } from './calls.js';
 
 const cache = new Map();
 const store = new Map();   // kết quả đã tải xong (để lưu lại dùng cho lần mở sau)
@@ -14,16 +15,19 @@ let months = [];
 let monthsPromise = null;
 let pbiLink = null;      // link Power BI (dòng "PBI" trong tab Danh sách link)
 let hrLink = null;       // link "Danh sách nhân sự SC" (tab Danh sách + tab Phép năm)
+let callLink = null;     // link "Dữ liệu call" (từng cuộc gọi do mục Xuất Call ghi ra)
 let libraryLink = null;  // link "Thư viện" (dòng Thư viện trong tab Danh sách link)
 
 /** Danh sách tháng được dựng từ tab "Danh sách link" của Sheet cấu hình. */
 const isPbi = (l) => l.info.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase() === 'pbi';
 const isHr = (l) => /nhan su/.test(l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase());
+const isCalls = (l) => /^du lieu call/.test(l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase());
 const isLibrary = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'thu vien';
 export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
   pbiLink = links.find(isPbi) ?? null;
   libraryLink = links.find(isLibrary) ?? null;
   hrLink = links.find(isHr) ?? null;
+  callLink = links.find(isCalls) ?? null;
   return resolveMonths(links);
 }).then((list) => (months = list)));
 export const reloadMonths = () => { monthsPromise = null; cache.clear(); store.clear(); };
@@ -95,15 +99,26 @@ export const loadHr = () => memo('hr', async () => {
   return buildHr(staff, leave);
 });
 
+/** Dữ liệu từng cuộc gọi (Sheet lớn): đọc một lần mỗi phiên, không lưu vào bản dữ liệu của ngày. */
+export const hasCalls = () => Boolean(callLink);
+export const loadCalls = () => memo('calls', async () => {
+  if (!callLink) throw new Error('Chưa có link "Dữ liệu call" trong tab Danh sách link');
+  const token = getToken();
+  const tabs = callLink.tab ? [callLink.tab] : await fetchTabs(callLink.id, token);   // mỗi tab một tháng (T7, T8, T9, T10…)
+  const sets = await Promise.all(tabs.map((tab) => fetchRows(callLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:O60000' })));
+  return parseCalls(sets, tabs);
+});
+
 export const clearCache = () => { cache.clear(); store.clear(); };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
-export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, entries: [...store].filter(([key]) => key !== 'sync') });
-export function restoreData({ months: saved, pbi, library, hr, entries }) {
+export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, calls: callLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls') });
+export function restoreData({ months: saved, pbi, library, hr, calls, entries }) {
   months = saved;
   pbiLink = pbi ?? null;
   libraryLink = library ?? null;
   hrLink = hr ?? null;
+  callLink = calls ?? null;
   monthsPromise = Promise.resolve(saved);
   entries.forEach(([key, value]) => { cache.set(key, Promise.resolve(value)); store.set(key, value); });
 }

@@ -1063,3 +1063,18 @@ details.timesheet > summary { display: flex; align-items: center; gap: 10px; }
 .toolbar:has(> .export-bar--inline) > .export-bar--inline { order: 2; margin: 0; }
 .toolbar:has(> .export-bar--inline) > .muted { order: 3; flex: 1 0 100%; margin: 0; text-align: left; }
 .card__head:has(> .export-bar--inline) { flex-wrap: nowrap; align-items: center; gap: 12px; }
+
+/* Chất lượng cuộc gọi kết nối */
+.stack--big { height: 22px; border-radius: 8px; margin: 10px 0 8px; }
+.advice { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.advice li { padding: 10px 12px; border-radius: 10px; border-left: 4px solid var(--muted); background: var(--surface-2); font-size: 14.5px; line-height: 1.55; }
+.advice--bad { border-left-color: var(--bad) !important; } .advice--warn { border-left-color: var(--warn) !important; } .advice--good { border-left-color: var(--good) !important; } .advice--info { border-left-color: var(--accent) !important; }
+.connect-table th, .connect-table td { white-space: nowrap; }
+.hist { display: grid; gap: 8px; margin: 10px 0; }
+.hist__row { display: grid; grid-template-columns: 110px 1fr 120px; gap: 12px; align-items: center; font-size: 14px; }
+.hist__row .num { text-align: right; }
+.hist .bar--bad .bar__fill { background: var(--bad); }
+@media (max-width: 640px) { .hist__row { grid-template-columns: 84px 1fr 96px; gap: 8px; font-size: 13px; } }
+small.talk-ok { color: var(--good); font-weight: 700; } small.talk-bad { color: var(--bad); font-weight: 700; }
+.swatch.s5, .stack__seg.s5 { background: #ef6a6a; } .swatch.s6, .stack__seg.s6 { background: #a78bfa; }
+.donut__arc.s5 { stroke: #ef6a6a; } .donut__arc.s6 { stroke: #a78bfa; }
