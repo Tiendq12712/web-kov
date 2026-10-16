@@ -25,7 +25,7 @@ export function segmentView(data, ui) {
   const a = analyzeSegment(data.rows, { key, month });
   const { seg, all, rest } = a.m;
   const mtext = month === 'all' ? `${data.months.map(mlabel).join(' + ')}` : mlabel(month);
-  const row = (title, f, fmt, good) => html`<tr class="static"><td class="sticky-col"><strong>${title}</strong></td><td class="right num strong">${fmt(seg[f])}</td><td class="right num">${fmt(all[f])}${delta(seg[f], all[f], { good })}</td><td class="right num">${fmt(rest[f])}</td></tr>`;
+  const row = (title, f, fmt, good) => html`<tr class="static"><td class="sticky-col"><strong>${title}</strong></td><td class="right num strong">${fmt(seg[f])}${delta(seg[f], all[f], { good })}</td><td class="right num">${fmt(all[f])}</td><td class="right num">${fmt(rest[f])}</td></tr>`;
   const countRow = (title, f) => html`<tr class="static"><td class="sticky-col"><strong>${title}</strong></td><td class="right num strong">${num(seg[f])}</td><td class="right num">${num(all[f])}</td><td class="right num">${num(rest[f])}</td></tr>`;
   const share = (t) => html`<td class="right num strong">${p1(t.segShare)}</td><td class="right num">${p1(t.allShare)}</td><td class="right num ${t.times && t.times >= 2 ? 'talk-bad' : ''}">${t.times == null ? '—' : `${t.times.toFixed(1).replace('.', ',')}×`}</td>`;
   return html`
@@ -40,10 +40,10 @@ export function segmentView(data, ui) {
       ${stat(`Data tệp "${label}"`, num(seg.n), `${p1(seg.n / all.n)} toàn data · đã làm ${num(seg.done)} (${p1(seg.doneShare)})`)}
       ${stat('Kết nối thành công', p1(seg.connRate), `${num(seg.conn)}/${num(seg.contacted)} data đã liên hệ · toàn data ${p1(all.connRate)}`)}
       ${stat('Impact (KH SC tác động)', p1(seg.impactRate), `${num(seg.impact)} data · toàn data ${p1(all.impactRate)}`)}
-      ${stat('Add-on / data kết nối', p1(seg.addRate), `${num(seg.addCount)} data trên ${num(seg.conn)} kết nối · toàn data ${p1(all.addRate)}`)}
+      ${stat('Add-on', `${num(seg.addCount)} data`, `Tỉ lệ ${p1(seg.addRate)} trên ${num(seg.conn)} data kết nối · ${num(seg.addPts)} điểm · toàn data ${p1(all.addRate)} (${num(all.addCount)} data)`)}
     </div>
     <section class="card"><h3 class="card__title">Gợi ý hành động cho tệp</h3><ul class="advice">${a.advice.map((x) => html`<li class="advice--${x.tone}">${x.text}</li>`)}</ul></section>
-    <div class="toolbar"><h2 class="section-title">So sánh với toàn bộ data</h2><p class="muted">Mũi tên: chênh lệch của tệp so với toàn data (điểm %), xanh là tốt hơn. "Khác" = toàn data trừ tệp này.</p></div>
+    <div class="toolbar"><h2 class="section-title">So sánh với toàn bộ data</h2><p class="muted">Mũi tên ở cột tệp: tệp <strong>cao hơn (▲)</strong> hay <strong>thấp hơn (▼)</strong> toàn data bao nhiêu điểm %. Màu xanh = có lợi, đỏ = bất lợi (riêng tỉ lệ còn tồn và liên hệ không được thì cao hơn là bất lợi). "Các nguồn khác" = toàn data trừ tệp này.</p></div>
     <div class="table-wrap"><table class="connect-table">
       <thead><tr><th scope="col" class="sticky-col">Chỉ số</th><th scope="col" class="right">${label}</th><th scope="col" class="right">Toàn data</th><th scope="col" class="right">Các nguồn khác</th></tr></thead>
       <tbody>
@@ -54,6 +54,7 @@ export function segmentView(data, ui) {
         ${row('Impact / data đã làm', 'impactRate', p1, 'up')}
         ${row('Impact / data kết nối', 'impactConnRate', p1, 'up')}
         ${row('Add-on / data kết nối thành công', 'addRate', p1, 'up')}
+        ${countRow('Số data kết nối thành công (mẫu số của add-on)', 'conn')}
         ${countRow('Số data có add-on', 'addCount')}${countRow('Điểm add-on', 'addPts')}${countRow('Tổng điểm', 'points')}
         ${countRow('Tồn sắp trễ SLA (tuổi 5–7 ngày)', 'soon')}${countRow('Tồn đã trễ SLA (trên 7 ngày)', 'late')}
       </tbody></table></div>
@@ -73,7 +74,7 @@ export function segmentView(data, ui) {
     <div class="table-wrap"><table class="connect-table sortable">
       <thead><tr><th scope="col" class="sticky-col">Nguyên nhân</th><th scope="col" class="right">Số data (tệp)</th><th scope="col" class="right">% tệp</th><th scope="col" class="right">% toàn data</th><th scope="col" class="right">Gấp</th></tr></thead>
       <tbody>${a.reasons.map((t) => html`<tr class="static"><td class="sticky-col">${t.name}</td><td class="right num">${num(t.seg)}</td>${share(t)}</tr>`)}</tbody></table></div>
-    <div class="toolbar"><h2 class="section-title">Add-on</h2></div>
+    <div class="toolbar"><h2 class="section-title">Add-on</h2><p class="muted">Số data ghi nhận từng loại add-on (một data có thể có nhiều loại). Tệp: ${num(seg.addCount)} data có add-on, ${num(seg.addPts)} điểm.</p></div>
     <div class="table-wrap"><table class="connect-table">
       <thead><tr><th scope="col" class="sticky-col">Loại add-on</th><th scope="col" class="right">Tệp</th><th scope="col" class="right">Toàn data</th></tr></thead>
       <tbody>${a.addons.map((t) => html`<tr class="static"><td class="sticky-col">${t.name}</td><td class="right num strong">${num(t.seg)}</td><td class="right num">${num(t.all)}</td></tr>`)}</tbody></table></div>
