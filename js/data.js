@@ -8,6 +8,7 @@ import { loadLinks, resolveMonths } from './directory.js';
 import { loadSyncTime, applySyncTime } from './syncTime.js';
 import { parsePbi } from './pbi.js';
 import { parseCalls } from './calls.js';
+import { parseDetail } from './segment.js';
 
 const cache = new Map();
 const store = new Map();   // kết quả đã tải xong (để lưu lại dùng cho lần mở sau)
@@ -109,10 +110,20 @@ export const loadCalls = () => memo('calls', async () => {
   return parseCalls(sets, tabs);
 });
 
+/** Chi tiết từng việc của file KPI (tab "Data Txx" của mỗi tháng): dùng để phân tích theo tệp data. */
+export const hasDetail = () => months.some((m) => m.detail);
+export const loadDetail = () => memo('detail', async () => {
+  const token = getToken();
+  const list = months.filter((m) => m.detail);
+  const sets = await Promise.all(list.map((m) => fetchRows(m.detail.id, token, { tab: `'${m.detail.tab.replace(/'/g, "''")}'`, range: 'A1:AK30000' })));
+  const rows = sets.flatMap((set, i) => parseDetail(set, list[i].month));
+  return { rows, months: list.map((m) => m.month).sort() };
+});
+
 export const clearCache = () => { cache.clear(); store.clear(); };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
-export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, calls: callLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls') });
+export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, calls: callLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'detail') });
 export function restoreData({ months: saved, pbi, library, hr, calls, entries }) {
   months = saved;
   pbiLink = pbi ?? null;

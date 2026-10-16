@@ -67,8 +67,8 @@ function trendView(data, ui, names) {
         <tr class="static"><td class="sticky-col"><strong>Số ngày có data</strong></td>${t.team.map((m) => html`<td class="right num">${m.days}</td>`)}</tr>
       </tbody></table></div>
     <div class="charts">
-      ${chartCard('Tỉ lệ kết nối qua các tháng', lineChart({ labels, series: [{ name: 'Tỉ lệ kết nối', cls: 's1', values: t.team.map((m) => m.rate) }], format: (v) => pct(v) }))}
-      ${chartCard(`Tỉ lệ cuộc ngắn (< ${sec(ui.shortSec)}) qua các tháng`, lineChart({ labels, series: [{ name: 'Tỉ lệ ngắn', cls: 's3', values: t.team.map((m) => m.shortShare) }], format: (v) => pct(v) }))}
+      ${chartCard('Tỉ lệ kết nối qua các tháng', lineChart({ labels, series: [{ name: 'Tỉ lệ kết nối', cls: 's1', values: t.team.map((m) => m.rate) }], format: (v) => pct(v), values: true, valueFormat: (v) => pct(v, 1) }))}
+      ${chartCard(`Tỉ lệ cuộc ngắn (< ${sec(ui.shortSec)}) qua các tháng`, lineChart({ labels, series: [{ name: 'Tỉ lệ ngắn', cls: 's3', values: t.team.map((m) => m.shortShare) }], format: (v) => pct(v), values: true, valueFormat: (v) => pct(v, 1) }))}
     </div>
     ${matrix('Tỉ lệ kết nối theo nhân sự', 'rate', 'up', 'Càng cao càng tốt; mũi tên xanh là cải thiện so với tháng trước.')}
     ${matrix('Tỉ lệ cuộc kết nối ngắn theo nhân sự', 'shortShare', 'down', 'Càng thấp càng tốt; mũi tên xanh là giảm so với tháng trước.')}`;
@@ -106,7 +106,7 @@ function monthView(data, ui, month, names) {
     <div class="charts">
       ${chartCard('Kết quả các cuộc gọi', donutChart({ segments: resultSegments, center: { value: pct(totals.rate ?? 0, 0), label: 'kết nối' } }), 'Tỉ lệ kết nối thành công và lý do không kết nối.')}
       ${chartCard('Cuộc kết nối theo thời gian đàm thoại', donutChart({ segments: lengthSegments, center: { value: pct(a.shortShare, 0), label: 'cuộc ngắn' } }), `Ngắn: dưới ${sec(ui.shortSec)} · Dài: từ ${sec(ui.longSec)}.`)}
-      ${chartCard('Theo khung giờ', groupedColumns({ categories: hourRows.map((h) => h.slot.replace('h', '')), series: [{ name: 'Tỉ lệ kết nối', cls: 's1', values: hourRows.map((h) => h.rate) }, { name: `Tỉ lệ cuộc ngắn (< ${sec(ui.shortSec)})`, cls: 's3', values: hourRows.map((h) => h.shortShare ?? 0) }] }), 'Chỉ các khung giờ có từ 50 cuộc gọi trở lên.')}
+      ${chartCard('Theo khung giờ', groupedColumns({ categories: hourRows.map((h) => h.slot.replace('h', '')), series: [{ name: 'Tỉ lệ kết nối', cls: 's1', values: hourRows.map((h) => h.rate) }, { name: `Tỉ lệ cuộc ngắn (< ${sec(ui.shortSec)})`, cls: 's3', values: hourRows.map((h) => h.shortShare ?? 0) }], values: true, valueFormat: (v) => pct(v, 1) }), 'Chỉ các khung giờ có từ 50 cuộc gọi trở lên.')}
       ${chartCard('Tỉ lệ cuộc ngắn theo nhân sự', html`<div class="hist">${rows.map((r) => html`<div class="hist__row"><span title="${nameOf(r)}">${nameOf(r).split(' ').slice(-2).join(' ')}</span>
         <div class="bar ${r.status === 'short' ? 'bar--bad' : ''}"><div class="bar__fill" style="width:${((r.shortShare ?? 0) / maxShort) * 100}%"></div></div><span class="num">${r.shortShare == null ? '—' : pct(r.shortShare, 1)}</span></div>`)}</div>`, 'Đỏ: cao hơn team từ 8 điểm % (cần coaching).')}
     </div>

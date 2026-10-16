@@ -21,7 +21,7 @@ const legend = (series) => html`
   <ul class="legend">${series.map((s) => html`<li><i class="swatch ${s.cls}"></i>${s.name}</li>`)}</ul>`;
 
 /** Cột nhóm; `line` là vạch ngang (thời gian đã qua). */
-export function groupedColumns({ categories, series, line, lineLabel, format = pct, ratio = true }) {
+export function groupedColumns({ categories, series, line, lineLabel, format = pct, ratio = true, values = false, valueFormat }) {
   const peak = Math.max(...series.flatMap((s) => s.values), line ?? 0);
   const top = ratio ? Math.ceil(Math.max(1, peak) * 4) / 4 : niceCeil(peak);
   const rotate = categories.length > 8 && Math.max(...categories.map((c) => String(c).length)) > 4;   // nhiều cột + nhãn dài: xoay để không chồng nhau
@@ -37,7 +37,8 @@ export function groupedColumns({ categories, series, line, lineLabel, format = p
     const x0 = PAD.l + slot * ci + (slot - bw * series.length) / 2;
     return series.map((s, si) => {
       const v = s.values[ci], x = x0 + bw * si;
-      return `<rect class="${s.cls}" x="${x}" y="${y(v)}" width="${bw - 2}" height="${PAD.t + ih - y(v)}" rx="3"><title>${escape(cat)} · ${escape(s.name)}: ${format(v)}</title></rect>`;
+      const label = values ? `<text class="val" x="${x + (bw - 2) / 2}" y="${y(v) - 4}" text-anchor="middle">${(valueFormat ?? format)(v)}</text>` : '';
+      return `<rect class="${s.cls}" x="${x}" y="${y(v)}" width="${bw - 2}" height="${PAD.t + ih - y(v)}" rx="3"><title>${escape(cat)} · ${escape(s.name)}: ${format(v)}</title></rect>${label}`;
     }).join('') + axisLabel(escape(cat), PAD.l + slot * (ci + 0.5), PAD.t + ih + 16, rotate);
   }).join('');
 
@@ -97,7 +98,7 @@ export const chartCard = (title, body, hint = '') => html`
   <section class="card"><h2 class="section-title">${title}</h2>${hint ? html`<p class="muted">${hint}</p>` : ''}${body}</section>`;
 
 /** Biểu đồ đường nhiều chuỗi (xu hướng theo khung giờ / theo tuần). */
-export function lineChart({ labels, series, format = (v) => String(v) }) {
+export function lineChart({ labels, series, format = (v) => String(v), values = false, valueFormat }) {
   const top = niceCeil(Math.max(...series.flatMap((s) => s.values)));
   const iw = W - PAD.l - PAD.r, ih = H - PAD.t - PAD.b;
   const INSET = 28;   // chừa chỗ cho nhãn đầu/cuối không bị cắt
@@ -110,7 +111,8 @@ export function lineChart({ labels, series, format = (v) => String(v) }) {
   const lines = series.map((s) => {
     const pts = s.values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
     const dots = s.values.map((v, i) => `<circle class="dot ${s.cls}" cx="${x(i)}" cy="${y(v)}" r="3.5"><title>${escape(labels[i])} · ${escape(s.name)}: ${format(v)}</title></circle>`).join('');
-    return `<polyline class="line ${s.cls}" points="${pts}"/>${dots}`;
+    const nums = values && s.values.length <= 14 ? s.values.map((v, i) => `<text class="val" x="${x(i)}" y="${y(v) - 9}" text-anchor="middle">${(valueFormat ?? format)(v)}</text>`).join('') : '';
+    return `<polyline class="line ${s.cls}" points="${pts}"/>${dots}${nums}`;
   }).join('');
   return html`
     <div class="chart">

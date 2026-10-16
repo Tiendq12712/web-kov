@@ -39,11 +39,31 @@ export const filterMembers = (team, query) => {
   return q ? team.members.filter((m) => `${m.name} ${m.code}`.toLowerCase().includes(q)) : team.members;
 };
 
+const mean = (list) => { const v = list.filter((x) => x != null && !Number.isNaN(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+
+/** Hàng "Trung bình" cuối bảng: trung bình các nhân sự đang hiển thị. */
+const averageRow = (members, team) => {
+  if (!members.length) return '';
+  const rnd = (v) => (v == null ? v : Math.round(v));
+  const block = (k) => ({ done: rnd(mean(members.map((m) => m[k].done))), target: rnd(mean(members.map((m) => m[k].target))), rate: mean(members.map((m) => m[k].rate)) });
+  const cells = {
+    name: html`<span class="person"><strong>Trung bình</strong><small>${members.length} nhân sự</small></span>`,
+    kpi: html`<span class="num strong">${pct(mean(members.map((m) => m.kpi)), 1)}</span>`,
+    status: '',
+    need: rateCell(block('need')), main: rateCell(block('main')), addon: rateCell(block('addon')),
+    act: html`<span class="num">${num(rnd(mean(members.map((m) => m.extra.actDone))))} / ${num(rnd(mean(members.map((m) => m.extra.assigned))))}</span>`,
+    impact: html`<span class="num">${pct(mean(members.map((m) => m.extra.impactRate)))}</span>`,
+    talk: members.some((m) => m.talk) ? html`<span class="num">${hm(mean(members.map((m) => m.talk?.actual)))} / ${hm(mean(members.map((m) => m.talk?.target)))}</span>` : '',
+  };
+  return html`<tr class="static avg-row">${KEYS.map((k) => html`<td class="${COLUMNS[k].sticky ? 'sticky-col' : ''}">${cells[k]}</td>`)}</tr>`;
+};
+
 export const rowsView = (team, query, sort) => {
-  return sortRows(filterMembers(team, query), team, sort).map((m) => html`
+  const list = filterMembers(team, query);
+  return html`${sortRows(list, team, sort).map((m) => html`
     <tr data-member="${team.id}:${m.code}" tabindex="0">
       ${KEYS.map((k) => html`<td class="${COLUMNS[k].sticky ? 'sticky-col' : ''}">${COLUMNS[k].cell(m, team)}</td>`)}
-    </tr>`);
+    </tr>`)}${averageRow(list, team)}`;
 };
 
 const stat = (title, value, sub) => html`
@@ -69,7 +89,7 @@ export function teamView(team, { query, sort }) {
       <input class="search" id="search" type="search" placeholder="Tìm theo tên hoặc mã…" value="${query}" aria-label="Tìm nhân sự" autocomplete="off">
     </div>
     <div class="table-wrap">
-      <table>
+      <table class="team-table">
         <thead><tr>${KEYS.map((k) => html`
           <th scope="col" aria-sort="${sort.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">
             <button type="button" data-sort="${k}">${COLUMNS[k].label}</button>

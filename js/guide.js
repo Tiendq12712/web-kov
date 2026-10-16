@@ -19,7 +19,7 @@ const SECTIONS = [
   ] },
   { id: 'overview', icon: '📊', title: 'Tổng quan', body: [
     ['p', 'Màn hình chính. Thành viên thấy tiến độ của mình; quản lý thấy toàn bộ team.'],
-    ['ul', ['Thẻ đầu trang: KPI đạt được, tỉ lệ hoàn thành và mức theo kịp thời gian đã qua của tháng.', 'Nhãn trạng thái: “Đạt tiến độ” = KPI theo kịp thời gian; “Cần đẩy” = từ 70% trở lên nhưng chưa kịp; “Chậm” = dưới 70%.', 'Bảng nhân sự: bấm vào một người để xem chi tiết từng chỉ tiêu; có nút xem chi tiết công và chi tiết SLA.', 'Biểu tượng bảng màu đổi kiểu tô màu: thanh màu, ít màu hoặc nhiều màu.', 'Các bảng thống kê bấm vào tiêu đề cột để sắp xếp, bấm lần nữa để đổi chiều.', 'Mỗi nhân sự có đầu số kèm tên để phân biệt người trùng tên.', 'Thẻ “Việc cần làm hôm nay” gợi ý việc ưu tiên (data sắp trễ SLA, ngày chưa chấm công…).']],
+    ['ul', ['Thẻ đầu trang: KPI đạt được, tỉ lệ hoàn thành và mức theo kịp thời gian đã qua của tháng.', 'Nhãn trạng thái: “Đạt tiến độ” = KPI theo kịp thời gian; “Cần đẩy” = từ 70% trở lên nhưng chưa kịp; “Chậm” = dưới 70%.', 'Bảng nhân sự: bấm vào một người để xem chi tiết từng chỉ tiêu; có nút xem chi tiết công và chi tiết SLA.', 'Biểu tượng bảng màu đổi kiểu tô màu: thanh màu, ít màu hoặc nhiều màu.', 'Các bảng thống kê bấm vào tiêu đề cột để sắp xếp, bấm lần nữa để đổi chiều.', 'Bấm vào một biểu đồ để xem phóng to (Esc hoặc bấm ra ngoài để đóng).', 'Mỗi nhân sự có đầu số kèm tên để phân biệt người trùng tên.', 'Thẻ “Việc cần làm hôm nay” gợi ý việc ưu tiên (data sắp trễ SLA, ngày chưa chấm công…).']],
     ['p', 'Nhân vật robot ở góc màn hình nhắc nhở khi tiến độ chậm và chúc mừng khi vượt tiến độ; bấm vào lời thoại để đi thẳng tới phần cần xem, bấm X để thu gọn.'],
   ] },
   { id: 'team', icon: '👥', title: 'Team', body: [
@@ -43,7 +43,7 @@ const SECTIONS = [
     ['ul', ['Thành viên: xem phép của mình (còn lại, đã dùng, được thêm, tồn từ 2025) và bảng theo từng tháng.', 'Quản lý: bốn thẻ tổng (nhân sự, phép đã dùng, còn lại, nợ phép), bảng cả team có tìm kiếm, lọc khu vực, sắp xếp và ma trận phép đã dùng theo tháng.', '“Còn lại” lấy theo tháng gần nhất đã có số liệu. Số âm (đỏ) nghĩa là đang dùng vượt phép được hưởng.', 'Thấy số chưa đúng? Báo quản lý ở mục Chia sẻ để sửa trong Sheet.']],
   ] },
   { id: 'analysis', icon: '📈', title: 'Phân tích (quản lý)', roles: MANAGER, body: [
-    ['ul', ['Xu hướng: biến động KPI theo từng ngày, dựa trên bản chụp lưu mỗi ngày trong tab Lịch sử.', 'So sánh tháng: đặt hai tháng cạnh nhau để thấy chênh lệch từng chỉ tiêu và từng người.', 'Thành viên không thấy nhóm Phân tích.']],
+    ['ul', ['Xu hướng: biến động KPI theo từng ngày, dựa trên bản chụp lưu mỗi ngày trong tab Lịch sử.', 'So sánh tháng: đặt hai tháng cạnh nhau để thấy chênh lệch từng chỉ tiêu và từng người.', 'Chất lượng kết nối: phân tích từng cuộc gọi (Sheet Dữ liệu call): tỉ lệ kết nối, cuộc ngắn, khách ngắt máy, khung giờ, lý do không kết nối, so sánh qua các tháng.', 'Phân tích tệp data: chọn một nguồn data (ví dụ Fnb kitchen print fail) để xem công việc hỗ trợ, tỉ lệ kết nối, impact, add-on, tồn đọng và so với toàn data; có gợi ý hành động.', 'Thành viên không thấy nhóm Phân tích.']],
   ] },
   { id: 'library', icon: '📚', title: 'Thư viện', body: [
     ['ul', ['Kho tài liệu của team (quy trình, biểu mẫu, hướng dẫn), mỗi mục có biểu tượng theo loại tệp.', 'Bấm vào tài liệu để mở trong tab mới. Chỉ hiện khi đã có link thư viện trong cấu hình.']],

@@ -250,6 +250,29 @@ const filteredRows = (data, { filter, mstatus = 'all', mquery = '', osort = { ke
     });
 };
 
+const avgOf = (list) => { const v = list.filter((x) => x != null && !Number.isNaN(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+
+/** Hàng "Trung bình" cuối bảng: trung bình các nhân sự đang hiển thị (theo bộ lọc). */
+function averageRow(rows, workdays, full) {
+  const ms = rows.map((r) => r.member);
+  const wd = avgOf(ms.map((m) => workdays.get(m.code) ?? m.extra.workdays));
+  const lead = html`<td class="sticky-col"><span class="person"><strong>Trung bình</strong><small>${rows.length} nhân sự</small></span></td><td></td><td class="right num">${pct(avgOf(ms.map((m) => m.kpi)), 1)}</td><td></td>`;
+  if (full) {
+    const cells = METRICS.flatMap(([, , read]) => {
+      const xs = ms.map(read), fmt = xs[0]?.time ? hm : num;
+      const t = avgOf(xs.map((x) => x.target)), d = avgOf(xs.map((x) => x.done)), r0 = (v) => (xs[0]?.time ? v : Math.round(v));
+      return [html`<td class="right num grp">${fmt(r0(t))}</td>`, html`<td class="right num">${fmt(r0(d))}</td>`, html`<td class="right num">${fmt(r0(avgOf(xs.map(missingOf))))}</td>`, html`<td class="right num">${pct(avgOf(xs.map((x) => x.rate)))}</td>`];
+    });
+    return html`<tr class="static avg-row">${lead}${cells}<td class="right num grp">${num(wd)}</td></tr>`;
+  }
+  const rnd = (v) => (v == null ? v : Math.round(v));
+  const block = (key) => ({ done: rnd(avgOf(ms.map((m) => m[key].done))), target: rnd(avgOf(ms.map((m) => m[key].target))), rate: avgOf(ms.map((m) => m[key].rate)) });
+  const cell = (inner) => html`<td class="right num">${inner}</td>`;
+  return html`<tr class="static avg-row">${lead}${['need', 'main', 'addon'].map((k) => cell(rateCell(block(k))))}
+    ${cell(`${num(rnd(avgOf(ms.map((m) => m.extra.actDone))))}/${num(rnd(avgOf(ms.map((m) => m.extra.assigned))))}`)}
+    ${cell(`${hm(avgOf(ms.map((m) => m.talk.actual)))} / ${hm(avgOf(ms.map((m) => m.talk.target)))}`)}${cell(num(wd))}</tr>`;
+}
+
 export function memberRowsView(data, ui, report) {
   const mode = HEAT_MODES.some(([id]) => id === ui.heat) ? ui.heat : 'bars';
   const workdays = report ? workdaysByCode(report) : new Map();
@@ -257,7 +280,7 @@ export function memberRowsView(data, ui, report) {
   // Top 3 KPI tổng của toàn bộ Online (người bằng điểm cùng hạng), không đổi theo bộ lọc.
   const podium = [...new Set(data.teams.flatMap((t) => t.members.map((m) => m.kpi ?? 0)).filter((k) => k > 0))].sort((a, b) => b - a).slice(0, 3);
   const full = ui.tview === 'full';
-  return rows.length ? html`${rows.map((row) => (full ? fullRow : memberRow)(row, workdays, mode, podium))}`
+  return rows.length ? html`${rows.map((row) => (full ? fullRow : memberRow)(row, workdays, mode, podium))}${averageRow(rows, workdays, full)}`
     : html`<tr class="static"><td colspan="${full ? 25 : 10}" class="muted">Không có nhân sự nào khớp bộ lọc.</td></tr>`;
 }
 

@@ -1078,3 +1078,28 @@ details.timesheet > summary { display: flex; align-items: center; gap: 10px; }
 small.talk-ok { color: var(--good); font-weight: 700; } small.talk-bad { color: var(--bad); font-weight: 700; }
 .swatch.s5, .stack__seg.s5 { background: #ef6a6a; } .swatch.s6, .stack__seg.s6 { background: #a78bfa; }
 .donut__arc.s5 { stroke: #ef6a6a; } .donut__arc.s6 { stroke: #a78bfa; }
+.chart text.val { fill: var(--text); font-size: 10.5px; font-weight: 700; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+
+/* Biểu đồ bấm để phóng to */
+.chart, .donut { cursor: zoom-in; }
+.zoom { position: fixed; inset: 0; z-index: 130; display: grid; place-items: center; padding: 20px; background: rgb(8 12 24 / .72); backdrop-filter: blur(4px); }
+.zoom__panel { width: min(1100px, 100%); max-height: 100%; overflow: auto; padding: 16px 20px 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 30px 80px -30px rgb(0 0 0 / .7); }
+.zoom__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.zoom__head h3 { margin: 0; font-size: 1.15rem; }
+.zoom__close { border: 0; background: transparent; color: var(--muted); font-size: 18px; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; }
+.zoom__close:hover { background: var(--accent-soft); color: var(--text); }
+.zoom__note { margin: 4px 0 10px; }
+.zoom__body .chart, .zoom__body .donut { cursor: default; }
+.zoom__body .chart svg { width: 100%; height: auto; max-height: 72vh; }
+.zoom__body .donut { grid-template-columns: minmax(200px, 320px) 1fr; gap: 28px; font-size: 16px; }
+@media (max-width: 640px) { .zoom { padding: 8px; } .zoom__body .donut { grid-template-columns: 1fr; } }
+.zoom__body .chart text.val { font-size: 8.5px; }
+
+/* Hàng trung bình cuối bảng KPI */
+tr.avg-row td { font-weight: 700; background: var(--surface-2) !important; border-top: 2px solid var(--border); }
+tr.avg-row td .person small { font-weight: 500; }
+
+/* Bảng KPI của team: các cột số liệu căn giữa (từ cột Tiến độ trở đi) */
+.team-table th:nth-child(n+3), .team-table td:nth-child(n+3) { text-align: center; }
+.team-table td:nth-child(n+3) .rate { align-items: center; justify-items: center; }
+.team-table th:nth-child(n+3) button { margin-inline: auto; }
