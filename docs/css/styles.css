@@ -1103,3 +1103,20 @@ tr.avg-row td .person small { font-weight: 500; }
 .team-table th:nth-child(n+3), .team-table td:nth-child(n+3) { text-align: center; }
 .team-table td:nth-child(n+3) .rate { align-items: center; justify-items: center; }
 .team-table th:nth-child(n+3) button { margin-inline: auto; }
+
+/* Cột TB/ngày cố định bên phải: màu nhiệt phải đặc (trộn với nền) để chữ của các cột cuộn qua không lộ ra phía sau */
+.day-table td:last-child.heat-low  { background: color-mix(in srgb, var(--bad-fill) 42%, var(--surface)) !important; }
+.day-table td:last-child.heat-mid  { background: color-mix(in srgb, var(--warn-fill) 40%, var(--surface)) !important; }
+.day-table td:last-child.heat-good { background: color-mix(in srgb, var(--good-fill) 30%, var(--surface)) !important; }
+.day-table td:last-child.heat-top  { background: color-mix(in srgb, var(--good-fill) 62%, var(--surface)) !important; }
+sup.half { font-size: 9px; margin-left: 2px; opacity: .85; }
+.talk-legend .swatch { display: inline-block; width: 14px; height: 10px; border-radius: 3px; vertical-align: middle; }
+
+/* Cột kết quả cuối bảng theo ngày (TB/ngày công, Tổng…): nổi bật hơn các cột ngày */
+.day-table td:last-child, .day-table th:last-child { border-left: 2px solid var(--accent); box-shadow: -10px 0 14px -10px rgb(0 0 0 / .55); }
+.day-table td:last-child { font-size: 15px; font-weight: 800; min-width: 84px; text-align: center; }
+.day-table thead th:last-child { background: color-mix(in srgb, var(--accent) 24%, var(--surface-2)) !important; color: var(--text); font-weight: 800; text-align: center; min-width: 84px; }
+.day-table tfoot td:last-child { background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)) !important; }
+.sla-cell--late { background: color-mix(in srgb, var(--bad-fill) 35%, transparent); color: var(--bad); font-weight: 700; }
+.sla-cell--soon { background: color-mix(in srgb, var(--warn-fill) 30%, transparent); color: var(--warn); font-weight: 700; }
+.sla-soon { color: var(--warn); font-weight: 700; margin-left: 3px; }

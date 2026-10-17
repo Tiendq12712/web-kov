@@ -32,12 +32,22 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   }
 
   /** Hỏi tiến độ tuần tự (xong lượt này mới hỏi lượt sau) và ghi log theo chỉ số tuyệt đối nên không bị lặp dòng. */
+  let pollGen = 0;   // mỗi lần bắt đầu hỏi tiến độ là một "thế hệ" mới; vòng hỏi cũ tự dừng để không chạy chồng và lặp dòng
+  const elapsedText = () => {
+    const sec = Math.max(0, Math.round((Date.now() - (ui.job?.startedAt ?? Date.now())) / 1000));
+    return `Đang chạy ${Math.floor(sec / 60)}p${String(sec % 60).padStart(2, '0')}s… bước lấy dữ liệu từ CRM thường mất 1–2 phút, vui lòng chờ và đừng bấm Dừng.`;
+  };
   function startPolling(jobId) {
     clearTimeout(timer);
+    const gen = ++pollGen;
     const tick = async () => {
+      if (gen !== pollGen || !ui.job || ui.job.id !== jobId) return;
       const since = ui.job.next;
       try {
         const data = await crmServer.job(jobId, since);
+        if (gen !== pollGen || !ui.job || ui.job.id !== jobId) return;
+        const clock = byId('crm-elapsed');
+        if (clock && !data.finished) clock.textContent = elapsedText();
         data.logs.forEach((line, i) => { ui.job.lines[since + i] = line; });
         Object.assign(ui.job, { next: Math.max(ui.job.next, data.next), done: data.done, total: data.total, ok: data.ok, finished: data.finished });
         const log = byId('crm-log');
@@ -68,7 +78,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   }
 
   function resumeJob(jobId, kind = '') {
-    ui.job = { kind, id: jobId, lines: [], next: 0, done: 0, total: 0, ok: 0, finished: false };
+    ui.job = { kind, id: jobId, lines: [], next: 0, done: 0, total: 0, ok: 0, finished: false, startedAt: Date.now() };
     startPolling(jobId);
   }
 
@@ -226,6 +236,9 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     }),
     'crm-stop': () => { if (ui.job) crmServer.stop(ui.job.id).catch((err) => fail(err.message)); },
   };
+
+  // Quay lại tab sau khi trình duyệt làm chậm bộ đếm: hỏi tiến độ ngay thay vì chờ.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ui.job && !ui.job.finished) startPolling(ui.job.id); });
 
   // Cookie có thể vừa được tiện ích Chrome gửi vào: quay lại trang thì đọc lại trạng thái.
   window.addEventListener('focus', async () => {

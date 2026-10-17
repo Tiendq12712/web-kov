@@ -204,6 +204,7 @@ const runCard = (ui, run) => {
         ${running ? html`<button class="btn btn--ghost" type="button" data-act="crm-stop">Dừng</button>` : ''}
       </div>
       ${status?.ready && !run.cookieSet ? html`<p class="muted">${run.needCookie}</p>` : ''}
+      ${running ? html`<p class="muted" id="crm-elapsed" role="status">Đang chạy… bước lấy dữ liệu từ CRM thường mất 1–2 phút, vui lòng chờ và đừng bấm Dừng.</p>` : ''}
       <div class="bar" role="progressbar" aria-valuenow="${Math.round(progress * 100)}"><div class="bar__fill" id="crm-progress" style="width:${progress * 100}%"></div></div>
       <pre class="code log" id="crm-log" aria-live="polite">${job ? job.lines.join('\n') : 'Nhật ký sẽ hiện ở đây khi chạy.'}</pre>
     </section>`;

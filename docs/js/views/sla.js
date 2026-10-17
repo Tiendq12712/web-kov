@@ -99,7 +99,7 @@ export function slaView(sla, { manager, code }) {
   const asOfNote = html`<p class="muted">Hạn tính đến <strong>${dm(sla.now)}</strong>${sla.now !== sla.asOf ? html` · số liệu đồng bộ ngày ${dm(sla.asOf)}` : ''}.</p>`;
   if (manager) {
     return html`
-      <div class="toolbar"><h2 class="section-title">Báo cáo SLA data ONL</h2>${asOfNote}</div>
+      <div class="toolbar"><h2 class="section-title">SLA data còn tồn (chưa làm + đang làm)</h2>${asOfNote}</div>
       ${explain}${cards(sla.totals)}
       <section class="card"><h3 class="card__title">Tuổi của data còn tồn</h3>${ageBars(sla.buckets)}</section>
       ${managerTable(sla)}
@@ -108,7 +108,7 @@ export function slaView(sla, { manager, code }) {
   const mine = sla.rows.find((r) => r.code === String(code));
   if (!mine) return html`<p class="notice">Chưa nhận ra bạn trong báo cáo (thiếu <strong>Đầu số</strong> trong tab Tài khoản). Hãy liên hệ quản lý để được bổ sung.</p>`;
   return html`
-    <div class="toolbar"><h2 class="section-title">SLA data của bạn</h2>${asOfNote}</div>
+    <div class="toolbar"><h2 class="section-title">SLA data còn tồn của bạn</h2>${asOfNote}</div>
     ${explain}${cards(mine)}
     <section class="card"><h3 class="card__title">Data còn tồn theo ngày chia</h3>${batchTable(mine.batches, sla.now)}</section>`;
 }

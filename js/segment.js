@@ -10,17 +10,38 @@ const one = (v) => v === 1 || v === true || String(v).trim() === '1';
 const sum = (list) => list.reduce((a, b) => a + b, 0);
 const ratio = (a, b) => (b ? a / b : null);
 
+/** Thời điểm (ms) từ ô ngày giờ: số của Google Sheets, "2026-10-16 05:25 AM" hoặc "9/30/2026 5:04"; không đọc được thì null. */
+export function tsOf(v) {
+  if (typeof v === 'number') return Math.round((v - 25569) * 86_400_000);
+  const t = String(v ?? '').trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?)?/i.exec(t);
+  if (m) {
+    let h = Number(m[4] ?? 0);
+    if (m[6]) h = (h % 12) + (m[6].toUpperCase() === 'PM' ? 12 : 0);
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], h, Number(m[5] ?? 0));
+  }
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?)?/i.exec(t);
+  if (m) {
+    let a = +m[1], b = +m[2];   // mặc định tháng/ngày/năm (kiểu Mỹ); nếu số đầu > 12 thì là ngày/tháng/năm
+    const [mo, d] = a > 12 ? [b, a] : [a, b];
+    let h = Number(m[4] ?? 0);
+    if (m[6]) h = (h % 12) + (m[6].toUpperCase() === 'PM' ? 12 : 0);
+    return Date.UTC(+m[3], mo - 1, d, h, Number(m[5] ?? 0));
+  }
+  return null;
+}
 function dateOf(v) {
-  if (typeof v === 'number') { const d = new Date(Math.round((v - 25569) * 86400) * 1000); return { ym: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`, iso: d.toISOString().slice(0, 10) }; }
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v ?? '').trim());
-  return m ? { ym: `${m[1]}-${m[2]}`, iso: `${m[1]}-${m[2]}-${m[3]}` } : { ym: '', iso: '' };
+  const ts = tsOf(v);
+  if (ts == null) return { ym: '', iso: '' };
+  const d = new Date(ts);
+  return { ym: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`, iso: d.toISOString().slice(0, 10) };
 }
 
 /** Một tab Data → danh sách dòng gọn. */
 export function parseDetail(rows, month) {
   const head = (rows[0] ?? []).map(plain);
   const at = (name) => head.indexOf(plain(name));
-  const col = { created: at('Thời gian tạo'), task: at('Công việc hỗ trợ'), source: at('Nguồn data'), handler: at('Người xử lý'), status: at('Tình trạng xử lý'), contact: at('Tình trạng liên hệ'), reason: at('Nguyên nhân'), impact: at('KH SC tác động'), addPts: at('Điểm add on'), points: at('Tổng điểm') };
+  const col = { created: at('Thời gian tạo'), modified: at('Thời gian tương tác') >= 0 ? at('Thời gian tương tác') : at('Thời gian chỉnh sửa'), retailer: at('Retailer ID'), task: at('Công việc hỗ trợ'), source: at('Nguồn data'), handler: at('Người xử lý'), status: at('Tình trạng xử lý'), contact: at('Tình trạng liên hệ'), reason: at('Nguyên nhân'), impact: at('KH SC tác động'), addPts: at('Điểm add on'), points: at('Tổng điểm') };
   if (col.source < 0 || col.status < 0) return [];
   const addCols = ADDONS.map((n) => ({ n, i: at(n) })).filter((c) => c.i >= 0);
   const out = [];
@@ -28,7 +49,7 @@ export function parseDetail(rows, month) {
     if (!r.length || !String(r[col.status] ?? '').trim()) continue;
     const d = dateOf(r[col.created]);
     out.push({
-      month: month ?? d.ym, created: d.iso,
+      month: month ?? d.ym, created: d.iso, retailer: col.retailer >= 0 ? String(r[col.retailer] ?? '') : '', createdTs: tsOf(r[col.created]), modifiedTs: col.modified >= 0 ? tsOf(r[col.modified]) : null,
       source: String(r[col.source] ?? '').trim() || '(Chưa gán nguồn)',
       tasks: String(r[col.task] ?? '').split('|##|').map((t) => t.trim()).filter(Boolean),
       handler: String(r[col.handler] ?? '').trim(), status: String(r[col.status] ?? '').trim(), contact: String(r[col.contact] ?? '').trim(),

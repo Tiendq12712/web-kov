@@ -8,6 +8,7 @@ export const CONFIG = {
   configSheet: '1z2zQNUtjH71qWJz0NZ6ofN95ZdAmBwCSxd-KWNnMsnM',
   // Bật/tắt nhân vật Coach KPI nổi ở góc màn hình (true = bật, false = tắt).
   coachEnabled: true,
+  addonReport: false,   // báo cáo Add-on (tab "Chi tiết addon" của Sheet PBI): tạm ẩn vì dữ liệu PBI chưa chuẩn; đổi thành true để hiện lại
   // Diện mạo nhân vật robot (nhân vật riêng): armor = màu giáp, accent = màu khiên/ánh sáng.
   mascot: { armor: '#2f63e0', accent: '#38bdf8' },
   // Sheet lưu tin nhắn chia sẻ (mặc định cùng Sheet cấu hình; nên dùng Sheet riêng để nhân sự không sửa được tab Tài khoản).

@@ -9,6 +9,8 @@ import { loadSyncTime, applySyncTime } from './syncTime.js';
 import { parsePbi } from './pbi.js';
 import { parseCalls } from './calls.js';
 import { parseDetail } from './segment.js';
+import { parseAddons } from './addons.js';
+import { CONFIG } from './config.js';
 
 const cache = new Map();
 const store = new Map();   // kết quả đã tải xong (để lưu lại dùng cho lần mở sau)
@@ -68,9 +70,26 @@ export const loadReport = (ym) => memo(`report:${ym}`, () => {
 
 /** Báo cáo Power BI "SC sử dụng Customer Info": có khi tab Danh sách link có dòng PBI. */
 export const hasPbi = () => Boolean(pbiLink);
-export const loadPbi = () => memo('pbi', () => {
+export const loadPbi = () => memo('pbi', async () => {
   if (!pbiLink) throw new Error('Chưa có link PBI trong tab Danh sách link');
-  return fetchRows(pbiLink.id, getToken(), { tab: pbiLink.tab || 'Data', range: 'A1:Z8000' }).then(parsePbi);
+  const token = getToken();
+  const tabs = await fetchTabs(pbiLink.id, token);
+  const plainTab = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+  // Tab Customer Info: theo cột Sheet của link nếu còn đúng, không thì tab có chữ "customer info", cuối cùng là tab đầu tiên.
+  const tab = tabs.find((t) => t === pbiLink.tab) ?? tabs.find((t) => plainTab(t).includes('customer info')) ?? tabs[0];
+  return fetchRows(pbiLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:Z8000' }).then(parsePbi);
+});
+
+/** Add-on nhân sự chọn và được ghi nhận: tab "Chi tiết addon" trong Sheet PBI. */
+export const hasAddons = () => CONFIG.addonReport && Boolean(pbiLink);
+export const loadAddons = () => memo('addons', async () => {
+  if (!pbiLink) throw new Error('Chưa có link PBI trong tab Danh sách link');
+  const token = getToken();
+  const tabs = await fetchTabs(pbiLink.id, token);
+  const plainTab = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+  const tab = tabs.find((t) => /chi tiet addon|chi tiet add-on/.test(plainTab(t)));
+  if (!tab) throw new Error('Sheet PBI chưa có tab "Chi tiết addon"');
+  return parseAddons(await fetchRows(pbiLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:L5000', render: 'FORMATTED_VALUE' }));
 });
 
 /** Thư viện tài liệu: mỗi tab hiển thị của Sheet là một nhóm (Quy trình/quy định, Chính sách, Giải trình…). */

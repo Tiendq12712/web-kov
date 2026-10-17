@@ -162,7 +162,7 @@ const hourHeatmap = (report, members, c) => {
 };
 
 /* ---------- Bảng theo ngày: nhân sự bên trái, cột là ngày ---------- */
-function dailyTable(report, ui, c) {
+export function dailyTable(report, ui, c) {
   const members = [...inRegion(report, ui.region)].sort(byName(c));
   const metric = DAY_METRICS[ui.dayMetric];
   const days = Array.from({ length: lastDay(report, members) }, (_, i) => i + 1);
@@ -176,8 +176,23 @@ function dailyTable(report, ui, c) {
   const avg = (list) => (present(list).length ? sum(list) / present(list).length : null);
   const tableMean = mean(present(grid.flat()));
   // Talktime so với chỉ tiêu của từng người; số call/kết nối so với trung bình cả bảng.
-  const heat = (v, m) => heatClass(v, ui.dayMetric === 'talk' ? m.kpiTalk : tableMean);
-  const cell = (v, klass = '') => html`<td class="right num ${klass} ${v == null ? 'muted' : ''}">${v == null ? '—' : metric.format(v)}</td>`;
+  const isTalk = ui.dayMetric === 'talk';
+  // Talktime: đối chiếu bảng công — X tính đủ chỉ tiêu, X/2 tính nửa chỉ tiêu, ngày không có công thì không đánh giá; chỉ tô đạt (xanh) / chưa đạt (đỏ).
+  const weightOf = (m, day) => { const sheet = report.timesheets?.[m.code]; return sheet ? (sheet.rows.find((r) => r.day === day)?.weight ?? 0) : 1; };
+  const passClass = (v, m, day) => {
+    if (v == null || !m.kpiTalk) return '';
+    const w = weightOf(m, day);
+    return w > 0 ? (v >= m.kpiTalk * Math.min(w, 1) ? 'heat-good' : 'heat-low') : '';
+  };
+  // TB/ngày công: tổng talktime chia tổng ngày công quy đổi (X = 1, X/2 = 0,5) rồi so với chỉ tiêu cả ngày.
+  const perWorkday = (m, list) => {
+    const total = list.reduce((a, v, i) => a + (v ?? 0) * (weightOf(m, days[i]) > 0 ? 1 : 0), 0);
+    const w = list.reduce((a, v, i) => a + (v != null ? weightOf(m, days[i]) : 0), 0);
+    return w ? total / w : null;
+  };
+  const avgClass = (m, v) => (v != null && m.kpiTalk ? (v >= m.kpiTalk ? 'heat-good' : 'heat-low') : '');
+  const heat = (v, m) => heatClass(v, isTalk ? m.kpiTalk : tableMean);
+  const cell = (v, klass = '', extra = {}) => html`<td class="right num ${klass} ${v == null ? 'muted' : ''}" ${extra.title ? html`title="${extra.title}"` : ''}>${v == null ? '—' : metric.format(v)}${extra.half ? html`<sup class="half">½</sup>` : ''}</td>`;
   const column = (i) => grid.map((row) => row[i]);
 
   return html`
@@ -191,18 +206,18 @@ function dailyTable(report, ui, c) {
     <div class="table-wrap"><table class="day-table sortable">
       <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>
         ${days.map((d) => html`<th scope="col" class="right">${d}</th>`)}
-        <th scope="col" class="right">Tổng</th><th scope="col" class="right">TB/ngày</th></tr></thead>
+        <th scope="col" class="right">Tổng</th><th scope="col" class="right">${isTalk ? 'TB/ngày công' : 'TB/ngày'}</th></tr></thead>
       <tbody>${members.map((m, r) => html`
         <tr class="static"><td class="sticky-col"><span class="person"><strong>${c.nameOf(m)}</strong><small>${m.code}</small></span></td>
-          ${grid[r].map((v) => cell(v, heat(v, m)))}
-          ${cell(present(grid[r]).length ? sum(grid[r]) : null)}${cell(avg(grid[r]), heat(avg(grid[r]), m))}</tr>`)}</tbody>
+          ${grid[r].map((v, i) => (isTalk ? cell(v, passClass(v, m, days[i]), { half: weightOf(m, days[i]) > 0 && weightOf(m, days[i]) < 1 && v != null, title: v != null && m.kpiTalk ? `${weightOf(m, days[i]) ? `Công ${weightOf(m, days[i]) < 1 ? 'X/2' : 'X'} · chỉ tiêu ${hm(m.kpiTalk * Math.min(weightOf(m, days[i]), 1))}` : 'Ngày không có công: không đánh giá'}` : '' }) : cell(v, heat(v, m))))}
+          ${cell(present(grid[r]).length ? sum(grid[r]) : null)}${isTalk ? cell(perWorkday(m, grid[r]), avgClass(m, perWorkday(m, grid[r])), { title: 'Talktime trung bình trên mỗi ngày công (X = 1, X/2 = 0,5) so với chỉ tiêu cả ngày' }) : cell(avg(grid[r]), heat(avg(grid[r]), m))}</tr>`)}</tbody>
       <tfoot>
         <tr><td class="sticky-col">Tổng team</td>${days.map((_, i) => cell(present(column(i)).length ? sum(column(i)) : null))}
           ${cell(sum(grid.flat()))}${cell(null)}</tr>
         <tr><td class="sticky-col">TB / người</td>${days.map((_, i) => cell(avg(column(i))))}${cell(null)}${cell(avg(grid.map((row) => avg(row))))}</tr>
       </tfoot>
     </table></div>
-    ${heatLegend(ui.dayMetric === 'talk' ? 'chỉ tiêu talktime của từng người' : 'trung bình các ô trong bảng')}`;
+    ${isTalk ? html`<p class="muted talk-legend"><span class="swatch heat-good"></span> Đạt chỉ tiêu ngày &nbsp; <span class="swatch heat-low"></span> Chưa đạt &nbsp; · Ô không màu: ngày không có công · <sup class="half">½</sup> = ngày X/2, tính nửa chỉ tiêu (đối chiếu bảng công).</p>` : heatLegend('trung bình các ô trong bảng')}`;
 }
 
 /* ---------- Bảng tổng công trong tháng: nhân sự bên trái, cột là ngày 1 → cuối tháng ---------- */
