@@ -9,6 +9,8 @@ const SECTIONS = [
     ['ul', ['Bấm “Đăng nhập bằng Google” và chọn tài khoản @kiotviet.com. Tài khoản khác sẽ bị từ chối.', 'Đăng nhập một lần là dùng được trong ngày; sang ngày mới cần đăng nhập lại.', 'Mở lại web trong ngày, trang hiện ngay số liệu đã lưu kèm thanh “làm mới”. Bấm lần đầu vào bất kỳ đâu hoặc nút làm mới để lấy dữ liệu mới nhất; Google có thể hiện cửa sổ xác nhận ngắn.', 'Chưa có quyền? Liên hệ quản trị để được thêm vào mục Tài khoản.']],
     ['h', 'Làm mới dữ liệu'],
     ['ul', ['Trên điện thoại: kéo từ đầu trang xuống để làm mới.', 'Trên máy tính: dùng nút làm mới ở thanh thông báo hoặc tải lại trang.', 'Dòng “Cập nhật” cho biết lần đồng bộ CRM gần nhất; số liệu chỉ mới bằng thời điểm đó.']],
+    ['h', 'Kiểm soát data'],
+    ['p', 'Trang Báo cáo → Kiểm soát kiểm tra data "Đã làm" theo Quy trình ONLINE: số cuộc gọi tối thiểu, mô tả và thông tin ghi nhận, ticket, nhóm tính năng khi tư vấn tính năng, cùng tiến độ SLA và mức trừ thưởng theo quy định. Quản lý xem cả team và danh sách data cần rà; nhân sự chỉ xem phần của mình. Đây là cảnh báo tự động, không thay cho việc quản lý rà soát.'],
     ['h', 'Xuất bảng ra Excel hoặc PDF'],
     ['ul', ['Phía trên mỗi bảng có hai nút “⬇ Excel” và “⬇ PDF” (ở góc phải).', 'Excel: tải về file .xlsx của đúng bảng đang xem (số được giữ dạng số để tính toán).', 'PDF: mở hộp thoại in, chọn “Lưu dưới dạng PDF”; khổ A4 ngang, chỉ gồm bảng đó.', 'Bảng được xuất đúng như đang hiển thị (theo bộ lọc, khu vực, tháng bạn chọn).']],
     ['h', 'Cài như ứng dụng'],

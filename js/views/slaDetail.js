@@ -21,7 +21,7 @@ export function slaDetailView(data, { month, manager, code, names }) {
   if (!t.total) return html`<p class="notice">Chưa có data chi tiết của tháng này (tab "Data Txx" của file KPI) để tính SLA theo thời gian tương tác.</p>`;
   return html`
     <div class="toolbar"><h2 class="section-title">SLA theo thời gian tương tác${manager ? '' : ' của bạn'}</h2>
-      <p class="muted">Trễ khi <strong>thời gian tương tác − thời gian tạo &gt; ${SLA_DAYS} ngày</strong>, gồm cả data đã làm. Data chưa xong tính đến hiện tại; data hủy không tính. Sắp trễ: chưa xong, đã qua từ ${SLA_DAYS - WARN_DAYS} đến ${SLA_DAYS} ngày.</p></div>
+      <p class="muted">Trễ khi <strong>ngày tương tác − ngày tạo &gt; ${SLA_DAYS} ngày</strong> (tính theo ngày lịch), gồm cả data đã làm. Data chưa xong tính đến hôm nay; data hủy không tính. Sắp trễ: chưa xong, đã qua từ ${SLA_DAYS - WARN_DAYS} đến ${SLA_DAYS} ngày.</p></div>
     <div class="grid">
       ${stat('Trễ SLA', num(t.late), `Đã làm nhưng trễ ${num(t.late_done)} · chưa xong quá hạn ${num(t.late_open)}`, 'bad', t.lateRate)}
       ${stat('Sắp trễ SLA', num(t.soon), `Chưa xong, đã qua ${SLA_DAYS - WARN_DAYS}–${SLA_DAYS} ngày`, 'warn', t.soonRate)}
@@ -37,9 +37,9 @@ export function slaDetailView(data, { month, manager, code, names }) {
       <tfoot><tr><td class="sticky-col">Tổng</td><td class="right num">${num(t.total)}</td><td class="right num">${num(t.late)}</td><td class="right num">${num(t.late_done)}</td><td class="right num">${num(t.late_open)}</td><td class="right num">${num(t.soon)}</td><td class="right num">${p1(t.lateRate)}</td></tr></tfoot>
     </table></div>` : ''}
     <div class="toolbar"><h2 class="section-title">Data đã làm bị trễ SLA${manager ? '' : ' của bạn'}</h2>
-      <p class="muted">Chỉ tính data có tình trạng "Đã làm": trễ khi thời gian tương tác − thời gian tạo &gt; ${SLA_DAYS} ngày. Tỉ lệ trễ = data đã làm trễ / data đã làm. Các cột 7–8, 8–9, 9–10, &gt;10 là số ngày xử lý của những data đã trễ.</p></div>
+      <p class="muted">Chỉ tính data có tình trạng "Đã làm": trễ khi ngày tương tác − ngày tạo &gt; ${SLA_DAYS} ngày (ngày lịch). Tỉ lệ trễ = data đã làm trễ / data đã làm. Các cột 8, 9, 10, &gt;10 ngày là số ngày xử lý của những data đã trễ.</p></div>
     <div class="table-wrap"><table class="sla-table sortable">
-      <thead><tr>${manager ? html`<th scope="col" class="sticky-col">Nhân sự</th>` : ''}<th scope="col" class="right">Data đã làm</th><th scope="col" class="right">Đã làm trễ SLA</th><th scope="col" class="right">Tỉ lệ trễ</th><th scope="col" class="right">TB ngày xử lý</th><th scope="col" class="right">Trung vị</th><th scope="col" class="right">Lâu nhất</th><th scope="col" class="right">7–8 ngày</th><th scope="col" class="right">8–9 ngày</th><th scope="col" class="right">9–10 ngày</th><th scope="col" class="right">&gt;10 ngày</th></tr></thead>
+      <thead><tr>${manager ? html`<th scope="col" class="sticky-col">Nhân sự</th>` : ''}<th scope="col" class="right">Data đã làm</th><th scope="col" class="right">Đã làm trễ SLA</th><th scope="col" class="right">Tỉ lệ trễ</th><th scope="col" class="right">TB ngày xử lý</th><th scope="col" class="right">Trung vị</th><th scope="col" class="right">Lâu nhất</th><th scope="col" class="right">8 ngày</th><th scope="col" class="right">9 ngày</th><th scope="col" class="right">10 ngày</th><th scope="col" class="right">&gt;10 ngày</th></tr></thead>
       <tbody>${(manager ? a.donePeople : [a.doneTotals]).map((p) => html`<tr class="static">${manager ? html`<td class="sticky-col"><span class="person"><strong>${names.get(p.code) ?? p.name}</strong>${p.code ? html`<small>${p.code}</small>` : ''}</span></td>` : ''}
         <td class="right num">${num(p.done)}</td><td class="right num">${bad(p.late)}</td><td class="right num strong">${p1(p.lateRate)}</td><td class="right num">${d1(p.avg)}</td><td class="right num">${d1(p.median)}</td><td class="right num">${d1(p.max)}</td>
         <td class="right num">${num(p.b1)}</td><td class="right num">${num(p.b2)}</td><td class="right num">${num(p.b3)}</td><td class="right num">${num(p.b4)}</td></tr>`)}</tbody>
@@ -58,10 +58,10 @@ export function slaDetailView(data, { month, manager, code, names }) {
         <td class="right num strong">${num(r.total)}</td></tr>`)}</tbody>
       <tfoot><tr><td class="sticky-col">Tổng</td>${a.matrixDays.map((d) => { const c = a.matrixTotals[d]; return html`<td class="right num">${num(c.late + c.soon)}</td>`; })}<td class="right num">${num(a.matrixTotal)}</td></tr></tfoot>
     </table></div>
-    <div class="toolbar"><h2 class="section-title">Data lâu nhất</h2><p class="muted">15 data có thời gian xử lý dài nhất.</p></div>
+    <div class="toolbar"><h2 class="section-title">Data lâu nhất</h2><p class="muted">15 data có số ngày xử lý (ngày lịch) dài nhất.</p></div>
     <div class="table-wrap"><table class="sla-table">
       <thead><tr><th scope="col">Retailer</th>${manager ? html`<th scope="col">Nhân sự</th>` : ''}<th scope="col">Tạo</th><th scope="col">Tương tác</th><th scope="col" class="right">Số ngày</th><th scope="col">Tình trạng</th><th scope="col">Nguồn</th></tr></thead>
-      <tbody>${a.longest.map((x) => html`<tr class="static"><td class="num">${x.retailer || '—'}</td>${manager ? html`<td>${names.get(/^(\d+)/.exec(x.handler)?.[1]) ?? x.handler.replace(/^\d+\s*-\s*/, '').split(' - ')[0]}</td>` : ''}<td class="num">${dt(x.createdTs)}</td><td class="num">${x.status === 'Đã làm' ? dt(x.modifiedTs) : 'Đến hiện tại'}</td><td class="right num strong">${x.elapsed.toFixed(1).replace('.', ',')}</td>
+      <tbody>${a.longest.map((x) => html`<tr class="static"><td class="num">${x.retailer || '—'}</td>${manager ? html`<td>${names.get(/^(\d+)/.exec(x.handler)?.[1]) ?? x.handler.replace(/^\d+\s*-\s*/, '').split(' - ')[0]}</td>` : ''}<td class="num">${dt(x.createdTs)}</td><td class="num">${x.status === 'Đã làm' ? dt(x.modifiedTs) : 'Đến hôm nay'}</td><td class="right num strong">${String(x.elapsed)}</td>
         <td><span class="badge badge--${KIND[x.kind][0]}">${KIND[x.kind][1]}</span></td><td>${x.source}</td></tr>`)}</tbody>
     </table></div>`;
 }

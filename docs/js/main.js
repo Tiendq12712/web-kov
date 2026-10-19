@@ -14,6 +14,8 @@ import { connectView } from './views/connect.js';
 import { connectCallsView } from './views/connectCalls.js';
 import { segmentView } from './views/segment.js';
 import { addonView } from './views/addons.js';
+import { slaDetailView } from './views/slaDetail.js';
+import { controlView } from './views/control.js';
 import { workdaysByCode } from './report.js';
 import { createSettings } from './settingsController.js';
 import { createChat } from './chatController.js';
@@ -64,6 +66,7 @@ const state = {
   connect: { region: 'all', shortSec: 30, longSec: 180, view: 'month' },   // phân tích chất lượng call kết nối (dùng chung dữ liệu năng suất)
   calls: { data: null, loading: false, error: '' },
   segment: { data: null, loading: false, error: '', key: '', month: 'all' },
+  control: { rule: 'all', person: 'all' },   // kiểm soát data theo quy trình (dùng chung dữ liệu chi tiết Data Txx)
   addons: { data: null, loading: false, error: '', month: 'all', type: 'all', person: 'all', status: 'all', q: '' },   // add-on nhân sự chọn và được ghi nhận (Sheet PBI, tab Chi tiết addon)   // phân tích tệp data (tab Data Txx)   // từng cuộc gọi (Sheet "Dữ liệu call")
   hr: { data: null, loading: false, error: '', q: '', region: 'all' },   // nhân sự và phép năm
   library: { data: null, loading: false, error: '', cat: 'all', q: '' },   // thư viện tài liệu (quy trình, chính sách, giải trình…)
@@ -93,6 +96,7 @@ const writeHash = () => history.replaceState(null, '', `#/${state.month}/${state
 const ICONS = {
   overview: '<rect x="3.5" y="3.5" width="7" height="9" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.8"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.8"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.8"/>',
   addon: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M17 3.5v7M13.5 7h7"/>',
+  control: '<path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
   segment: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
   connect: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
   hr: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>',
@@ -120,6 +124,7 @@ function buildNav() {
   if (d.work) reports.push(item('work', 'Theo dõi công việc', 'Công việc', 'Tiến độ xử lý data, bảng chia data'));
   if (d.work?.backlogAll) reports.push(item('sla', 'SLA', 'SLA', 'Data đã trễ và sắp trễ hạn 7 ngày'));
   if (hasPbi()) reports.push(item('cinfo', 'Customer Info', 'C-Info', 'Tỉ lệ SC dùng Customer Info'));
+  if (hasDetail()) reports.push(item('control', 'Kiểm soát', 'Kiểm soát', 'Data điền đúng quy trình, SLA và mức trừ'));
   if (hasAddons()) reports.push(item('addon', 'Add-on', 'Add-on', 'Add-on đã chọn và được ghi nhận'));
   if (hasReport(state.month)) reports.push(item('report', 'Năng suất', 'Năng suất', 'Cuộc gọi, talktime, ngày công'));
   if (hasHr()) reports.push(item('hr', 'Phép năm', 'Phép năm', 'Nhân sự và phép năm 2026'));
@@ -288,6 +293,7 @@ function currentPage() {
   const report = preloadReport();   // ngày công và năng suất lấy từ file năng suất, nên luôn tải nền
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
+  if (state.tab === 'control' && hasDetail()) return { view: lazyTab(state.segment, 'control', loadDetail, (d) => controlView(d, state.control, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month })), title: 'Kiểm soát' };
   if (state.tab === 'addon' && hasAddons()) return { view: lazyTab(state.addons, 'addon', loadAddons, (d) => addonView(d, state.addons, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Add-on' };
   if (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'segment', loadDetail, (data) => segmentView(data, state.segment)), title: 'Phân tích tệp data' };
   if (state.tab === 'connect' && state.me.role !== 'member') {
@@ -313,7 +319,7 @@ function currentPage() {
 }
 
 /** Tab phụ thuộc vào tháng đang xem (Tổng quan, các team, Công việc, SLA, Năng suất) mới có ô chọn tháng; các tab khác (Customer Info, Xu hướng, So sánh, Chia sẻ, Thiết lập) thì không. */
-const isMonthly = (tab) => ['overview', 'work', 'sla', 'report'].includes(tab) || (tab === 'connect' && !hasCalls()) || Boolean(state.data?.teams.some((t) => t.id === tab));
+const isMonthly = (tab) => ['overview', 'work', 'sla', 'report', 'control'].includes(tab) || (tab === 'connect' && !hasCalls()) || Boolean(state.data?.teams.some((t) => t.id === tab));
 
 /** Ô chọn tháng nằm trong nội dung của tab (không đặt ở thanh trên cùng). */
 function monthBar() {
@@ -372,7 +378,7 @@ async function setMonth(ym, { boot = false } = {}) {
   }
   Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || team();
+  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'control' && hasDetail()) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -506,6 +512,8 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', (e) => {
+  if (e.target.id === 'ctl-rule') { state.control.rule = e.target.value; return renderView(); }
+  if (e.target.id === 'ctl-person') { state.control.person = e.target.value; return renderView(); }
   if (e.target.id === 'addon-month') { state.addons.month = e.target.value; state.addons.person = 'all'; state.addons.type = 'all'; return renderView(); }
   if (e.target.id === 'addon-type') { state.addons.type = e.target.value; return renderView(); }
   if (e.target.id === 'addon-person') { state.addons.person = e.target.value; return renderView(); }

@@ -1,5 +1,5 @@
 /**
- * SLA tính trên từng data (tab "Data Txx", cột "Thời gian tạo" và "Thời gian tương tác"): trễ khi (thời gian tương tác − thời gian tạo) > 7 ngày, gồm cả data đã làm.
+ * SLA tính trên từng data (tab "Data Txx", cột "Thời gian tạo" và "Thời gian tương tác"): trễ khi (ngày tương tác − ngày tạo) > 7 ngày, tính theo ngày lịch, gồm cả data đã làm.
  * Data chưa xong (chưa làm, đang làm) tính đến hiện tại; data hủy không tính. Sắp trễ: chưa xong, đã qua từ 5 đến 7 ngày.
  */
 import { SLA_DAYS, WARN_DAYS } from './sla.js';
@@ -11,12 +11,15 @@ const nameOf = (h) => (/^\d+\s*-/.test(h) ? h.replace(/^(\d+)\s*-\s*([^-]+?)(\s*
 const codeOf = (h) => /^(\d+)\s*-/.exec(h)?.[1] ?? '';
 
 /** Phân loại một data: { elapsed (ngày), kind: 'late-done' | 'late-open' | 'soon' | 'ok' | 'cancel' }. */
-export function classify(r, now) {
+export const wallNow = () => Date.now() - new Date().getTimezoneOffset() * 60_000;   // giờ hiện tại theo giờ địa phương (cùng hệ với giờ ghi trong Sheet)
+const dayNo = (ts) => Math.floor(ts / DAY);
+
+export function classify(r, now = wallNow()) {
   if (r.status === 'Hủy') return { kind: 'cancel', elapsed: null };
   const done = r.status === 'Đã làm';
   const end = done ? (r.modifiedTs ?? r.createdTs) : now;
   if (r.createdTs == null || end == null) return { kind: 'ok', elapsed: null };
-  const elapsed = (end - r.createdTs) / DAY;
+  const elapsed = dayNo(end) - dayNo(r.createdTs);   // chênh lệch theo ngày lịch (ngày tương tác − ngày tạo)
   if (elapsed > SLA_DAYS) return { kind: done ? 'late-done' : 'late-open', elapsed };
   if (!done && elapsed >= SLA_DAYS - WARN_DAYS) return { kind: 'soon', elapsed };
   return { kind: 'ok', elapsed };
@@ -30,7 +33,7 @@ const tally = (items) => {
   return { ...c, total, late, lateRate: ratio(late, total), soonRate: ratio(c.soon, total) };
 };
 
-export function computeSlaDetail(rows, { month, code = null, now = Date.now() } = {}) {
+export function computeSlaDetail(rows, { month, code = null, now = wallNow() } = {}) {
   const scoped = rows.filter((r) => (!month || r.month === month) && (!code || codeOf(r.handler) === code)).map((r) => ({ r, ...classify(r, now) }));
   const live = scoped.filter((x) => x.kind !== 'cancel');
   const totals = tally(live);
@@ -53,9 +56,9 @@ export function computeSlaDetail(rows, { month, code = null, now = Date.now() } 
   const median = (arr) => { const v = [...arr].sort((a, b) => a - b); return v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2) : null; };
   const doneStat = (list) => {
     const days = list.map((x) => x.elapsed), late = list.filter((x) => x.kind === 'late-done');
-    const band = (lo, hi) => late.filter((x) => x.elapsed > lo && x.elapsed <= hi).length;
+    const band = (lo, hi) => late.filter((x) => x.elapsed > lo && x.elapsed <= hi).length;   // số ngày lịch: 8, 9, 10, trên 10
     return { done: list.length, late: late.length, lateRate: ratio(late.length, list.length), avg: days.length ? sum(days) / days.length : null, median: median(days), max: days.length ? Math.max(...days) : null,
-      b1: band(SLA_DAYS, 8), b2: band(8, 9), b3: band(9, 10), b4: band(10, Infinity) };
+      b1: band(7, 8), b2: band(8, 9), b3: band(9, 10), b4: band(10, Infinity) };
   };
   const donePeople = [...new Map(doneItems.map((x) => [`${codeOf(x.r.handler)}|${nameOf(x.r.handler)}`, x])).entries()].map(([key]) => {
     const [code, name] = key.split('|');

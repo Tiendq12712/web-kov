@@ -41,7 +41,7 @@ function dateOf(v) {
 export function parseDetail(rows, month) {
   const head = (rows[0] ?? []).map(plain);
   const at = (name) => head.indexOf(plain(name));
-  const col = { created: at('Thời gian tạo'), modified: at('Thời gian tương tác') >= 0 ? at('Thời gian tương tác') : at('Thời gian chỉnh sửa'), retailer: at('Retailer ID'), task: at('Công việc hỗ trợ'), source: at('Nguồn data'), handler: at('Người xử lý'), status: at('Tình trạng xử lý'), contact: at('Tình trạng liên hệ'), reason: at('Nguyên nhân'), impact: at('KH SC tác động'), addPts: at('Điểm add on'), points: at('Tổng điểm') };
+  const col = { desc: at('Mô tả'), calls: at('Số cuộc gọi thực hiện'), feature: at('Tính năng'), featureGroup: at('Nhóm tính năng'), usage: at('Tình trạng sử dụng phần mềm'), created: at('Thời gian tạo'), modified: at('Thời gian tương tác') >= 0 ? at('Thời gian tương tác') : at('Thời gian chỉnh sửa'), retailer: at('Retailer ID'), task: at('Công việc hỗ trợ'), source: at('Nguồn data'), handler: at('Người xử lý'), status: at('Tình trạng xử lý'), contact: at('Tình trạng liên hệ'), reason: at('Nguyên nhân'), impact: at('KH SC tác động'), addPts: at('Điểm add on'), points: at('Tổng điểm') };
   if (col.source < 0 || col.status < 0) return [];
   const addCols = ADDONS.map((n) => ({ n, i: at(n) })).filter((c) => c.i >= 0);
   const out = [];
@@ -49,6 +49,8 @@ export function parseDetail(rows, month) {
     if (!r.length || !String(r[col.status] ?? '').trim()) continue;
     const d = dateOf(r[col.created]);
     out.push({
+      desc: col.desc >= 0 ? String(r[col.desc] ?? '').trim().slice(0, 800) : '', calls: col.calls >= 0 ? Number(r[col.calls]) || 0 : null,
+      feature: col.feature >= 0 ? String(r[col.feature] ?? '').trim() : '', featureGroup: col.featureGroup >= 0 ? String(r[col.featureGroup] ?? '').trim() : '', usage: col.usage >= 0 ? String(r[col.usage] ?? '').trim() : '',
       month: month ?? d.ym, created: d.iso, retailer: col.retailer >= 0 ? String(r[col.retailer] ?? '') : '', createdTs: tsOf(r[col.created]), modifiedTs: col.modified >= 0 ? tsOf(r[col.modified]) : null,
       source: String(r[col.source] ?? '').trim() || '(Chưa gán nguồn)',
       tasks: String(r[col.task] ?? '').split('|##|').map((t) => t.trim()).filter(Boolean),
