@@ -90,14 +90,28 @@ function dailyChart(work, selected) {
   });
 }
 
-const industryChart = (work) => {
-  const block = work.dataByIndustry;
-  if (!block) return html`<p class="muted">Chưa có dữ liệu ngành hàng.</p>`;
-  return lineChart({
-    labels: Array.from({ length: work.lastDay }, (_, i) => String(i + 1)),
-    series: block.groups.map((g, i) => ({ name: g.name, cls: ['s1', 's2', 's3'][i % 3], values: g.values.slice(0, work.lastDay).map((v) => v ?? 0) })),
-    format: (v) => num(v),
-  });
+/** Ngành hàng theo cột Product của data chi tiết (gộp FnB/Fnb; ô trống là "Chưa phân loại"). */
+const industryOf = (r) => { const p = (r.product || '').trim().toLowerCase(); return p === 'fnb' ? 'FnB' : p === 'retail' ? 'Retail' : p === 'booking' ? 'Booking' : p ? r.product : 'Chưa phân loại'; };
+export const industryChart = (work, industry, selectedCode) => {
+  if (!industry?.rows) return html`<p class="muted">${industry === undefined ? 'Chưa có dữ liệu chi tiết (tab "Data Txx") để thống kê ngành hàng.' : 'Đang tải dữ liệu chi tiết…'}</p>`;
+  const codeOf = (h) => /^(\d+)\s*-/.exec(h)?.[1] ?? '';
+  const list = industry.rows.filter((r) => r.month === industry.month && (!codeOf(r.handler) ? selectedCode('') : selectedCode(codeOf(r.handler))) && r.status !== 'Hủy');
+  if (!list.length) return html`<p class="muted">Chưa có data chi tiết của tháng này.</p>`;
+  const groups = new Map();
+  for (const r of list) { const k = industryOf(r); (groups.get(k) ?? groups.set(k, []).get(k)).push(r); }
+  const stats = [...groups].map(([name, rs]) => {
+    const done = rs.filter((r) => r.status === 'Đã làm'), contacted = rs.filter((r) => r.contact), conn = rs.filter((r) => r.contact === 'Kết nối thành công');
+    return { name, rows: rs, total: rs.length, done: done.length, open: rs.length - done.length, doneRate: ratio(done.length, rs.length), connRate: ratio(conn.length, contacted.length), impactRate: ratio(done.filter((r) => r.impact).length, done.length) };
+  }).sort((a, b) => b.total - a.total);
+  const days = Array.from({ length: work.lastDay || 31 }, (_, i) => i + 1);
+  const grand = { total: sum(stats.map((x) => x.total)), done: sum(stats.map((x) => x.done)) };
+  return html`
+    ${lineChart({ labels: days.map(String), series: stats.slice(0, 4).map((g, i) => ({ name: g.name, cls: ['s1', 's2', 's3', 's4'][i], values: days.map((d) => g.rows.filter((r) => Number((r.created || '').slice(8, 10)) === d).length) })), format: (v) => num(v) })}
+    <div class="table-wrap"><table class="connect-table">
+      <thead><tr><th scope="col" class="sticky-col">Ngành hàng (Product)</th><th scope="col" class="right">Số data</th><th scope="col" class="right">% tổng</th><th scope="col" class="right">Đã làm</th><th scope="col" class="right">Còn tồn</th><th scope="col" class="right">Tỉ lệ đã làm</th><th scope="col" class="right">Tỉ lệ kết nối</th><th scope="col" class="right">Impact</th></tr></thead>
+      <tbody>${stats.map((g) => html`<tr class="static"><td class="sticky-col"><strong>${g.name}</strong></td><td class="right num">${num(g.total)}</td><td class="right num">${pct(ratio(g.total, grand.total), 1)}</td><td class="right num">${num(g.done)}</td><td class="right num">${num(g.open)}</td><td class="right num">${pct(g.doneRate, 1)}</td><td class="right num">${g.connRate == null ? '—' : pct(g.connRate, 1)}</td><td class="right num">${g.impactRate == null ? '—' : pct(g.impactRate, 1)}</td></tr>`)}</tbody>
+      <tfoot><tr><td class="sticky-col">Tổng</td><td class="right num">${num(grand.total)}</td><td class="right num">100%</td><td class="right num">${num(grand.done)}</td><td class="right num">${num(grand.total - grand.done)}</td><td class="right num">${pct(ratio(grand.done, grand.total), 1)}</td><td class="right"></td><td class="right"></td></tr></tfoot>
+    </table></div>`;
 };
 
 /** Phân bố số cuộc gọi trên mỗi ACT (1, 2, 3… cuộc). */
@@ -214,7 +228,7 @@ function divideTable(work, rows) {
 const selector = (ui, people) => (code) => ui.team === 'all' || people.get(code)?.team === ui.team;
 
 /* ---------- Trang báo cáo ---------- */
-export function workView(work, ui, people, teams) {
+export function workView(work, ui, people, teams, industry) {
   const selected = selector(ui, people);
   const rows = buildRows(work, selected);
   const ariaSort = (k) => (ui.sort.key === k ? (ui.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
@@ -234,7 +248,7 @@ export function workView(work, ui, people, teams) {
       ${chartCard('Tiến độ xử lý theo nhân sự', progressChart(rows), 'Tỉ lệ data đã làm / đang làm / chưa làm trên tổng data được chia.')}
       ${chartCard('Tình trạng liên hệ theo nhóm CSKH', contactChart(work.contact), 'Kết quả cuộc gọi của data đã làm; số bên phải là tỉ lệ kết nối thành công.')}
       ${chartCard('Data được chia và còn tồn theo ngày', dailyChart(work, selected), 'Cột vàng càng thấp so với cột xanh là ngày đó được xử lý càng tốt.')}
-      ${chartCard('Data theo ngành hàng', industryChart(work), 'Số data mỗi ngành hàng được chia theo ngày.')}
+      ${chartCard('Data theo ngành hàng', industryChart(work, industry, selected), 'Theo cột Product của data chi tiết: số data tạo mỗi ngày và kết quả xử lý từng ngành hàng (FnB và Fnb được gộp).')}
       ${chartCard('Số cuộc gọi trên mỗi ACT', callsDistribution(work, selected), 'Tỉ lệ ACT cần 1, 2, 3… cuộc gọi để xử lý xong.')}
       ${chartCard('Nguồn data theo nhân sự', sourcesChart(work, rows), 'Data nhận từ các nhóm CSKH T15, NA, OI.')}
     </div>

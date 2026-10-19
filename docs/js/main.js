@@ -262,7 +262,12 @@ const renderChat = () => chat.view();
 let baseTitle = document.title;
 const applyTitle = () => { const n = state.me ? chat.unread() : 0; document.title = n ? `(${n}) ${baseTitle}` : baseTitle; };
 
-const renderWork = () => workView(state.data.work, state.work, kpiPeople(), state.data.teams.map(({ id, name }) => ({ id, name })));
+const renderWork = () => {
+  // Ngành hàng lấy từ data chi tiết (cột Product); đang tải thì báo "đang tải", chưa có link thì để trống.
+  const loaded = hasDetail() ? lazyTab(state.segment, 'work', loadDetail, (d) => d) : null;
+  const industry = hasDetail() && !state.segment.error ? (loaded?.rows ? { rows: loaded.rows, month: state.month } : { loading: true }) : undefined;
+  return workView(state.data.work, state.work, kpiPeople(), state.data.teams.map(({ id, name }) => ({ id, name })), industry);
+};
 
 /** Tổng quan cũng cần dữ liệu năng suất: tải nền (không chặn trang), có rồi thì vẽ lại. Không có hoặc lỗi thì bỏ qua phần đó. */
 function preloadReport() {
