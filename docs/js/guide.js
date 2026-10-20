@@ -10,14 +10,14 @@ const SECTIONS = [
     ['h', 'Làm mới dữ liệu'],
     ['ul', ['Trên điện thoại: kéo từ đầu trang xuống để làm mới.', 'Trên máy tính: dùng nút làm mới ở thanh thông báo hoặc tải lại trang.', 'Dòng “Cập nhật” cho biết lần đồng bộ CRM gần nhất; số liệu chỉ mới bằng thời điểm đó.']],
     ['h', 'Kiểm soát data'],
-    ['p', 'Trang Báo cáo → Kiểm soát kiểm tra data "Đã làm" theo Quy trình ONLINE: số cuộc gọi tối thiểu, mô tả và thông tin ghi nhận, ticket, nhóm tính năng khi tư vấn tính năng, cùng tiến độ SLA và mức trừ thưởng theo quy định. Quản lý xem cả team và danh sách data cần rà; nhân sự chỉ xem phần của mình. Đây là cảnh báo tự động, không thay cho việc quản lý rà soát.'],
+    ['p', 'Mục Vận hành → Kiểm soát kiểm tra data "Đã làm" theo Quy trình ONLINE: số cuộc gọi tối thiểu, mô tả và thông tin ghi nhận, ticket, nhóm tính năng khi tư vấn tính năng, cùng tiến độ SLA và mức trừ thưởng theo quy định. Quản lý xem cả team và danh sách data cần rà; nhân sự chỉ xem phần của mình. Đây là cảnh báo tự động, không thay cho việc quản lý rà soát.'],
     ['h', 'Xuất bảng ra Excel hoặc PDF'],
     ['ul', ['Phía trên mỗi bảng có hai nút “⬇ Excel” và “⬇ PDF” (ở góc phải).', 'Excel: tải về file .xlsx của đúng bảng đang xem (số được giữ dạng số để tính toán).', 'PDF: mở hộp thoại in, chọn “Lưu dưới dạng PDF”; khổ A4 ngang, chỉ gồm bảng đó.', 'Bảng được xuất đúng như đang hiển thị (theo bộ lọc, khu vực, tháng bạn chọn).']],
     ['h', 'Cài như ứng dụng'],
     ['p', 'Trên điện thoại chọn “Thêm vào Màn hình chính” (iPhone: nút Chia sẻ của Safari). Trên Chrome máy tính dùng biểu tượng cài đặt ở thanh địa chỉ.'],
   ] },
   { id: 'nav', icon: '🧭', title: 'Điều hướng và chọn tháng', body: [
-    ['ul', ['Thanh tab phía trên (máy tính) hoặc thanh dưới cùng (điện thoại) gồm: Tổng quan, Team, Báo cáo, Phân tích, Thư viện, Chia sẻ.', 'Mục có dấu ▾ (Team, Báo cáo, Phân tích) mở ra danh sách để chọn; tab đang chọn hiện tên đầy đủ, ví dụ “Báo cáo: Công việc”.', 'Màn hình hẹp: các tab khác chỉ hiện biểu tượng, rê chuột để xem tên.', 'Ô chọn tháng nằm trong các mục theo tháng (Tổng quan, Team, Công việc, SLA, Năng suất). Trang nhớ tháng bạn chọn và đường dẫn có thể gửi cho đồng nghiệp.', 'Nút tròn tài khoản (góc phải) mở menu: Thiết lập (quản trị), Hướng dẫn sử dụng, Giao diện sáng/tối và Đăng xuất.']],
+    ['ul', ['Thanh tab phía trên (máy tính) hoặc thanh dưới cùng (điện thoại) gồm: Tổng quan, Team, Vận hành, Phân tích, Thư viện, Chia sẻ (Phép năm nằm trong nhóm Team).', 'Mục có dấu ▾ (Team, Vận hành, Phân tích) mở ra danh sách để chọn; tab đang chọn hiện tên đầy đủ, ví dụ “Vận hành: Công việc”.', 'Màn hình hẹp: các tab khác chỉ hiện biểu tượng, rê chuột để xem tên.', 'Ô chọn tháng nằm trong các mục theo tháng (Tổng quan, Team, Công việc, SLA, Năng suất). Trang nhớ tháng bạn chọn và đường dẫn có thể gửi cho đồng nghiệp.', 'Nút tròn tài khoản (góc phải) mở menu: Thiết lập (quản trị), Hướng dẫn sử dụng, Giao diện sáng/tối và Đăng xuất.']],
   ] },
   { id: 'overview', icon: '📊', title: 'Tổng quan', body: [
     ['p', 'Màn hình chính. Thành viên thấy tiến độ của mình; quản lý thấy toàn bộ team.'],
@@ -27,20 +27,20 @@ const SECTIONS = [
   { id: 'team', icon: '👥', title: 'Team', body: [
     ['ul', ['Chọn một team trong nhóm “Team” để xem KPI và nhân sự của team đó.', 'Bảng nhân sự có cột cố định bên trái để cuộn ngang vẫn thấy tên; bấm tiêu đề cột để sắp xếp.', 'Chọn tháng ngay trong tab; có thể so sánh với tháng khác ở mục So sánh (quản lý).']],
   ] },
-  { id: 'work', icon: '🗂️', title: 'Báo cáo: Theo dõi công việc', body: [
+  { id: 'work', icon: '🗂️', title: 'Vận hành: Theo dõi công việc', body: [
     ['ul', ['Thống kê tiến độ xử lý data theo nhân sự: đã xử lý, còn tồn, theo loại công việc.', 'Bảng chia data theo ngày cho cả tháng; cột nhân sự và cột tổng cuối được ghim nên luôn nhìn thấy khi cuộn.', 'Có thể lọc theo khu vực (Miền Nam, Miền Bắc, T15…) khi dữ liệu có.', 'Chọn tháng trong tab; số liệu lấy theo file KPI của tháng đó.']],
   ] },
-  { id: 'sla', icon: '⏱️', title: 'Báo cáo: SLA', body: [
+  { id: 'sla', icon: '⏱️', title: 'Vận hành: SLA', body: [
     ['p', 'Data ONL có hạn xử lý 7 ngày. Mục này thống kê data đã trễ và sắp trễ SLA.'],
     ['ul', ['Quản lý: bảng tổng theo nhân sự gồm SL trễ, SL sắp trễ và tỉ lệ trễ tính trên tổng data được giao.', 'Bảng chi tiết trễ/sắp trễ theo ngày để biết đợt data nào cần xử lý trước.', 'Nhân sự: chỉ thấy data của mình, kèm nút xem chi tiết từ màn hình Tổng quan.', 'Tiêu đề cột căn giữa, bấm để sắp xếp.']],
   ] },
-  { id: 'cinfo', icon: 'ℹ️', title: 'Báo cáo: Customer Info', body: [
+  { id: 'cinfo', icon: 'ℹ️', title: 'Vận hành: Customer Info', body: [
     ['ul', ['Chỉ hiện khi quản trị đã thêm link Power BI vào cấu hình.', 'Thống kê tỉ lệ SC dùng Customer Info, tư vấn tính năng và Act TVTN theo RCM (kèm tỉ lệ %).', 'Quản lý xem cả team, nhân sự xem phần của mình.']],
   ] },
-  { id: 'report', icon: '📞', title: 'Báo cáo: Năng suất', body: [
+  { id: 'report', icon: '📞', title: 'Vận hành: Năng suất', body: [
     ['ul', ['Cuộc gọi, talktime và ngày công theo nhân sự, theo tháng.', 'Ô công để trống ở những ngày đã qua (trừ Chủ nhật) được tính là “chưa chấm công”.', 'Mã nhân sự giữa file KPI và file năng suất được tự khớp theo tên, nên lệch mã vẫn ra đúng người.']],
   ] },
-  { id: 'hr', icon: '🌴', title: 'Báo cáo: Phép năm', body: [
+  { id: 'hr', icon: '🌴', title: 'Team: Phép năm', body: [
     ['p', 'Danh sách nhân sự và phép năm 2026, lấy từ Sheet “Danh sách nhân sự SC” trong mục Danh sách link của cấu hình.'],
     ['ul', ['Thành viên: xem phép của mình (còn lại, đã dùng, được thêm, tồn từ 2025) và bảng theo từng tháng.', 'Quản lý: bốn thẻ tổng (nhân sự, phép đã dùng, còn lại, nợ phép), bảng cả team có tìm kiếm, lọc khu vực, sắp xếp và ma trận phép đã dùng theo tháng.', '“Còn lại” lấy theo tháng gần nhất đã có số liệu. Số âm (đỏ) nghĩa là đang dùng vượt phép được hưởng.', 'Thấy số chưa đúng? Báo quản lý ở mục Chia sẻ để sửa trong Sheet.']],
   ] },

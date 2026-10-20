@@ -1125,3 +1125,8 @@ sup.half { font-size: 9px; margin-left: 2px; opacity: .85; }
 @media (max-width: 520px) { .lib-item__actions { flex-direction: column; align-items: stretch; } }
 .lib-item__copy { width: 36px; height: 36px; padding: 0; display: inline-grid; place-items: center; }
 @media (max-width: 520px) { .lib-item__actions { flex-direction: row; } }
+
+/* Cảnh báo chất lượng dữ liệu */
+.dq { display: grid; gap: 6px; margin-bottom: 12px; }
+.dq p { margin: 0; }
+.dq .btn { justify-self: start; }

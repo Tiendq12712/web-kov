@@ -6,6 +6,7 @@ import { loadAccounts, findAccount, canOpenSettings } from './directory.js';
 import { html, mount, raw } from './dom.js';
 import { monthLabel } from './format.js';
 import { overviewView, memberRowsView } from './views/overview.js';
+import { qualityWarnings, acceptQuality } from './quality.js';
 import { teamView, rowsView } from './views/team.js';
 import { detailView } from './views/detail.js';
 import { workView, workRowsView } from './views/work.js';
@@ -92,7 +93,13 @@ const readHash = () => {
   const [month, tab] = location.hash.replace(/^#\/?/, '').split('/');
   return { month, tab };
 };
-const writeHash = () => history.replaceState(null, '', `#/${state.month}/${state.tab}`);
+/** Nhớ tab và tháng đang xem của từng tài khoản để lần mở sau vào lại đúng chỗ. */
+const lastKey = (email) => `kpi.last.${email}`;
+const readLast = (email) => { try { return JSON.parse(localStorage.getItem(lastKey(email))) ?? {}; } catch { return {}; } };
+const writeHash = () => {
+  history.replaceState(null, '', `#/${state.month}/${state.tab}`);
+  if (state.me?.email && state.month) { try { localStorage.setItem(lastKey(state.me.email), JSON.stringify({ month: state.month, tab: state.tab })); } catch { /* không lưu được thì thôi */ } }
+};
 
 /* ---------- Render ---------- */
 const ICONS = {
@@ -116,13 +123,14 @@ const ICONS = {
 const tabIcon = (id) => raw(`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id] ?? ICONS.team}</svg>`);
 
 /** Cùng một danh sách tab: thanh ngang trên desktop, thanh dưới cùng trên mobile. */
-/** Các mục điều hướng: một số mục gom thành nhóm (Team, Báo cáo, Phân tích) mở ra danh sách để chọn. */
+/** Các mục điều hướng: một số mục gom thành nhóm (Team, Vận hành, Phân tích) mở ra danh sách để chọn. */
 let navModel = [];
 function buildNav() {
   const d = state.data, manager = state.me?.role !== 'member';
   const item = (id, name, short, desc = '') => ({ id, name, short: short ?? name, desc });
   const group = (id, name, icon, items) => (items.length > 1 ? { group: id, id, name, short: name, icon, items } : items[0]);
   const teams = d.teams.map((t) => item(t.id, t.name, t.name.replace('Team ', ''), 'KPI và nhân sự của team'));
+  if (hasHr()) teams.push(item('hr', 'Phép năm', 'Phép năm', 'Nhân sự và phép năm 2026'));
   const reports = [];
   if (d.work) reports.push(item('work', 'Theo dõi công việc', 'Công việc', 'Tiến độ xử lý data, bảng chia data'));
   if (d.work?.backlogAll) reports.push(item('sla', 'SLA', 'SLA', 'Data đã trễ và sắp trễ hạn 7 ngày'));
@@ -130,14 +138,13 @@ function buildNav() {
   if (hasDetail()) reports.push(item('control', 'Kiểm soát', 'Kiểm soát', 'Data điền đúng quy trình, SLA và mức trừ'));
   if (hasAddons()) reports.push(item('addon', 'Add-on', 'Add-on', 'Add-on đã chọn và được ghi nhận'));
   if (hasReport(state.month)) reports.push(item('report', 'Năng suất', 'Năng suất', 'Cuộc gọi, talktime, ngày công'));
-  if (hasHr()) reports.push(item('hr', 'Phép năm', 'Phép năm', 'Nhân sự và phép năm 2026'));
   const analysis = [];
   if (manager) analysis.push(item('trend', 'Xu hướng', 'Xu hướng', 'Biến động theo ngày'));
   if (manager && hasDetail()) analysis.push(item('xfer', 'Chuyển Offline → Online', 'Chuyển data', 'Data chuyển theo tháng, nguồn và tỉnh/thành'));
   if (manager && hasDetail()) analysis.push(item('segment', 'Phân tích tệp data', 'Tệp data', 'Công việc, kết nối, impact, add-on theo nguồn data'));
   if (manager && (hasCalls() || hasReport(state.month))) analysis.push(item('connect', 'Chất lượng kết nối', 'Kết nối', 'Tỉ lệ kết nối và call đàm thoại ngắn'));
   if (manager && monthList.length > 1) analysis.push(item('compare', 'So sánh tháng', 'So sánh', 'Đặt hai tháng cạnh nhau'));
-  return [item('overview', 'Tổng quan'), group('team', 'Team', 'team', teams), group('report', 'Báo cáo', 'report', reports), group('analysis', 'Phân tích', 'trend', analysis),
+  return [item('overview', 'Tổng quan'), group('team', 'Team', 'team', teams), group('ops', 'Vận hành', 'report', reports), group('analysis', 'Phân tích', 'trend', analysis),
     hasLibrary() ? item('library', 'Thư viện') : null, item('chat', 'Chia sẻ')].filter(Boolean);
 }
 
@@ -195,6 +202,7 @@ function toggleAccountMenu() {
   accountBtn.setAttribute('aria-expanded', 'true');
 }
 document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-dq-accept]')) { if (state.segment.data) acceptQuality(state.segment.data); return renderView(); }
   if (e.target.closest('[data-nav-group]')) return openNavMenu(e.target.closest('[data-nav-group]'));
   if (e.target.closest('#user')) return toggleAccountMenu();
   closeMenus();   // bấm ra ngoài hoặc chọn một mục: đóng menu (mục vẫn được các xử lý khác thực hiện)
@@ -207,6 +215,14 @@ const kpiNames = () => new Map(state.data.teams.flatMap((t) => t.members.map((m)
 
 /** Mã nhân sự -> { name, team } từ báo cáo KPI, để lọc theo team ở các tab khác. */
 const kpiPeople = () => new Map(state.data.teams.flatMap((t) => t.members.map((m) => [m.code, { name: m.name, team: t.id }])));
+
+/** Dải cảnh báo chất lượng dữ liệu chi tiết (chỉ quản lý thấy) đặt trên đầu báo cáo dùng Data Txx. */
+function withQuality(tab, detail, view) {
+  if (state.me?.role === 'member') return view;
+  const warns = qualityWarnings(detail, { tab });
+  if (!warns.length) return view;
+  return html`<div class="notice dq" role="alert">${warns.map((w) => html`<p><strong>⚠️ Chất lượng dữ liệu:</strong> ${w.text}</p>`)}<button class="btn btn--ghost" type="button" data-dq-accept>Bỏ qua, dùng số hiện tại làm mốc</button></div>${view}`;
+}
 
 /** Tải một tab theo yêu cầu rồi nhớ lại; dùng chung cho Công việc và Năng suất. */
 function lazyTab(slice, tab, loader, render) {
@@ -302,10 +318,10 @@ function currentPage() {
   const report = preloadReport();   // ngày công và năng suất lấy từ file năng suất, nên luôn tải nền
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
-  if (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'xfer', loadDetail, (d) => transferView({ rows: d.rows, months: d.months }, state.xfer)), title: 'Chuyển Offline → Online' };
-  if (state.tab === 'control' && hasDetail()) return { view: lazyTab(state.segment, 'control', loadDetail, (d) => controlView(d, state.control, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month })), title: 'Kiểm soát' };
+  if (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'xfer', loadDetail, (d) => withQuality('xfer', d, transferView({ rows: d.rows, months: d.months }, state.xfer))), title: 'Chuyển Offline → Online' };
+  if (state.tab === 'control' && hasDetail()) return { view: lazyTab(state.segment, 'control', loadDetail, (d) => withQuality('control', d, controlView(d, state.control, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month }))), title: 'Kiểm soát' };
   if (state.tab === 'addon' && hasAddons()) return { view: lazyTab(state.addons, 'addon', loadAddons, (d) => addonView(d, state.addons, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Add-on' };
-  if (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'segment', loadDetail, (data) => segmentView(data, state.segment)), title: 'Phân tích tệp data' };
+  if (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'segment', loadDetail, (data) => withQuality('segment', data, segmentView(data, state.segment))), title: 'Phân tích tệp data' };
   if (state.tab === 'connect' && state.me.role !== 'member') {
     const view = hasCalls()
       ? lazyTab(state.calls, 'connect', loadCalls, (data) => connectCallsView(data, state.connect, state.month, kpiNames()))
@@ -320,7 +336,7 @@ function currentPage() {
   if (state.tab === 'cinfo') return { view: lazyTab(state.cinfo, 'cinfo', loadPbi, (d) => cinfoView(d, state.cinfo.f, { manager: state.me.role !== 'member', code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code })), title: 'Customer Info' };
   if (state.tab === 'sla') {
     const manager = state.me.role !== 'member';
-    const detail = hasDetail() ? lazyTab(state.segment, 'sla', loadDetail, (d) => slaDetailView(d, { month: state.month, manager, code: myCode(), names: kpiNames() })) : '';
+    const detail = hasDetail() ? lazyTab(state.segment, 'sla', loadDetail, (d) => withQuality('sla', d, slaDetailView(d, { month: state.month, manager, code: myCode(), names: kpiNames() }))) : '';
     return { view: html`${detail}${slaView(computeSla(state.data.work, latestAsOf(state.data), state.month), { manager, code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code })}`, title: 'SLA' };
   }
   if (state.tab === 'work') return { view: renderWork(), title: 'Theo dõi công việc' };
@@ -825,8 +841,10 @@ async function startApp() {
       if (canSettings()) { state.tab = 'settings'; return renderView(); }
       return showError('Chưa có link báo cáo nào. Hãy nhờ Admin hoặc Quản trị thêm link trong mục Thiết lập.');
     }
-    const { month } = readHash();
-    state.tab = 'overview';   // luôn vào Tổng quan trước
+    // Ưu tiên đường dẫn được gửi (#/tháng/tab), rồi tới nơi đã xem lần trước, cuối cùng là Tổng quan. Tab không hợp lệ sẽ tự về Tổng quan.
+    const hash = readHash(), last = readLast(state.me.email);
+    const month = hash.month || last.month;
+    state.tab = hash.tab || last.tab || 'overview';
     await setMonth(months.some((m) => m.month === month) ? month : months[0].month, { boot: true });
   } catch (err) {
     if (err.code === 'auth') showLogin(err.message); else showError(err.message);
@@ -909,8 +927,10 @@ async function startFromSnapshot(snap) {
     staleSession = true;
     const months = await loadMonths();
     fillMonths(months);
-    state.tab = 'overview';
-    await Promise.all([setMonth(months.some((m) => m.month === snap.month) ? snap.month : months[0].month, { boot: true }), sleep(700)]);
+    const last = readLast(snap.me.email);
+    state.tab = last.tab || 'overview';
+    const want = snap.month;   // bản lưu chỉ có dữ liệu của tháng này
+    await Promise.all([setMonth(months.some((m) => m.month === want) ? want : months[0].month, { boot: true }), sleep(700)]);
     if (!state.data) { staleSession = false; return showLogin(); }
     syncLogout();
   } finally { setBoot(); }

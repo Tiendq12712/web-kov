@@ -7,7 +7,7 @@ const heat = () => { const b = document.querySelector('[data-heat]'); return vis
 
 const STEPS = [
   { el: () => first('#month'), title: 'Chọn tháng', text: 'Chuyển giữa các tháng báo cáo. Dữ liệu lấy trực tiếp từ Google Sheet của công ty.' },
-  { el: () => first('#tabs', '#bottom-nav'), title: 'Các mục báo cáo', text: 'Các mục có dấu ▾ (Team, Báo cáo, Phân tích) mở ra danh sách để chọn. Tổng quan, Thư viện và Chia sẻ bấm là vào ngay.' },
+  { el: () => first('#tabs', '#bottom-nav'), title: 'Các mục báo cáo', text: 'Các mục có dấu ▾ (Team, Vận hành, Phân tích) mở ra danh sách để chọn. Tổng quan, Thư viện và Chia sẻ bấm là vào ngay.' },
   { el: heat, title: 'Kiểu màu bảng', text: 'Đổi cách tô màu bảng nhân sự: thanh màu, ít màu hoặc nhiều màu — chọn kiểu bạn dễ nhìn nhất.' },
   { el: () => first('.card__head .badge', '.badge--good', '.badge--warn', '.badge--bad'), title: 'Cách đọc trạng thái', text: 'Nhãn màu này cho biết tiến độ của team hoặc nhân sự. “Đạt tiến độ” = KPI theo kịp thời gian đã qua của tháng; “Cần đẩy” = từ 70% trở lên; “Chậm” = dưới 70%. Bấm vào một nhân sự để xem chi tiết.' },
   { el: () => first('[data-tab="chat"]'), title: 'Chia sẻ với quản lý', text: 'Gặp khó khăn? Gửi tin cho quản lý ở đây và xem phản hồi của họ.' },
