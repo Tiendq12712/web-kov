@@ -4,6 +4,9 @@
  */
 export const SLA_DAYS = 7;     // hạn xử lý
 export const WARN_DAYS = 2;    // còn tối đa 2 ngày là "sắp trễ"
+/** Ngày tạo được cộng thêm hạn (ngày): data tạo ngày đó có hạn SLA = 7 + số ngày cộng thêm. */
+export const SLA_EXTRA = { '2026-10-15': 3 };
+export const slaDaysFor = (iso) => SLA_DAYS + (SLA_EXTRA[String(iso ?? '').slice(0, 10)] ?? 0);
 
 const DAY_MS = 86_400_000;
 const pad = (n) => String(n).padStart(2, '0');
@@ -11,7 +14,7 @@ const toDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return n
 const sum = (list) => list.reduce((a, b) => a + (b ?? 0), 0);
 
 /** Trạng thái của một lô theo tuổi (số ngày kể từ ngày chia): trễ > 7 ngày, sắp trễ từ ngày thứ 5 đến ngày thứ 7. */
-export const slaStatus = (age) => (age > SLA_DAYS ? 'late' : age >= SLA_DAYS - WARN_DAYS ? 'soon' : 'ok');
+export const slaStatus = (age, limit = SLA_DAYS) => (age > limit ? 'late' : age >= limit - WARN_DAYS ? 'soon' : 'ok');
 
 export const STATUS_LABELS = { late: 'Đã trễ SLA', soon: 'Sắp trễ SLA', ok: 'Trong hạn' };
 
@@ -42,8 +45,9 @@ export function computeSla(work, asOf, month, { live = true } = {}) {
       if (!count) return null;
       const date = `${month}-${pad(day)}`;
       const age = Math.round((now - toDate(date)) / DAY_MS);
-      const due = new Date(toDate(date).getTime() + SLA_DAYS * DAY_MS);
-      return { day, date, count, age, left: SLA_DAYS - age, due: `${pad(due.getDate())}/${pad(due.getMonth() + 1)}`, status: slaStatus(age) };
+      const limit = slaDaysFor(date);
+      const due = new Date(toDate(date).getTime() + limit * DAY_MS);
+      return { day, date, count, age, limit, left: limit - age, due: `${pad(due.getDate())}/${pad(due.getMonth() + 1)}`, status: slaStatus(age, limit) };
     }).filter((b) => b && b.age >= 0);
     const by = (s) => sum(batches.filter((b) => b.status === s).map((b) => b.count));
     const total = sum(batches.map((b) => b.count));

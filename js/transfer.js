@@ -30,7 +30,12 @@ const count = (list, keyOf, labelOf) => {
 const industryOf = (r) => { const p = (r.product || '').trim().toLowerCase(); return p === 'fnb' ? 'FnB' : p === 'retail' ? 'Retail' : p === 'booking' ? 'Booking' : p ? r.product : 'Chưa phân loại'; };
 const jobOf = (r) => (/T15/i.test(r.jobType ?? '') ? 'T15' : /OI/i.test(r.jobType ?? '') ? 'OI' : /NA/i.test(r.jobType ?? '') ? 'NA' : r.jobType || 'Khác');
 
-export function analyzeTransfer(all, { month = 'all' } = {}) {
+export function analyzeTransfer(raw, { month = 'all' } = {}) {
+  // Ô tỉnh/thành trống thì lấy từ dòng khác có cùng Retailer ID (cùng một gian hàng).
+  const known = new Map();
+  for (const r of raw) if (r.province && r.retailer) known.set(r.retailer, r.province);
+  let filled = 0;
+  const all = raw.map((r) => { if (!r.province && r.retailer && known.has(r.retailer)) { filled += r.transfer ? 1 : 0; return { ...r, province: known.get(r.retailer), provinceFilled: true }; } return r; });
   const months = [...new Set(all.map((r) => r.month).filter(Boolean))].sort();
   const pool = month === 'all' ? all : all.filter((r) => r.month === month);
   const xfer = pool.filter((r) => r.transfer);
@@ -54,5 +59,5 @@ export function analyzeTransfer(all, { month = 'all' } = {}) {
   const dayMap = new Map();
   for (const r of xfer) { const k = r.created || '—'; dayMap.set(k, (dayMap.get(k) ?? 0) + 1); }
   const days = [...dayMap].filter(([k]) => k !== '—').sort((a, b) => a[0].localeCompare(b[0])).map(([iso, n]) => ({ iso, n }));
-  return { months, total: pool.length, xferCount: xfer.length, rate: ratio(xfer.length, pool.length), done: done.length, doneRate: ratio(done.length, xfer.length), byMonth, sources, provs, regions, industries, statuses, days, provCount: provs.filter((p) => p.key).length };
+  return { months, total: pool.length, xferCount: xfer.length, rate: ratio(xfer.length, pool.length), done: done.length, doneRate: ratio(done.length, xfer.length), byMonth, sources, provs, regions, industries, statuses, days, provCount: provs.filter((p) => p.key).length, filled: xfer.filter((r) => r.provinceFilled).length };
 }

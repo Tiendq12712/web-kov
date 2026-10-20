@@ -85,7 +85,7 @@ function batchTable(batches, asOf) {
         <td>${dm(b.date)} <span class="muted">(${b.age} ngày trước)</span></td><td class="right num strong">${num(b.count)}</td><td>${b.due}</td>
         <td><span class="badge badge--${TONE[b.status]}">${leftText(b)}</span></td></tr>`)}</tbody>
     </table></div>
-    <p class="muted">Tính đến ${dm(asOf)}. Hạn xử lý = ngày chia + ${SLA_DAYS} ngày.</p>`;
+    <p class="muted">Tính đến ${dm(asOf)}. Hạn xử lý = ngày chia + ${SLA_DAYS} ngày (lô ngày 15/10 được cộng thêm 3 ngày, hạn 10 ngày).</p>`;
 }
 
 const explain = html`<p class="muted">SLA xử lý data ONL là <strong>${SLA_DAYS} ngày</strong> kể từ ngày được chia.

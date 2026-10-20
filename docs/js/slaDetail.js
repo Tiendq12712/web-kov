@@ -2,7 +2,7 @@
  * SLA tính trên từng data (tab "Data Txx", cột "Thời gian tạo" và "Thời gian tương tác"): trễ khi (ngày tương tác − ngày tạo) > 7 ngày, tính theo ngày lịch, gồm cả data đã làm.
  * Data chưa xong (chưa làm, đang làm) tính đến hiện tại; data hủy không tính. Sắp trễ: chưa xong, đã qua từ 5 đến 7 ngày.
  */
-import { SLA_DAYS, WARN_DAYS } from './sla.js';
+import { WARN_DAYS, slaDaysFor } from './sla.js';
 
 const DAY = 86_400_000;
 const sum = (list) => list.reduce((a, b) => a + b, 0);
@@ -20,8 +20,9 @@ export function classify(r, now = wallNow()) {
   const end = done ? (r.modifiedTs ?? r.createdTs) : now;
   if (r.createdTs == null || end == null) return { kind: 'ok', elapsed: null };
   const elapsed = dayNo(end) - dayNo(r.createdTs);   // chênh lệch theo ngày lịch (ngày tương tác − ngày tạo)
-  if (elapsed > SLA_DAYS) return { kind: done ? 'late-done' : 'late-open', elapsed };
-  if (!done && elapsed >= SLA_DAYS - WARN_DAYS) return { kind: 'soon', elapsed };
+  const limit = slaDaysFor(r.created);   // 7 ngày, riêng ngày được gia hạn thì cộng thêm
+  if (elapsed > limit) return { kind: done ? 'late-done' : 'late-open', elapsed, limit };
+  if (!done && elapsed >= limit - WARN_DAYS) return { kind: 'soon', elapsed, limit };
   return { kind: 'ok', elapsed };
 }
 

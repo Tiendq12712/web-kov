@@ -2,7 +2,7 @@
  * Phân tích một "tệp data" (cột Nguồn data) trong tab chi tiết "Data Txx" của file KPI:
  * công việc hỗ trợ, tỉ lệ kết nối, impact, add-on, tồn đọng, rồi so với toàn bộ data.
  */
-import { SLA_DAYS, WARN_DAYS } from './sla.js';
+import { WARN_DAYS, slaDaysFor } from './sla.js';
 
 const plain = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
 export const ADDONS = ['Kích hoạt payment thành công', 'Giới thiệu Kship', 'Giới thiệu Lending', 'Giới thiệu nâng gói', 'Mua phần cứng', 'Giới thiệu Thêm kho/thêm chi nhánh', 'Giới thiệu Hotellink', 'Hướng dẫn KH HDDT/CKS thành công', 'Chuyển lead ký mới', 'Chuyển lead tái ký'];
@@ -92,7 +92,7 @@ export function metrics(rows, today) {
     impact: rows.filter((r) => r.impact).length, impactRate: ratio(done.filter((r) => r.impact).length, done.length), impactConnRate: ratio(conn.filter((r) => r.impact).length, conn.length),
     addCount: addRows.length, addRate: ratio(addRows.length, conn.length), addPts: sum(rows.map((r) => r.addPts)), points: sum(rows.map((r) => r.points)),
     failCount: fail.length, failRate: ratio(fail.length, contacted.length),
-    soon: open.filter((r) => age(r) >= SLA_DAYS - WARN_DAYS && age(r) <= SLA_DAYS).length, late: open.filter((r) => age(r) > SLA_DAYS).length,
+    soon: open.filter((r) => age(r) >= slaDaysFor(r.created) - WARN_DAYS && age(r) <= slaDaysFor(r.created)).length, late: open.filter((r) => age(r) > slaDaysFor(r.created)).length,
     doneShare: ratio(done.length, rows.length), openShare: ratio(open.length, rows.length),
   };
 }
