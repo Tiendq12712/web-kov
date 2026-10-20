@@ -42,7 +42,7 @@ export function transferView(data, ui) {
     </table></div>
     <div class="toolbar"><h2 class="section-title">Theo khu vực (tỉnh/thành phố)</h2><p class="muted">Cột "Tỉ lệ" là data chuyển / tổng data của tỉnh đó (chỉ tính data có ghi tỉnh/thành). Ô tỉnh/thành trống trong Sheet được bổ sung từ dòng khác có cùng Retailer ID nếu có.</p></div>
     <div class="charts">
-      ${chartCard('Top tỉnh/thành có data chuyển', html`<div class="hist">${topProv.map((p) => html`<div class="hist__row"><span title="${p.label}">${p.label}</span>${bar(p.n, maxProv)}<span class="num">${num(p.n)} <small class="muted">(${p1(p.share)})</small></span></div>`)}</div>`, '12 tỉnh/thành có nhiều data chuyển nhất trong kỳ.')}<span class="num">${num(r.n)} <small class="muted">(${p1(r.share)})</small></span></div>`)}</div>`, 'Gộp tỉnh/thành theo miền Bắc, Trung, Nam.')}
+      ${chartCard('Top tỉnh/thành có data chuyển', html`<div class="hist">${topProv.map((p) => html`<div class="hist__row"><span title="${p.label}">${p.label}</span>${bar(p.n, maxProv)}<span class="num">${num(p.n)} <small class="muted">(${p1(p.share)})</small></span></div>`)}</div>`, '12 tỉnh/thành có nhiều data chuyển nhất trong kỳ.')}
     </div>
     <div class="table-wrap"><table class="connect-table sortable">
       <thead><tr><th scope="col" class="sticky-col">Tỉnh/Thành phố</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">% data chuyển</th><th scope="col" class="right">Tổng data của tỉnh</th><th scope="col" class="right">Tỉ lệ</th>${data.months.map((m) => html`<th scope="col" class="right">${mlabel(m)}</th>`)}</tr></thead>
