@@ -11,6 +11,7 @@ import { parseCalls } from './calls.js';
 import { parseDetail } from './segment.js';
 import { parseAddons } from './addons.js';
 import { CONFIG } from './config.js';
+import { persistGet, persistSet, persistClear } from './persist.js';
 
 const cache = new Map();
 const store = new Map();   // kết quả đã tải xong (để lưu lại dùng cho lần mở sau)
@@ -33,7 +34,7 @@ export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
   callLink = links.find(isCalls) ?? null;
   return resolveMonths(links);
 }).then((list) => (months = list)));
-export const reloadMonths = () => { monthsPromise = null; cache.clear(); store.clear(); };
+export const reloadMonths = () => { monthsPromise = null; cache.clear(); store.clear(); persistClear(); };
 
 const entryOf = (ym) => {
   const entry = months.find((m) => m.month === ym);
@@ -125,24 +126,33 @@ export const loadCalls = () => memo('calls', async () => {
   if (!callLink) throw new Error('Chưa có link "Dữ liệu call" trong tab Danh sách link');
   const token = getToken();
   const tabs = callLink.tab ? [callLink.tab] : await fetchTabs(callLink.id, token);   // mỗi tab một tháng (T7, T8, T9, T10…)
-  const sets = await Promise.all(tabs.map((tab) => fetchRows(callLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:O60000' })));
+  const sets = await Promise.all(tabs.map((tab) => fetchRows(callLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:O60000', timeout: 180_000 })));
   return parseCalls(sets, tabs);
 });
 
 /** Chi tiết từng việc của file KPI (tab "Data Txx" của mỗi tháng): dùng để phân tích theo tệp data. */
 export const hasDetail = () => months.some((m) => m.detail);
+const DETAIL_TTL = 12 * 3_600_000;   // tháng đã qua ít đổi: dùng lại bản lưu trong trình duyệt tối đa 12 giờ
+/** Chi tiết của một tháng, đọc song song theo tháng. Tháng mới nhất luôn tải mới; các tháng cũ dùng bản lưu nếu còn hạn. */
+const loadDetailMonth = (m, isLatest) => memo(`detail:${m.month}`, async () => {
+  const key = `detail:${m.detail.id}:${m.detail.tab}:${m.month}`;
+  if (!isLatest) { const saved = await persistGet(key, DETAIL_TTL); if (saved) return saved; }
+  const set = await fetchRows(m.detail.id, getToken(), { tab: `'${m.detail.tab.replace(/'/g, "''")}'`, range: 'A1:AK30000', timeout: 180_000 });
+  const rows = parseDetail(set, m.month);
+  if (!isLatest) persistSet(key, rows);
+  return rows;
+});
 export const loadDetail = () => memo('detail', async () => {
-  const token = getToken();
   const list = months.filter((m) => m.detail);
-  const sets = await Promise.all(list.map((m) => fetchRows(m.detail.id, token, { tab: `'${m.detail.tab.replace(/'/g, "''")}'`, range: 'A1:AK30000' })));
-  const rows = sets.flatMap((set, i) => parseDetail(set, list[i].month));
-  return { rows, months: list.map((m) => m.month).sort() };
+  const latest = list[0]?.month;   // danh sách đã xếp tháng mới nhất lên đầu
+  const sets = await Promise.all(list.map((m) => loadDetailMonth(m, m.month === latest)));
+  return { rows: sets.flat(), months: list.map((m) => m.month).sort() };
 });
 
-export const clearCache = () => { cache.clear(); store.clear(); };
+export const clearCache = () => { cache.clear(); store.clear(); persistClear(); };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
-export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, calls: callLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'detail') });
+export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, calls: callLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && !key.startsWith('detail')) });
 export function restoreData({ months: saved, pbi, library, hr, calls, entries }) {
   months = saved;
   pbiLink = pbi ?? null;

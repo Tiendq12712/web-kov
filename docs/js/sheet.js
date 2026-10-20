@@ -92,12 +92,18 @@ export function parseKpi(rows, month) {
 /* ---------- Gọi Google Sheets API ---------- */
 export const sheetId = (urlOrId) => /\/d\/([\w-]+)/.exec(urlOrId)?.[1] ?? urlOrId;
 
+/** fetch có thời gian chờ: quá hạn thì báo lỗi thay vì chờ mãi. */
+async function fetchWithin(url, init, ms) {
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { ...init, signal: ctrl.signal }); }
+  catch (err) { throw err.name === 'AbortError' ? new Error('Google Sheets phản hồi quá lâu. Kiểm tra mạng rồi thử lại.') : err; }
+  finally { clearTimeout(timer); }
+}
+
 /** Đọc một tab. `render`: UNFORMATTED_VALUE (số thô) hoặc FORMATTED_VALUE (chuỗi như đang hiển thị). */
-export async function fetchRows(urlOrId, token, { tab, range: area = 'A1:AZ1000', render = 'UNFORMATTED_VALUE' } = {}) {
+export async function fetchRows(urlOrId, token, { tab, range: area = 'A1:AZ1000', render = 'UNFORMATTED_VALUE', timeout = 60_000 } = {}) {
   const range = encodeURIComponent(`${tab}!${area}`);
-  const res = await fetch(`${API}/${sheetId(urlOrId)}/values/${range}?valueRenderOption=${render}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetchWithin(`${API}/${sheetId(urlOrId)}/values/${range}?valueRenderOption=${render}`, { headers: { Authorization: `Bearer ${token}` } }, timeout);
   if (res.status === 401) throw Object.assign(new Error('Phiên đăng nhập đã hết hạn'), { code: 'auth' });
   if (res.status === 403 || res.status === 404) {
     throw new Error('Tài khoản của bạn chưa được cấp quyền xem Google Sheet này');
@@ -109,7 +115,7 @@ export async function fetchRows(urlOrId, token, { tab, range: area = 'A1:AZ1000'
 
 /** Tên các tab đang hiển thị của một Google Sheet. */
 export async function fetchTabs(urlOrId, token) {
-  const res = await fetch(`${API}/${sheetId(urlOrId)}?fields=sheets.properties(title,hidden)`, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetchWithin(`${API}/${sheetId(urlOrId)}?fields=sheets.properties(title,hidden)`, { headers: { Authorization: `Bearer ${token}` } }, 60_000);
   if (res.status === 401) throw Object.assign(new Error('Phiên đăng nhập đã hết hạn'), { code: 'auth' });
   if (res.status === 403 || res.status === 404) throw new Error('Tài khoản của bạn chưa được cấp quyền xem Google Sheet này');
   if (!res.ok) throw new Error(`Google Sheets trả lỗi ${res.status}`);
