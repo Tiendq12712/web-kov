@@ -16,6 +16,7 @@ import { segmentView } from './views/segment.js';
 import { addonView } from './views/addons.js';
 import { slaDetailView } from './views/slaDetail.js';
 import { controlView } from './views/control.js';
+import { transferView } from './views/transfer.js';
 import { workdaysByCode } from './report.js';
 import { createSettings } from './settingsController.js';
 import { createChat } from './chatController.js';
@@ -27,7 +28,7 @@ import { loadHistory, recordHistory, buildSnapshot } from './history.js';
 import { buildTodo } from './todo.js';
 import { coachFor } from './coach.js';
 import { coachFloat } from './views/coach.js';
-import { libraryView, libraryListView } from './views/library.js';
+import { libraryView, libraryListView, CHECK_ICON } from './views/library.js';
 import { hrView, hrRowsView } from './views/hr.js';
 import { summarizeMonth } from './compare.js';
 import { compareView } from './views/compare.js';
@@ -66,6 +67,7 @@ const state = {
   connect: { region: 'all', shortSec: 30, longSec: 180, view: 'month' },   // phân tích chất lượng call kết nối (dùng chung dữ liệu năng suất)
   calls: { data: null, loading: false, error: '' },
   segment: { data: null, loading: false, error: '', key: '', month: 'all' },
+  xfer: { month: 'all' },   // data chuyển Offline → Online (dùng chung dữ liệu chi tiết)
   control: { rule: 'all', person: 'all' },   // kiểm soát data theo quy trình (dùng chung dữ liệu chi tiết Data Txx)
   addons: { data: null, loading: false, error: '', month: 'all', type: 'all', person: 'all', status: 'all', q: '' },   // add-on nhân sự chọn và được ghi nhận (Sheet PBI, tab Chi tiết addon)   // phân tích tệp data (tab Data Txx)   // từng cuộc gọi (Sheet "Dữ liệu call")
   hr: { data: null, loading: false, error: '', q: '', region: 'all' },   // nhân sự và phép năm
@@ -96,6 +98,7 @@ const writeHash = () => history.replaceState(null, '', `#/${state.month}/${state
 const ICONS = {
   overview: '<rect x="3.5" y="3.5" width="7" height="9" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.8"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.8"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.8"/>',
   addon: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M17 3.5v7M13.5 7h7"/>',
+  xfer: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
   control: '<path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
   segment: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
   connect: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
@@ -130,6 +133,7 @@ function buildNav() {
   if (hasHr()) reports.push(item('hr', 'Phép năm', 'Phép năm', 'Nhân sự và phép năm 2026'));
   const analysis = [];
   if (manager) analysis.push(item('trend', 'Xu hướng', 'Xu hướng', 'Biến động theo ngày'));
+  if (manager && hasDetail()) analysis.push(item('xfer', 'Chuyển Offline → Online', 'Chuyển data', 'Data chuyển theo tháng, nguồn và tỉnh/thành'));
   if (manager && hasDetail()) analysis.push(item('segment', 'Phân tích tệp data', 'Tệp data', 'Công việc, kết nối, impact, add-on theo nguồn data'));
   if (manager && (hasCalls() || hasReport(state.month))) analysis.push(item('connect', 'Chất lượng kết nối', 'Kết nối', 'Tỉ lệ kết nối và call đàm thoại ngắn'));
   if (manager && monthList.length > 1) analysis.push(item('compare', 'So sánh tháng', 'So sánh', 'Đặt hai tháng cạnh nhau'));
@@ -298,6 +302,7 @@ function currentPage() {
   const report = preloadReport();   // ngày công và năng suất lấy từ file năng suất, nên luôn tải nền
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
+  if (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'xfer', loadDetail, (d) => transferView({ rows: d.rows, months: d.months }, state.xfer)), title: 'Chuyển Offline → Online' };
   if (state.tab === 'control' && hasDetail()) return { view: lazyTab(state.segment, 'control', loadDetail, (d) => controlView(d, state.control, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month })), title: 'Kiểm soát' };
   if (state.tab === 'addon' && hasAddons()) return { view: lazyTab(state.addons, 'addon', loadAddons, (d) => addonView(d, state.addons, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Add-on' };
   if (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'segment', loadDetail, (data) => segmentView(data, state.segment)), title: 'Phân tích tệp data' };
@@ -383,7 +388,7 @@ async function setMonth(ym, { boot = false } = {}) {
   }
   Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'control' && hasDetail()) || team();
+  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -399,6 +404,25 @@ function setTab(tab) {
 }
 
 /* ---------- Chi tiết nhân sự ---------- */
+/** Sao chép link tài liệu vào bộ nhớ tạm; nút đổi chữ báo kết quả trong 1,5 giây. */
+async function copyLink(btn) {
+  const url = btn.dataset.copyLink;
+  let ok = false;
+  try { await navigator.clipboard.writeText(url); ok = true; } catch {
+    const box = Object.assign(document.createElement('textarea'), { value: url });   // trình duyệt chặn Clipboard API: dùng cách cũ
+    box.style.cssText = 'position:fixed;opacity:0'; document.body.append(box); box.select();
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    box.remove();
+  }
+  const old = btn.dataset.html ?? btn.innerHTML;
+  btn.dataset.html = old;
+  btn.innerHTML = ok ? CHECK_ICON : '✕';
+  btn.title = ok ? 'Đã sao chép' : 'Không chép được';
+  btn.classList.toggle('is-copied', ok);
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => { btn.innerHTML = old; btn.title = 'Sao chép link'; btn.classList.remove('is-copied'); }, 1500);
+}
+
 function openMember(ref, { timesheet = false } = {}) {
   const [teamId, code] = ref.split(':');
   const t = state.data.teams.find((x) => x.id === teamId);
@@ -460,6 +484,7 @@ document.addEventListener('click', (e) => {
   if (hit('[data-coach-next]')) { state.coachBump += 1; return renderCoach(); }
   if (hit('[data-coach-toggle]')) { state.coachPref.open = !state.coachPref.open; saveCoachPref(); return renderCoach(); }
   if (hit('[data-coach-side]')) { state.coachPref.side = state.coachPref.side === 'right' ? 'left' : 'right'; saveCoachPref(); return renderCoach(); }
+  if (hit('[data-copy-link]')) { copyLink(hit('[data-copy-link]')); return; }
   if (hit('[data-lib-cat]')) { state.library.cat = hit('[data-lib-cat]').dataset.libCat; return renderView(); }
   if (hit('[data-trend-metric]')) { state.trend.metric = hit('[data-trend-metric]').dataset.trendMetric; return renderView(); }
   if (hit('[data-record-history]')) return recordHistoryNow();
@@ -517,6 +542,7 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('change', (e) => {
+  if (e.target.id === 'xfer-month') { state.xfer.month = e.target.value; return renderView(); }
   if (e.target.id === 'ctl-rule') { state.control.rule = e.target.value; return renderView(); }
   if (e.target.id === 'ctl-person') { state.control.person = e.target.value; return renderView(); }
   if (e.target.id === 'addon-month') { state.addons.month = e.target.value; state.addons.person = 'all'; state.addons.type = 'all'; return renderView(); }

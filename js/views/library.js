@@ -20,6 +20,9 @@ const GLYPH = {
 const GROUPS = [['quy trinh', 'book', '#3b82f6'], ['chinh sach', 'shield', '#f59e0b'], ['giai trinh', 'clipboard', '#8b5cf6']];
 const KIND_COLOR = { doc: '#3b82f6', sheet: '#10b981', slide: '#f59e0b', form: '#8b5cf6', file: '#ef4444', video: '#ef4444', link: '#64748b' };
 const icon = (glyph, color, size = 36) => raw(`<span class="lib-icon" style="--c:${color};width:${size}px;height:${size}px"><svg viewBox="0 0 24 24" width="${Math.round(size * 0.58)}" height="${Math.round(size * 0.58)}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPH[glyph]}</svg></span>`);
+/** Biểu tượng sao chép (hai tờ giấy chồng nhau) và dấu tích báo đã chép. */
+export const COPY_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2.2"/><path d="M5 15V6.2A2.2 2.2 0 0 1 7.2 4H16"/></svg>';
+export const CHECK_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const groupIcon = (name, size) => { const g = GROUPS.find(([k]) => plain(name).includes(k)); return icon(g?.[1] ?? 'folder', g?.[2] ?? '#0ea5e9', size); };
 
 /** Các mục khớp bộ lọc nhóm + ô tìm kiếm (không dấu). */
@@ -35,7 +38,10 @@ const itemRow = (i) => html`
     <span class="lib-item__icon" title="${i.kind.label}" aria-hidden="true">${icon(i.kind.id, KIND_COLOR[i.kind.id] ?? '#64748b')}</span>
     <span class="lib-item__text"><strong>${i.title}</strong>
       <small>${i.kind.label}${i.extra.map(([h, v]) => ` · ${h}: ${v}`).join('')}</small></span>
-    <a class="btn btn--ghost lib-item__go" href="${i.url}" target="_blank" rel="noopener noreferrer">Mở</a>
+    <span class="lib-item__actions">
+      <button class="btn btn--ghost lib-item__copy" type="button" data-copy-link="${i.url}" title="Sao chép link" aria-label="Sao chép link ${i.title}">${raw(COPY_ICON)}</button>
+      <a class="btn btn--ghost lib-item__go" href="${i.url}" target="_blank" rel="noopener noreferrer">Mở</a>
+    </span>
   </li>`;
 
 export const libraryListView = (lib, ui) => {

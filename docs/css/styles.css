@@ -1120,3 +1120,8 @@ sup.half { font-size: 9px; margin-left: 2px; opacity: .85; }
 .sla-cell--late { background: color-mix(in srgb, var(--bad-fill) 35%, transparent); color: var(--bad); font-weight: 700; }
 .sla-cell--soon { background: color-mix(in srgb, var(--warn-fill) 30%, transparent); color: var(--warn); font-weight: 700; }
 .sla-soon { color: var(--warn); font-weight: 700; margin-left: 3px; }
+.lib-item__actions { display: inline-flex; gap: 8px; align-items: center; flex: none; }
+.lib-item__copy.is-copied { color: var(--good); border-color: var(--good); }
+@media (max-width: 520px) { .lib-item__actions { flex-direction: column; align-items: stretch; } }
+.lib-item__copy { width: 36px; height: 36px; padding: 0; display: inline-grid; place-items: center; }
+@media (max-width: 520px) { .lib-item__actions { flex-direction: row; } }

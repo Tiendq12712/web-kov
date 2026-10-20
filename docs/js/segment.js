@@ -41,7 +41,7 @@ function dateOf(v) {
 export function parseDetail(rows, month) {
   const head = (rows[0] ?? []).map(plain);
   const at = (name) => head.indexOf(plain(name));
-  const col = { product: at('Product'), desc: at('Mô tả'), calls: at('Số cuộc gọi thực hiện'), feature: at('Tính năng'), featureGroup: at('Nhóm tính năng'), usage: at('Tình trạng sử dụng phần mềm'), created: at('Thời gian tạo'), modified: at('Thời gian tương tác') >= 0 ? at('Thời gian tương tác') : at('Thời gian chỉnh sửa'), retailer: at('Retailer ID'), task: at('Công việc hỗ trợ'), source: at('Nguồn data'), handler: at('Người xử lý'), status: at('Tình trạng xử lý'), contact: at('Tình trạng liên hệ'), reason: at('Nguyên nhân'), impact: at('KH SC tác động'), addPts: at('Điểm add on'), points: at('Tổng điểm') };
+  const col = { jobType: at('Loại công việc'), province: at('Tỉnh/Thành phố'), product: at('Product'), desc: at('Mô tả'), calls: at('Số cuộc gọi thực hiện'), feature: at('Tính năng'), featureGroup: at('Nhóm tính năng'), usage: at('Tình trạng sử dụng phần mềm'), created: at('Thời gian tạo'), modified: at('Thời gian tương tác') >= 0 ? at('Thời gian tương tác') : at('Thời gian chỉnh sửa'), retailer: at('Retailer ID'), task: at('Công việc hỗ trợ'), source: at('Nguồn data'), handler: at('Người xử lý'), status: at('Tình trạng xử lý'), contact: at('Tình trạng liên hệ'), reason: at('Nguyên nhân'), impact: at('KH SC tác động'), addPts: at('Điểm add on'), points: at('Tổng điểm') };
   if (col.source < 0 || col.status < 0) return [];
   const addCols = ADDONS.map((n) => ({ n, i: at(n) })).filter((c) => c.i >= 0);
   const out = [];
@@ -49,6 +49,9 @@ export function parseDetail(rows, month) {
     if (!r.length || !String(r[col.status] ?? '').trim()) continue;
     const d = dateOf(r[col.created]);
     out.push({
+      jobType: col.jobType >= 0 ? String(r[col.jobType] ?? '').trim() : '',
+      province: col.province >= 0 ? String(r[col.province] ?? '').trim() : '',
+      transfer: col.desc >= 0 && /chuyển đổi từ offline sang online/i.test(String(r[col.desc] ?? '')),
       product: col.product >= 0 ? String(r[col.product] ?? '').trim() : '',
       desc: col.desc >= 0 ? String(r[col.desc] ?? '').trim().slice(0, 800) : '', calls: col.calls >= 0 ? Number(r[col.calls]) || 0 : null,
       feature: col.feature >= 0 ? String(r[col.feature] ?? '').trim() : '', featureGroup: col.featureGroup >= 0 ? String(r[col.featureGroup] ?? '').trim() : '', usage: col.usage >= 0 ? String(r[col.usage] ?? '').trim() : '',
