@@ -162,6 +162,13 @@ const loadDetailMonth = (m, isLatest) => memo(`detail:${m.month}`, async () => {
   if (!isLatest) persistSet(key, rows);
   return rows;
 });
+/** Chi tiết chỉ của các tháng được chọn (SLA, Kiểm soát, Công việc chỉ cần tháng đang xem): nhanh hơn vì không tải các tháng khác. */
+export const loadDetailFor = async (wanted) => {
+  const all = months.filter((m) => m.detail), latest = all[0]?.month;
+  const list = all.filter((m) => wanted.includes(m.month));
+  const sets = await Promise.all(list.map((m) => loadDetailMonth(m, m.month === latest)));
+  return { rows: sets.flat(), months: list.map((m) => m.month).sort() };
+};
 export const loadDetail = () => memo('detail', async () => {
   const list = months.filter((m) => m.detail);
   const latest = list[0]?.month;   // danh sách đã xếp tháng mới nhất lên đầu

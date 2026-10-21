@@ -6,7 +6,18 @@ const card = (c) => `<div class="card t-${c.tone ?? 'info'}"><div class="card__t
   <div class="card__v">${esc(c.value)}</div><div class="card__s">${esc(c.sub)}</div>
   ${c.progress != null ? `<div class="track"><i style="width:${pctOf(c.progress, 1)}"></i>${c.mark != null ? `<b style="left:${pctOf(c.mark, 1)}"></b>` : ''}</div>` : ''}</div>`;
 
-const chart = (c) => `<section class="chart${c.wide ? ' chart--wide' : ''}"><h3>${esc(c.title)}</h3><p class="note">${esc(c.note ?? '')}</p>
+/** Biểu đồ đường SVG: một chuỗi theo ngày, có số trên từng điểm. */
+function lineSvg(c) {
+  const W = 360, H = 130, L = 22, R = 22, T = 18, B = 22, v = c.values, lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || Math.max(Math.abs(hi), 1) * 0.2;
+  const min = lo - span * 0.15, max = hi + span * 0.15, x = (i) => L + ((W - L - R) * i) / (v.length - 1), y = (val) => T + (H - T - B) * (1 - (val - min) / (max - min));
+  const fmt = (val) => (c.pct ? `${(val * 100).toFixed(1).replace('.', ',')}%` : String(Math.round(val * 10) / 10).replace('.', ','));
+  const step = v.length > 9 ? 2 : 1;
+  const dots = v.map((val, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(val).toFixed(1)}" r="2.6" fill="#2f63e0"/>${i % step === 0 || i === v.length - 1 ? `<text x="${x(i).toFixed(1)}" y="${(y(val) - 6).toFixed(1)}" text-anchor="middle" font-size="7.5" fill="#1c2433">${esc(fmt(val))}</text>` : ''}`).join('');
+  const axis = c.labels.map((l, i) => (i % step === 0 || i === v.length - 1 ? `<text x="${x(i).toFixed(1)}" y="${H - 7}" text-anchor="middle" font-size="7.5" fill="#66728a">${esc(l)}</text>` : '')).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(c.title)}"><polyline points="${v.map((val, i) => `${x(i).toFixed(1)},${y(val).toFixed(1)}`).join(' ')}" fill="none" stroke="#2f63e0" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${axis}</svg>`;
+}
+
+const chart = (c) => c.kind === 'line' ? `<section class="chart"><h3>${esc(c.title)}</h3><p class="note">${esc(c.note ?? '')}</p>${lineSvg(c)}</section>` : `<section class="chart${c.wide ? ' chart--wide' : ''}"><h3>${esc(c.title)}</h3><p class="note">${esc(c.note ?? '')}</p>
   ${c.items.map((i) => `<div class="row"><span class="lab">${esc(i.label)}</span><span class="track track--s"><i class="t-${i.tone}" style="width:${pctOf(i.value - (c.floor ?? 0), c.scale - (c.floor ?? 0))}"></i>${c.mark != null ? `<b style="left:${pctOf(c.mark, c.scale)}"></b>` : ''}</span><span class="val">${esc(i.text)}</span></div>`).join('')}</section>`;
 
 const table = (sec) => `<h2>${esc(sec.title)}</h2><table><thead><tr>${sec.head.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${

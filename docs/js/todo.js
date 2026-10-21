@@ -21,7 +21,7 @@ function unpaidDays(report, code, asOf) {
  * item = { tone: 'bad' | 'warn' | 'info', count, text, hint, tab?, timesheet? }.
  * Trả về [] nếu không có gì (view sẽ hiện lời chúc mừng).
  */
-export function buildTodo({ me, found, data, report, pbi, unread, control }) {
+export function buildTodo({ me, found, data, report, pbi, unread, control, alerts = [] }) {
   const asOf = data.teams.map((t) => t.asOf).sort().at(-1);
   const sla = computeSla(data.work, asOf, data.month);
   const items = [];
@@ -36,6 +36,7 @@ export function buildTodo({ me, found, data, report, pbi, unread, control }) {
     if (sla?.totals.soon) push({ tone: 'warn', count: sla.totals.soon, text: 'data sắp trễ SLA', hint: `${sla.rows.filter((r) => r.soon).length} nhân sự đang giữ`, tab: 'sla' });
     const slow = data.teams.flatMap((t) => t.members.filter((m) => memberStatus(m, t).key === 'bad'));
     if (slow.length) push({ tone: 'bad', count: slow.length, text: 'nhân sự KPI chậm tiến độ', hint: 'Dưới 70% mức thời gian đã qua', tab: 'overview' });
+    for (const a of alerts) push(a);   // cảnh báo tự động theo ngưỡng (nhân sự không nghe máy / không impact / SLA / lỗi / call cần chấn chỉnh)
     if (control?.flaggedCount) push({ tone: 'warn', count: control.flaggedCount, text: 'data đã làm chưa đúng quy trình', hint: `Kiểm soát: ${control.people.filter((p) => p.flagged).length} nhân sự có lỗi · tỉ lệ lỗi ${pct(control.errRate, 1)}`, tab: 'control' });
     const lowTalk = data.teams.flatMap((t) => t.members.filter(underTalk));
     if (lowTalk.length) push({ tone: 'warn', count: lowTalk.length, text: 'nhân sự talktime thấp hơn tiến độ tháng', hint: 'Talktime thực tế dưới mức cần có theo ngày đã qua', tab: 'report' });

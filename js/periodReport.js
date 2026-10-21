@@ -7,6 +7,10 @@
  */
 import { summarize, combineTeams, memberStatus, projectedKpi } from './metrics.js';
 import { analyzeControl } from './control.js';
+import { series } from './history.js';
+import { analyzeCallScores, QUALITY } from './callScores.js';
+import { analyzeListen } from './listen.js';
+import { heardKey } from './heard.js';
 
 const nf = new Intl.NumberFormat('vi-VN');
 const n = (v) => (v == null ? '' : nf.format(v));
@@ -21,12 +25,16 @@ const list = (names) => (names.length <= 1 ? names.join('') : `${names.slice(0, 
 const slaTone = (r) => (r == null ? null : r >= 0.98 ? 'good' : r >= 0.9 ? 'warn' : 'bad');
 const errTone = (r) => (r == null ? null : r < 0.05 ? 'good' : r <= 0.15 ? 'warn' : 'bad');
 
-export function buildPeriodReport({ data, rows = null, period = 'month', now = new Date() }) {
+export function buildPeriodReport({ data, rows = null, period = 'month', now = new Date(), history = null, scores = null, heard = null }) {
   const all = combineTeams(data.teams), s = summarize(all), asOf = all.asOf;
   const week = period === 'week';
   const from = week ? addDays(asOf, -6) : `${data.month}-01`;
   const scoped = rows ? rows.filter((r) => r.created && r.created.slice(0, 10) >= from && r.created.slice(0, 10) <= (week ? asOf : `${data.month}-31`)) : null;
   const ctl = scoped ? analyzeControl(scoped, { now: Date.parse(`${asOf}T23:59:59Z`) }) : null;
+  const inRange = (iso) => iso && iso >= from && iso <= (week ? asOf : `${data.month}-31`);
+  const sc = scores ? analyzeCallScores(scores.filter((r) => inRange(r.date)), {}) : null;   // call chấm theo thời gian tạo Activity trong kỳ
+  const ls = scoped ? analyzeListen(scoped, { month: 'all', job: 'all' }) : null;           // data kết nối nhưng không impact trong kỳ
+  const heardCount = ls ? ls.items.filter((i) => heard?.has(heardKey(i.r.retailer, i.r.modifiedTs))).length : 0;
   const range = week ? `${dmy(from)} – ${dmy(asOf)}` : mlabel(data.month);
   const sections = [], charts = [], insights = [], cards = [];
 
@@ -44,6 +52,8 @@ export function buildPeriodReport({ data, rows = null, period = 'month', now = n
     cards.push({ title: 'Tỉ lệ đạt SLA', value: p(ctl.slaRate), sub: `${n(ctl.late)} / ${n(ctl.live)} data trễ${ctl.slaCut ? ` · mức trừ ${ctl.slaCut}%` : ''}`, tone: slaTone(ctl.slaRate) });
     cards.push({ title: 'Data lỗi quy trình', value: p(ctl.errRate), sub: `${n(ctl.flaggedCount)} / ${n(ctl.total)} data đã làm`, tone: errTone(ctl.errRate) });
   }
+  if (sc?.total) cards.push({ title: 'Call chấm cần chấn chỉnh', value: n(sc.quality.urgent), sub: `${n(sc.quality.weak)} chưa tốt · ${n(sc.quality.good)} tốt trên ${n(sc.total)} call`, tone: sc.quality.urgent ? 'bad' : sc.quality.weak ? 'warn' : 'good' });
+  if (ls?.conn) cards.push({ title: 'Kết nối không impact', value: p(ls.noImpact / ls.conn, 0), sub: `${n(ls.noImpact)} / ${n(ls.conn)} data · ${n(ls.high)} nên nghe lại (mức Cao)`, tone: ls.noImpact / ls.conn >= 0.5 ? 'warn' : 'good' });
   cards.push({ title: 'Đạt talktime', value: `${talkPass} / ${all.members.length}`, sub: 'nhân sự đạt chỉ tiêu talktime', tone: talkPass === all.members.length ? 'good' : talkPass >= all.members.length / 2 ? 'warn' : 'bad' });
 
   /* ---- Nhận định bằng lời ---- */
@@ -66,8 +76,18 @@ export function buildPeriodReport({ data, rows = null, period = 'month', now = n
       ? 'Không phát hiện data đã làm nào chưa đúng quy trình.'
       : `${n(ctl.flaggedCount)} / ${n(ctl.total)} data đã làm chưa đúng quy trình (${p(ctl.errRate)})${topRule ? `; lỗi gặp nhiều nhất: “${topRule.rule.label}” (${n(topRule.count)} data)` : ''}.`);
   } else insights.push('Chưa tải được dữ liệu chi tiết nên báo cáo này chưa có phần SLA và Kiểm soát quy trình.');
+  if (scores) insights.push(sc?.total
+    ? `Chấm call trong kỳ: ${n(sc.total)} call, ${n(sc.quality.urgent)} call cần chấn chỉnh ngay và ${n(sc.quality.weak)} call chưa tốt${sc.avgScore != null ? `; điểm đánh giá trung bình ${sc.avgScore.toFixed(1).replace('.', ',')}` : ''}.`
+    : 'Chưa có call nào được chấm trong kỳ báo cáo.');
+  if (ls?.conn) insights.push(`${n(ls.noImpact)} / ${n(ls.conn)} data kết nối thành công nhưng không impact (${p(ls.noImpact / ls.conn)}); ${n(ls.high)} data mức Cao nên nghe lại${ls.contradict ? `, trong đó ${n(ls.contradict)} data ghi chú như chưa nghe máy nhưng chọn "Kết nối thành công"` : ''}${heard ? `; đã nghe ${n(heardCount)} data` : ''}.`);
 
   /* ---- Biểu đồ ---- */
+  const dayLine = (metric, title, note, pctFmt) => {
+    const pts = history ? series(history, metric, 'all').filter((x) => x.date >= from && x.date <= asOf) : [];
+    if (pts.length >= 2) charts.push({ kind: 'line', title, note, labels: pts.map((x) => dmy(x.date).slice(0, 5)), values: pts.map((x) => x.value), pct: pctFmt });
+  };
+  dayLine('kpi', 'KPI toàn đội theo ngày', 'Trung bình KPI các nhân sự, theo bản chụp mỗi lần đồng bộ', true);
+  dayLine('late', 'Data trễ SLA theo ngày', 'Tổng data trễ SLA toàn đội (càng thấp càng tốt)', false);
   charts.push({ title: 'KPI theo nhân sự', note: `Vạch đứng = thời gian đã qua (${p(s.elapsed, 0)})`, scale: Math.max(1, ...people.map((x) => x.m.kpi ?? 0)), mark: s.elapsed,
     items: ranked.map((x) => ({ label: nameOf(x.m), value: x.m.kpi ?? 0, text: p(x.m.kpi, 0), tone: x.status.key })) });
   if (ctl) {
@@ -108,6 +128,22 @@ export function buildPeriodReport({ data, rows = null, period = 'month', now = n
       tones: byErr.map((x) => [null, null, x.flagged ? 'warn' : null, errTone(x.errRate)]),
       foot: ['Toàn đội', n(ctl.total), n(ctl.flaggedCount), p(ctl.errRate)] });
     sections.push({ title: 'Lỗi theo quy tắc', head: ['Quy tắc', 'Số data'], rows: ctl.byRule.map((r) => [r.rule.label ?? r.rule.id, n(r.count)]) });
+  }
+  if (sc?.total) {
+    const byUrgent = [...sc.people].sort((a, b) => b.urgent - a.urgent || b.weak - a.weak || (b.avgPenalty ?? 0) - (a.avgPenalty ?? 0));
+    sections.push({ title: `Kiểm soát call (${range})`, head: ['Nhân sự', 'Call đã chấm', 'Cần chấn chỉnh', 'Chưa tốt', 'Điểm trừ TB', 'Điểm đánh giá TB'],
+      rows: byUrgent.map((x) => [cn(x), n(x.calls), n(x.urgent), n(x.weak), x.avgPenalty == null ? '' : `${x.avgPenalty.toFixed(1).replace('.', ',')}%`, x.avgScore == null ? '' : x.avgScore.toFixed(1).replace('.', ',')]),
+      tones: byUrgent.map((x) => [null, null, x.urgent ? 'bad' : null, x.weak ? 'warn' : null, null, x.avgScore == null ? null : x.avgScore >= 4 ? 'good' : x.avgScore >= 3 ? 'warn' : 'bad']),
+      foot: ['Toàn đội', n(sc.total), n(sc.quality.urgent), n(sc.quality.weak), sc.avgPenalty == null ? '' : `${sc.avgPenalty.toFixed(1).replace('.', ',')}%`, sc.avgScore == null ? '' : sc.avgScore.toFixed(1).replace('.', ',')] });
+    charts.push({ title: 'Chất lượng call được chấm', note: 'Số call theo từng mức xếp loại', scale: Math.max(1, sc.total), items: ['urgent', 'weak', 'good', 'none'].map((k) => ({ label: QUALITY[k].label, value: sc.quality[k], text: n(sc.quality[k]), tone: QUALITY[k].tone === 'bad' ? 'bad' : QUALITY[k].tone === 'warn' ? 'warn' : QUALITY[k].tone === 'good' ? 'good' : 'info' })) });
+  }
+  if (ls?.conn) {
+    const byHigh = [...ls.byPerson].sort((a, b) => b.high - a.high || (b.rate ?? 0) - (a.rate ?? 0));
+    const heardBy = (code) => ls.items.filter((i) => i.code === code && heard?.has(heardKey(i.r.retailer, i.r.modifiedTs))).length;
+    sections.push({ title: `Nghe lại call (${range})`, head: ['Nhân sự', 'Kết nối thành công', 'Không impact', '% không impact', 'Nên nghe (mức Cao)', 'Đã nghe'],
+      rows: byHigh.map((x) => [cn(x), n(x.conn), n(x.noImpact), p(x.rate), n(x.high), heard ? n(heardBy(x.code)) : '']),
+      tones: byHigh.map((x) => [null, null, null, x.rate == null ? null : x.rate >= 0.6 ? 'bad' : x.rate >= 0.5 ? 'warn' : null, x.high ? 'bad' : null, null]),
+      foot: ['Toàn đội', n(ls.conn), n(ls.noImpact), p(ls.rate), n(ls.high), heard ? n(heardCount) : ''] });
   }
   return { title: `Báo cáo ${week ? 'tuần' : 'tháng'} Online · ${range}`, kind: week ? 'Báo cáo tuần' : 'Báo cáo tháng', range, subtitle: `Report SC ONLINE · số liệu đến ${dmy(asOf)} · xuất lúc ${now.toLocaleString('vi-VN')}`, cards, insights, charts, sections };
 }

@@ -145,3 +145,13 @@ export function donutChart({ segments, center, format = (v) => num(v) }) {
       </ul>
     </div>`;
 }
+
+/** Đường nhỏ (sparkline) cho thẻ chỉ số và bảng: không trục, chấm ở điểm cuối. */
+export function sparkline(values, { w = 96, h = 30, cls = 's1' } = {}) {
+  const v = values.filter((x) => x != null);
+  if (v.length < 2) return '';
+  const lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1, pad = 3;
+  const x = (i) => pad + ((w - 2 * pad) * i) / (v.length - 1), y = (val) => h - pad - ((h - 2 * pad) * (val - lo)) / span;
+  const pts = v.map((val, i) => `${x(i).toFixed(1)},${y(val).toFixed(1)}`).join(' ');
+  return html`<svg class="spark ${cls}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Xu hướng"><polyline points="${pts}"/><circle cx="${x(v.length - 1).toFixed(1)}" cy="${y(v.at(-1)).toFixed(1)}" r="2.6"/></svg>`;
+}

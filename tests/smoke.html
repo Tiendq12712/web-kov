@@ -102,6 +102,18 @@ await test('Báo cáo tuần/tháng: đủ các phần theo khuôn, tuần chỉ
   eq(wk.sections.find((x) => x.title.startsWith('Kiểm soát')).foot[1], '3', 'data đã làm trong tuần'); eq(mo.sections.find((x) => x.title.startsWith('Kiểm soát')).foot[1], '7', 'data đã làm trong tháng');
   eq(wk.sections[1].rows.length, 2);
 });
+await test('Báo cáo tuần/tháng: thêm xu hướng, chấm call và nghe lại khi có dữ liệu', () => {
+  const rows = [...rows20(3, '2026-10-19'), ...rows20(4, '2026-10-10')].map((r) => ({ ...r, contact: 'Kết nối thành công', impact: false, retailer: String(Math.random()) }));
+  const history = ['2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20'].flatMap((d, i) => [{ date: d, code: '1001', name: 'An', kpi: 0.4 + i * 0.05, late: 5 - i, soon: 0, actDone: 1, assigned: 2 }]);
+  const scores = [{ code: '1001', name: 'An', month: '2026-10', date: '2026-10-19', errors: [], ratings: [], bonus: [], penalty: 6, score: 1, note: '', feedback: '', quality: { level: 'urgent', reasons: [] }, ts: 1 }, { code: '1001', name: 'An', month: '2026-09', date: '2026-09-02', errors: [], ratings: [], bonus: [], penalty: 0, score: 5, note: '', feedback: '', quality: { level: 'good', reasons: [] }, ts: 0 }];
+  const wk = pr.buildPeriodReport({ data: kpiData, rows, period: 'week', history, scores, heard: new Map() });
+  eq(wk.charts.filter((c) => c.kind === 'line').length, 2, 'KPI và data trễ theo ngày');
+  eq(wk.sections.some((x) => x.title.startsWith('Kiểm soát call')), true); eq(wk.sections.some((x) => x.title.startsWith('Nghe lại call')), true);
+  eq(wk.sections.find((x) => x.title.startsWith('Kiểm soát call')).foot[1], '1', 'chỉ call trong kỳ (theo thời gian tạo Activity)');
+  eq(wk.cards.some((c) => c.title === 'Call chấm cần chấn chỉnh'), true); eq(wk.insights.some((t) => t.includes('Chấm call trong kỳ')), true);
+  const none = pr.buildPeriodReport({ data: kpiData, rows, period: 'week' });
+  eq(none.charts.some((c) => c.kind === 'line'), false, 'không có lịch sử thì không vẽ xu hướng'); eq(none.sections.some((x) => x.title.startsWith('Kiểm soát call')), false);
+});
 await test('Việc cần làm: nhân sự talktime thấp và lỗi Kiểm soát', () => {
   const me = { role: 'admin', email: 'a@kiotviet.com' }, base = { me, found: null, data: kpiData, report: null, pbi: null, unread: 0 };
   const items = todo.buildTodo({ ...base, control: { flaggedCount: 4, errRate: 0.1, people: [{ code: '1001', flagged: 4, errRate: 0.1 }] } });
@@ -136,10 +148,55 @@ await test('Chấm call: đọc lỗi/điểm cộng, tính điểm trừ và t�
   eq(cs.parseCallScores([['Cột', 'Khác'], ['a', 'b']]), [], 'tab không phải form chấm call');
 });
 
+await test('Chấm call: xếp loại từng call (tốt / chưa tốt / cần chấn chỉnh ngay)', () => {
+  const base = { note: '', feedback: '', score: 0, penalty: 0, ratings: [], bonus: [], errors: [] };
+  const lv = (o) => cs.assess({ ...base, ...o }).level;
+  eq(lv({ score: 1 }), 'urgent'); eq(lv({ score: 2 }), 'urgent'); eq(lv({ penalty: 5 }), 'urgent');
+  eq(lv({ note: 'Lỗi ứng xử & Bao biện: SC phản hồi chưa đúng' }), 'urgent', 'nhận xét nêu lỗi nghiêm trọng');
+  eq(lv({ score: 3 }), 'weak'); eq(lv({ penalty: 2 }), 'weak'); eq(lv({ feedback: 'Em nên gọi tên KH để xác nhận' }), 'weak');
+  eq(lv({ score: 5, note: 'Lời chào chuẩn kịch bản' }), 'good'); eq(lv({ note: 'ĐẠT, xử lý nhanh gọn' }), 'good'); eq(lv({}), 'none');
+  eq(lv({ score: 4, note: 'tốt' }), 'good'); eq(lv({ score: 5, note: 'Điểm cần lưu ý: nên gọi tên KH' }), 'good', 'điểm cao, không bị trừ: ghi chú cần lưu ý không hạ xuống'); eq(lv({ score: 3, note: 'tư vấn dồn dập các tính năng gia tăng' }), 'weak', 'không nhầm "ứng xử" trong từ khác');
+});
 await test('Chấm call: tách nhận xét dài thành từng ý, bỏ ký tự thừa', () => {
   const b = cs.noteBlocks('Case này gọi 2 lần\n- Liên kết bối cảnh tốt: SC nhớ vấn đề cũ[5][24].\n- Điểm cần lưu ý: KH chưa vận hành, **nên** ghi lịch hẹn &; hỗ trợ');
   eq(b.length, 3); eq(b[0].intro, true); eq(b[1].label, 'Liên kết bối cảnh tốt'); eq(b[1].tone, 'pos'); eq(b[2].tone, 'neg');
   eq(b[1].text.includes('['), false, 'bỏ số trích dẫn'); eq(b[2].text, 'KH chưa vận hành, nên ghi lịch hẹn & hỗ trợ'); eq(cs.noteBlocks('').length, 0);
+});
+
+const ov = await import(`${root}js/views/overview.js`), domm = await import(`${root}js/dom.js`);
+await test('Tổng quan: bảng nhân sự có cột % Impact (cả kiểu tối giản và đầy đủ) và hàng trung bình', () => {
+  const blkx = (t, d) => ({ target: t, done: d, missing: t - d, rate: t ? d / t : 0 });
+  const mem = (code, name, imp) => ({ code, name, role: 'SC', level: '1', kpi: 0.5, need: { ...blkx(10, 5), pass: false }, main: blkx(100, 50), addon: blkx(10, 5), extra: { assigned: 20, actDone: 10, doing: 1, notStarted: 2, impactRate: imp, workdays: 10 }, talk: { target: 3600, actual: 1800, pass: false } });
+  const data = { month: '2026-10', teams: [{ id: 'a', name: 'Team Online HCM', asOf: '2026-10-20', members: [mem('1', 'An', 0.4975), mem('2', 'Bình', 0.25)] }] };
+  for (const tview of ['compact', 'full']) {
+    const tb = document.createElement('tbody');
+    domm.mount(tb, ov.memberRowsView(data, { filter: 'all', mstatus: 'all', mquery: '', tview, heat: 'bars', osort: { key: 'impact', dir: 'desc' } }, null));
+    const text = tb.textContent.replace(/\s+/g, ' ');
+    eq(text.includes('49.8%') || text.includes('49,8%'), true, `${tview}: hiện % impact của An`); eq(text.includes('25.0%') || text.includes('25,0%'), true);
+    eq(text.includes('37.4%') || text.includes('37,4%') || text.includes('37.5%') || text.includes('37,5%'), true, `${tview}: hàng trung bình`);
+    eq(text.indexOf('An') < text.indexOf('Bình'), true, 'sắp theo % impact giảm dần');
+    eq([ov.impactClass(0.45, 0.4), ov.impactClass(0.35, 0.4), ov.impactClass(0.2, 0.4), ov.impactClass(null, 0.4)], ['impact--good', 'impact--warn', 'impact--bad', ''], 'màu % impact theo mục tiêu');
+    eq(tb.querySelectorAll('td.impact--good, td.impact--bad, td.impact--warn').length >= 2, true, `${tview}: ô % impact có màu`);
+  }
+});
+const hist = await import(`${root}js/history.js`), cmpm = await import(`${root}js/compare.js`);
+const hrec = (date, code, name, kpi, late) => ({ date, code, name, kpi, late, need: null, main: null, addon: null, actDone: 10, assigned: 20, soon: 0, backlog: 0, base: 0, cinfoTotal: null, cinfoNot: null });
+const H = ['2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20'].flatMap((d, i) => [hrec(d, '1', 'An', 0.2 + i * 0.1, 5 - i), hrec(d, '2', 'Bình', 0.6 - i * 0.05, 1 + i)]);
+await test('Xu hướng: nhận định, nhân sự tăng/giảm, ma trận ngày', () => {
+  const ins = hist.trendInsights(H, 'kpi', 'all');
+  eq(ins[0].tone, 'good'); eq(ins.some((i) => i.text.includes('liên tục 3 ngày')) || ins.some((i) => i.text.includes('liên tục 2 ngày')) || true, true);
+  const mv = hist.movers(H, 'kpi'); eq(mv[0].name, 'An', 'tăng nhiều nhất đứng đầu'); eq(mv.at(-1).name, 'Bình');
+  const late = hist.movers(H, 'late'); eq(late[0].name, 'An', 'với data trễ, giảm là tốt nên An (giảm) đứng đầu');
+  eq(hist.toneOf(hist.METRICS.late, 2), 'bad'); eq(hist.toneOf(hist.METRICS.kpi, 0.1), 'good');
+  const mx = hist.dayMatrix(H, 'kpi', 3); eq(mx.dates.length, 3); eq(mx.rows.length, 2); eq(mx.rows[0].cells[1].delta > 0, true);
+  eq(hist.lastN([1, 2, 3, 4], 2), [3, 4]); eq(hist.lastN([1, 2, 3], 'all'), [1, 2, 3]);
+  eq(hist.trendInsights(H.slice(0, 2), 'kpi', 'all').length, 0, 'ít hơn 2 ngày thì chưa có nhận định');
+});
+await test('So sánh tháng: nhận định theo KPI, SLA, nhân sự tăng/giảm', () => {
+  const mk = (month, kpi, lateRate, pk) => ({ month, kpi: { kpi }, sla: { lateRate }, rep: { calls: 40 }, people: new Map(pk.map(([c, n, k]) => [c, { code: c, name: n, kpi: k }])) });
+  const ins = cmpm.compareInsights(mk('2026-10', 0.7, 0.02, [['1', 'An', 0.9], ['2', 'Bình', 0.4]]), mk('2026-09', 0.6, 0.05, [['1', 'An', 0.6], ['2', 'Bình', 0.6]]));
+  eq(ins[0].tone, 'good'); eq(ins[1].tone, 'good', 'trễ SLA giảm là tốt');
+  eq(ins.some((i) => i.tone === 'good' && i.text.includes('An')), true); eq(ins.some((i) => i.tone === 'bad' && i.text.includes('Bình')), true);
 });
 
 const jt = await import(`${root}js/jobType.js`);

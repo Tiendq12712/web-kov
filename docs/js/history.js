@@ -85,3 +85,57 @@ export function series(records, metric, who) {
     return { date, value };
   }).filter((p) => p.value != null).sort((a, b) => a.date.localeCompare(b.date));
 }
+
+/* ---------- Phân tích xu hướng ---------- */
+const dmOf = (iso) => iso.split('-').slice(1).reverse().map(Number).join('/');
+export const fmtMetric = (m, v) => (v == null ? '—' : m.pct ? `${(v * 100).toFixed(1).replace('.', ',')}%` : String(Math.round(v * 10) / 10).replace('.', ','));
+export const fmtDeltaMetric = (m, d) => (m.pct ? `${(Math.abs(d) * 100).toFixed(1).replace('.', ',')} điểm %` : String(Math.round(Math.abs(d) * 10) / 10).replace('.', ','));
+/** Thay đổi theo hướng tốt/xấu: 'good' | 'bad' | '' (không đổi). */
+export const toneOf = (m, d) => (!d ? '' : (m.goodUp ? d > 0 : d < 0) ? 'good' : 'bad');
+/** Lấy N ngày cuối của chuỗi ('all' = hết). */
+export const lastN = (list, n) => (n === 'all' || !Number(n) ? list : list.slice(-Number(n)));
+
+/** Biến động từng nhân sự giữa hai ngày gần nhất, xếp từ cải thiện nhiều nhất đến xấu nhất (theo hướng tốt của chỉ số). */
+export function movers(records, metric) {
+  const m = METRICS[metric];
+  const names = new Map(records.map((r) => [r.code, r.name]));
+  return [...names].map(([code, name]) => {
+    const s = series(records, metric, code), last = s.at(-1), prev = s.at(-2);
+    return { code, name, last: last?.value ?? null, prev: prev?.value ?? null, delta: last && prev ? last.value - prev.value : null, values: s.map((p) => p.value) };
+  }).filter((r) => r.delta != null).sort((a, b) => (m.goodUp ? b.delta - a.delta : a.delta - b.delta));
+}
+
+/** Ma trận nhân sự × N ngày gần nhất: mỗi ô { value, delta so với ngày liền trước }. */
+export function dayMatrix(records, metric, days = 10) {
+  const dates = lastN([...new Set(records.map((r) => r.date))].sort(), days);
+  const names = new Map(records.map((r) => [r.code, r.name]));
+  const rows = [...names].map(([code, name]) => {
+    const s = new Map(series(records, metric, code).map((p) => [p.date, p.value]));
+    return { code, name, cells: dates.map((d, i) => ({ date: d, value: s.get(d) ?? null, delta: s.get(d) != null && s.get(dates[i - 1]) != null ? s.get(d) - s.get(dates[i - 1]) : null })) };
+  }).filter((r) => r.cells.some((c) => c.value != null)).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  return { dates, rows };
+}
+
+/** Nhận định bằng lời cho chuỗi đang xem: [{ tone, text }]. */
+export function trendInsights(records, metric, who, scopeName = 'Toàn đội') {
+  const m = METRICS[metric], s = series(records, metric, who), out = [];
+  if (s.length < 2) return out;
+  const first = s[0], last = s.at(-1), prev = s.at(-2), d = last.value - prev.value;
+  const verb = (x) => (x > 0 ? 'tăng' : 'giảm');
+  out.push({ tone: toneOf(m, d), text: `${scopeName} · ${m.label}: ${fmtMetric(m, last.value)} (${dmOf(last.date)}), ${d === 0 ? 'không đổi' : `${verb(d)} ${fmtDeltaMetric(m, d)}`} so với ${dmOf(prev.date)}.` });
+  let run = 0;
+  for (let i = s.length - 1; i > 0; i--) { const x = s[i].value - s[i - 1].value; if (x === 0 || Math.sign(x) !== Math.sign(d)) break; run += 1; }
+  if (d !== 0 && run >= 3) out.push({ tone: toneOf(m, d), text: `Đã ${verb(d)} liên tục ${run} ngày gần nhất.` });
+  const dFirst = last.value - first.value;
+  if (dFirst !== 0 && s.length > 2) out.push({ tone: toneOf(m, dFirst), text: `So với ngày đầu theo dõi (${dmOf(first.date)}: ${fmtMetric(m, first.value)}): ${verb(dFirst)} ${fmtDeltaMetric(m, dFirst)}.` });
+  const best = [...s].sort((a, b) => (m.goodUp ? b.value - a.value : a.value - b.value))[0];
+  if (best.date !== last.date) out.push({ tone: '', text: `Ngày tốt nhất: ${dmOf(best.date)} (${fmtMetric(m, best.value)}).` });
+  if (who === 'all') {
+    const mv = movers(records, metric).filter((x) => x.delta !== 0);
+    const up = mv.filter((x) => toneOf(m, x.delta) === 'good').slice(0, 2), down = [...mv].reverse().filter((x) => toneOf(m, x.delta) === 'bad').slice(0, 2);
+    const fmtList = (list) => list.map((x) => `${x.name} (${x.delta > 0 ? '+' : '−'}${fmtDeltaMetric(m, x.delta)})`).join(', ');
+    if (up.length) out.push({ tone: 'good', text: `Cải thiện nhiều nhất so với hôm trước: ${fmtList(up)}.` });
+    if (down.length) out.push({ tone: 'bad', text: `Cần chú ý (xấu đi nhiều nhất): ${fmtList(down)}.` });
+  }
+  return out;
+}

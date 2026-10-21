@@ -1,5 +1,6 @@
 import { summarize, combineTeams } from './metrics.js';
 import { computeSla } from './sla.js';
+import { monthLabel } from './format.js';
 
 const mean = (list) => (list.length ? list.reduce((a, b) => a + b, 0) / list.length : null);
 const finite = (list) => list.filter((v) => typeof v === 'number' && Number.isFinite(v));
@@ -48,3 +49,26 @@ export const ROWS = [
   { group: 'SLA', label: 'Tổng data được chia', kind: 'num', good: null, get: (s) => s.sla?.base },
   { group: 'SLA', label: 'Tỉ lệ trễ trên tổng chia', kind: 'pct', good: false, get: (s) => s.sla?.lateRate },
 ];
+
+/** Nhận định bằng lời khi so sánh tháng `a` (mới) với tháng `b`: [{ tone, text }]. */
+export function compareInsights(a, b) {
+  const out = [], A = monthLabel(a.month), B = monthLabel(b.month);
+  const pp = (d) => `${(Math.abs(d) * 100).toFixed(1).replace('.', ',')} điểm %`;
+  const rel = (va, vb) => (vb ? `${va >= vb ? '+' : '−'}${(Math.abs(va / vb - 1) * 100).toFixed(1).replace('.', ',')}%` : '');
+  const kpiA = a.kpi.kpi, kpiB = b.kpi.kpi;
+  if (kpiA != null && kpiB != null) {
+    const d = kpiA - kpiB;
+    out.push({ tone: d === 0 ? '' : d > 0 ? 'good' : 'bad', text: `KPI trung bình ${A} đạt ${(kpiA * 100).toFixed(1).replace('.', ',')}%, ${d === 0 ? 'bằng' : d > 0 ? `cao hơn ${pp(d)} so với` : `thấp hơn ${pp(d)} so với`} ${B} (${(kpiB * 100).toFixed(1).replace('.', ',')}%). Lưu ý tháng chưa kết thúc thì KPI chưa đủ để so ngang.` });
+  }
+  if (a.sla?.lateRate != null && b.sla?.lateRate != null) {
+    const d = a.sla.lateRate - b.sla.lateRate;
+    out.push({ tone: d === 0 ? '' : d < 0 ? 'good' : 'bad', text: `Tỉ lệ data trễ SLA ${A}: ${(a.sla.lateRate * 100).toFixed(1).replace('.', ',')}% (${d === 0 ? 'không đổi' : d < 0 ? `giảm ${pp(d)}` : `tăng ${pp(d)}`} so với ${B}).` });
+  }
+  if (a.rep?.calls != null && b.rep?.calls != null) out.push({ tone: a.rep.calls >= b.rep.calls ? 'good' : 'bad', text: `Call trung bình mỗi người mỗi ngày: ${Math.round(a.rep.calls * 10) / 10} ở ${A} so với ${Math.round(b.rep.calls * 10) / 10} ở ${B} (${rel(a.rep.calls, b.rep.calls)}).` });
+  const both = [...a.people.values()].map((p) => ({ name: p.name, d: p.kpi != null && b.people.get(p.code)?.kpi != null ? p.kpi - b.people.get(p.code).kpi : null })).filter((x) => x.d != null).sort((x, y) => y.d - x.d);
+  const up = both.filter((x) => x.d > 0).slice(0, 3), down = [...both].reverse().filter((x) => x.d < 0).slice(0, 3);
+  const list = (arr) => arr.map((x) => `${x.name} (${x.d > 0 ? '+' : '−'}${pp(x.d)})`).join(', ');
+  if (up.length) out.push({ tone: 'good', text: `Nhân sự tăng KPI nhiều nhất: ${list(up)}.` });
+  if (down.length) out.push({ tone: 'bad', text: `Nhân sự giảm KPI nhiều nhất: ${list(down)}.` });
+  return out;
+}
