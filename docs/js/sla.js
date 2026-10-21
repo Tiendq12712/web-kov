@@ -4,8 +4,30 @@
  */
 export const SLA_DAYS = 7;     // hạn xử lý
 export const WARN_DAYS = 2;    // còn tối đa 2 ngày là "sắp trễ"
-/** Ngày tạo được cộng thêm hạn (ngày): data tạo ngày đó có hạn SLA = 7 + số ngày cộng thêm. */
-export const SLA_EXTRA = { '2026-10-15': 3 };
+/** Ngày tạo được cộng thêm hạn (ngày): data tạo ngày đó có hạn SLA = 7 + số ngày cộng thêm. Mặc định như dưới; tab "Gia hạn SLA" trong Sheet cấu hình ghi đè (xem setSlaExtra). */
+const DEFAULT_EXTRA = { '2026-10-15': 3 };
+export let SLA_EXTRA = { ...DEFAULT_EXTRA };
+
+/** Ngày dạng 2026-10-15, 15/10/2026 hoặc 15/10 (không ghi năm thì lấy năm hiện tại) -> 'YYYY-MM-DD'; không hiểu thì null. */
+export function parseSlaDate(text, year = new Date().getFullYear()) {
+  const t = String(text ?? '').trim(), pad2 = (n) => String(n).padStart(2, '0');
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(t);
+  if (m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+  m = /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?$/.exec(t);
+  if (!m) return null;
+  const y = m[3] ? (m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3])) : year;
+  return `${y}-${pad2(m[2])}-${pad2(m[1])}`;
+}
+
+/** Áp các dòng [ngày, số ngày cộng thêm] đọc từ Sheet: ghi đè mặc định; số ngày 0 là bỏ gia hạn của ngày đó. */
+export function setSlaExtra(rows) {
+  const next = { ...DEFAULT_EXTRA };
+  for (const [date, days] of rows) {
+    const iso = parseSlaDate(date), n = Number(String(days).replace(',', '.'));
+    if (iso && Number.isFinite(n) && n >= 0) next[iso] = n;
+  }
+  SLA_EXTRA = next;
+}
 export const slaDaysFor = (iso) => SLA_DAYS + (SLA_EXTRA[String(iso ?? '').slice(0, 10)] ?? 0);
 
 const DAY_MS = 86_400_000;
@@ -74,3 +96,7 @@ function dayRows(rows) {
   }
   return [...byDay.values()].sort((a, b) => b.age - a.age);
 }
+
+/** Câu mô tả các ngày được gia hạn, ví dụ "Data tạo ngày 15/10 được cộng thêm 3 ngày (hạn 10 ngày)."; rỗng nếu không có. */
+export const extraNote = () => Object.entries(SLA_EXTRA).filter(([, n]) => n > 0).sort()
+  .map(([iso, n]) => `Data tạo ngày ${iso.slice(8)}/${iso.slice(5, 7)} được cộng thêm ${n} ngày (hạn ${SLA_DAYS + n} ngày).`).join(' ');

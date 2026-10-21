@@ -21,7 +21,7 @@ const SECTIONS = [
   ] },
   { id: 'overview', icon: '📊', title: 'Tổng quan', body: [
     ['p', 'Màn hình chính. Thành viên thấy tiến độ của mình; quản lý thấy toàn bộ team.'],
-    ['ul', ['Thẻ đầu trang: KPI đạt được, tỉ lệ hoàn thành và mức theo kịp thời gian đã qua của tháng.', 'Nhãn trạng thái: “Đạt tiến độ” = KPI theo kịp thời gian; “Cần đẩy” = từ 70% trở lên nhưng chưa kịp; “Chậm” = dưới 70%.', 'Bảng nhân sự: bấm vào một người để xem chi tiết từng chỉ tiêu; có nút xem chi tiết công và chi tiết SLA.', 'Biểu tượng bảng màu đổi kiểu tô màu: thanh màu, ít màu hoặc nhiều màu.', 'Các bảng thống kê bấm vào tiêu đề cột để sắp xếp, bấm lần nữa để đổi chiều.', 'Bấm vào một biểu đồ để xem phóng to (Esc hoặc bấm ra ngoài để đóng).', 'Mỗi nhân sự có đầu số kèm tên để phân biệt người trùng tên.', 'Thẻ “Việc cần làm hôm nay” gợi ý việc ưu tiên (data sắp trễ SLA, ngày chưa chấm công…).']],
+    ['ul', ['Thẻ đầu trang: KPI đạt được, tỉ lệ hoàn thành và mức theo kịp thời gian đã qua của tháng.', 'Nhãn trạng thái: “Đạt tiến độ” = KPI theo kịp thời gian; “Cần đẩy” = từ 70% trở lên nhưng chưa kịp; “Chậm” = dưới 70%.', 'Bảng nhân sự: bấm vào một người để xem chi tiết từng chỉ tiêu; có nút xem chi tiết công và chi tiết SLA.', 'Biểu tượng bảng màu đổi kiểu tô màu: thanh màu, ít màu hoặc nhiều màu.', 'Các bảng thống kê bấm vào tiêu đề cột để sắp xếp, bấm lần nữa để đổi chiều.', 'Bấm vào một biểu đồ để xem phóng to (Esc hoặc bấm ra ngoài để đóng).', 'Mỗi nhân sự có đầu số kèm tên để phân biệt người trùng tên.', 'Thẻ “Việc cần làm hôm nay” gợi ý việc ưu tiên (data sắp trễ SLA, lỗi Kiểm soát, talktime thấp hơn tiến độ, ngày chưa chấm công…). Số lỗi Kiểm soát hiện sau vài giây khi data chi tiết tải xong.', 'Quản lý: nút “Báo cáo gửi quản lý” (Tuần / Tháng, Excel hoặc PDF) xuất báo cáo theo khuôn cố định: Tổng quan, KPI theo nhân sự, SLA, Kiểm soát. Tuần = 7 ngày gần nhất tính theo ngày tạo data.']],
     ['p', 'Nhân vật robot ở góc màn hình nhắc nhở khi tiến độ chậm và chúc mừng khi vượt tiến độ; bấm vào lời thoại để đi thẳng tới phần cần xem, bấm X để thu gọn.'],
   ] },
   { id: 'team', icon: '👥', title: 'Team', body: [
@@ -31,8 +31,12 @@ const SECTIONS = [
     ['ul', ['Thống kê tiến độ xử lý data theo nhân sự: đã xử lý, còn tồn, theo loại công việc.', 'Bảng chia data theo ngày cho cả tháng; cột nhân sự và cột tổng cuối được ghim nên luôn nhìn thấy khi cuộn.', 'Có thể lọc theo khu vực (Miền Nam, Miền Bắc, T15…) khi dữ liệu có.', 'Chọn tháng trong tab; số liệu lấy theo file KPI của tháng đó.']],
   ] },
   { id: 'sla', icon: '⏱️', title: 'Vận hành: SLA', body: [
-    ['p', 'Data ONL có hạn xử lý 7 ngày. Mục này thống kê data đã trễ và sắp trễ SLA.'],
+    ['p', 'Data ONL có hạn xử lý 7 ngày. Mục này thống kê data đã trễ và sắp trễ SLA. Ngày được gia hạn (ví dụ cộng thêm 3 ngày) do Admin khai trong tab “Gia hạn SLA” của Sheet cấu hình: cột Ngày tạo data, Số ngày cộng thêm, Ghi chú (số 0 là bỏ gia hạn của ngày đó).'],
     ['ul', ['Quản lý: bảng tổng theo nhân sự gồm SL trễ, SL sắp trễ và tỉ lệ trễ tính trên tổng data được giao.', 'Bảng chi tiết trễ/sắp trễ theo ngày để biết đợt data nào cần xử lý trước.', 'Nhân sự: chỉ thấy data của mình, kèm nút xem chi tiết từ màn hình Tổng quan.', 'Tiêu đề cột căn giữa, bấm để sắp xếp.']],
+  ] },
+  { id: 'callctl', icon: '🎧', title: 'Vận hành: Kiểm soát call', body: [
+    ['p', 'Kết quả chấm chất lượng cuộc gọi lấy từ Sheet “Chấm call” (link thêm trong Thiết lập → Danh sách link, dòng tên “Chấm call”). Mỗi dòng là một call được chấm; các lỗi ghi dạng “Tên lỗi (-5%)”, ô trống là không lỗi.'],
+    ['ul', ['Thẻ đầu trang: số call đã chấm, số call có lỗi, điểm trừ trung bình mỗi call và số call có điểm cộng.', 'Quản lý: bảng theo nhân sự (số call chấm, tỉ lệ lỗi, tổng và trung bình điểm trừ), lọc theo tháng và theo nhân sự. Tháng được tính theo cột “Thời gian tạo Activity” của call (không phải ngày chấm).', 'Lỗi theo giai đoạn của cuộc gọi và danh sách lỗi hay gặp giúp biết cần huấn luyện khâu nào.', 'Chi tiết từng call kèm nhận xét và góp ý của người chấm.', 'Nhân sự chỉ thấy các call của mình.']],
   ] },
   { id: 'cinfo', icon: 'ℹ️', title: 'Vận hành: Customer Info', body: [
     ['ul', ['Chỉ hiện khi quản trị đã thêm link Power BI vào cấu hình.', 'Thống kê tỉ lệ SC dùng Customer Info, tư vấn tính năng và Act TVTN theo RCM (kèm tỉ lệ %).', 'Quản lý xem cả team, nhân sự xem phần của mình.']],

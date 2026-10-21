@@ -92,7 +92,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     if (links.status === 'fulfilled') ui.links = links.value;
     if (tasks.status === 'fulfilled') ui.tasks = tasks.value;
     const failure = results.find((r) => r.status === 'rejected');
-    if (failure?.reason.code === 'auth') return onAuthExpired(failure.reason.message);
+    if (failure?.reason.code === 'auth') { ui.loading = false; return onAuthExpired(failure.reason.message); }   // hết phiên: bỏ trạng thái "đang tải" để lần mở sau (khi đã làm mới đăng nhập) tải lại được
     ui.error = failure ? failure.reason.message : '';
     ui.loading = false;
     ui.loaded = true;

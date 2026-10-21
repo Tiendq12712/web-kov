@@ -6,8 +6,11 @@ import { parseReport, alignCodes } from './report.js';
 import { tryParseWork } from './work.js';
 import { loadLinks, resolveMonths } from './directory.js';
 import { loadSyncTime, applySyncTime } from './syncTime.js';
+import { readTable } from './sheetTable.js';
+import { setSlaExtra } from './sla.js';
 import { parsePbi } from './pbi.js';
 import { parseCalls } from './calls.js';
+import { parseCallScores } from './callScores.js';
 import { parseDetail } from './segment.js';
 import { parseAddons } from './addons.js';
 import { CONFIG } from './config.js';
@@ -19,6 +22,7 @@ let months = [];
 let monthsPromise = null;
 let pbiLink = null;      // link Power BI (dòng "PBI" trong tab Danh sách link)
 let hrLink = null;       // link "Danh sách nhân sự SC" (tab Danh sách + tab Phép năm)
+let scoreLink = null;    // link "Chấm call" (Google Form chấm chất lượng cuộc gọi)
 let callLink = null;     // link "Dữ liệu call" (từng cuộc gọi do mục Xuất Call ghi ra)
 let libraryLink = null;  // link "Thư viện" (dòng Thư viện trong tab Danh sách link)
 
@@ -26,14 +30,20 @@ let libraryLink = null;  // link "Thư viện" (dòng Thư viện trong tab Danh
 const isPbi = (l) => l.info.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase() === 'pbi';
 const isHr = (l) => /nhan su/.test(l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase());
 const isCalls = (l) => /^du lieu call/.test(l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase());
+const isScore = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'cham call';
 const isLibrary = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'thu vien';
 export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
   pbiLink = links.find(isPbi) ?? null;
   libraryLink = links.find(isLibrary) ?? null;
   hrLink = links.find(isHr) ?? null;
   callLink = links.find(isCalls) ?? null;
+  scoreLink = links.find(isScore) ?? null;
   return resolveMonths(links);
-}).then((list) => (months = list)));
+}).then(async (list) => {
+  // Ngày được gia hạn SLA nằm ở tab "Gia hạn SLA" (Ngày | Số ngày cộng thêm | Ghi chú); không đọc được thì dùng mặc định.
+  try { setSlaExtra(await readTable({ url: CONFIG.configSheet, tab: CONFIG.tabs.slaExtra, columns: ['Ngày tạo data', 'Số ngày cộng thêm', 'Ghi chú'] })); } catch { /* giữ mặc định */ }
+  return (months = list);
+}));
 export const reloadMonths = () => { monthsPromise = null; cache.clear(); store.clear(); persistClear(); };
 
 const entryOf = (ym) => {
@@ -130,6 +140,16 @@ export const loadCalls = () => memo('calls', async () => {
   return parseCalls(sets, tabs);
 });
 
+/** Kết quả chấm call: mọi tab hiển thị của Sheet có cột "Nhân sự" và "Activity ID" (Form có thể có nhiều tab); đọc một lần mỗi phiên. */
+export const hasScores = () => Boolean(scoreLink);
+export const loadScores = () => memo('scores', async () => {
+  if (!scoreLink) throw new Error('Chưa có link "Chấm call" trong tab Danh sách link');
+  const token = getToken();
+  const tabs = scoreLink.tab ? [scoreLink.tab] : await fetchTabs(scoreLink.id, token);
+  const sets = await Promise.all(tabs.map((tab) => fetchRows(scoreLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:Z5000' })));
+  return { rows: sets.flatMap((set) => parseCallScores(set)) };
+});
+
 /** Chi tiết từng việc của file KPI (tab "Data Txx" của mỗi tháng): dùng để phân tích theo tệp data. */
 export const hasDetail = () => months.some((m) => m.detail);
 const DETAIL_TTL = 12 * 3_600_000;   // tháng đã qua ít đổi: dùng lại bản lưu trong trình duyệt tối đa 12 giờ
@@ -152,13 +172,14 @@ export const loadDetail = () => memo('detail', async () => {
 export const clearCache = () => { cache.clear(); store.clear(); persistClear(); };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
-export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, calls: callLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && !key.startsWith('detail')) });
-export function restoreData({ months: saved, pbi, library, hr, calls, entries }) {
+export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, calls: callLink, scores: scoreLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'scores' && !key.startsWith('detail')) });
+export function restoreData({ months: saved, pbi, library, hr, calls, scores, entries }) {
   months = saved;
   pbiLink = pbi ?? null;
   libraryLink = library ?? null;
   hrLink = hr ?? null;
   callLink = calls ?? null;
+  scoreLink = scores ?? null;
   monthsPromise = Promise.resolve(saved);
   entries.forEach(([key, value]) => { cache.set(key, Promise.resolve(value)); store.set(key, value); });
 }

@@ -9,7 +9,11 @@ const lastColumn = (columns) => String.fromCharCode(64 + columns.length);
 const rangeOf = (tab, a1) => encodeURIComponent(`${tab}!${a1}`);
 
 async function call(url, token, options = {}) {
-  const res = await fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 60_000);   // quá 60 giây thì báo lỗi thay vì chờ mãi
+  let res;
+  try { res = await fetch(url, { ...options, signal: ctrl.signal, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }); }
+  catch (err) { throw err.name === 'AbortError' ? new Error('Google Sheets phản hồi quá lâu. Kiểm tra mạng rồi thử lại.') : err; }
+  finally { clearTimeout(timer); }
   if (res.status === 401) throw Object.assign(new Error('Phiên đăng nhập đã hết hạn'), { code: 'auth' });
   if (res.status === 403) throw new Error('Bạn không có quyền với Google Sheet này (cần quyền chỉnh sửa để thay đổi)');
   return res;

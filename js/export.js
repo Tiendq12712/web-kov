@@ -1,5 +1,7 @@
 /** Xuất bảng đang xem ra Excel (.xlsx) hoặc PDF (in ra PDF). Không dùng thư viện ngoài. */
 
+import { reportHtml } from './reportPdf.js';
+
 /* ---------- Đọc bảng HTML thành mảng dòng ---------- */
 const clean = (el) => el.textContent.replace(/\s+/g, ' ').trim();
 /** Đọc một ô: nếu ô có thẻ <small> phụ (mã nhân sự, thứ trong tuần) thì ghép sau chữ chính. */
@@ -62,7 +64,7 @@ function parseValue(text) {
   return m[4] ? { value: value / 100, percent: true } : { value };
 }
 
-export function buildXlsx(rows, sheetName = 'Dữ liệu') {
+export function buildXlsx(rows, sheetName = 'Dữ liệu', { freeze = true } = {}) {
   const widths = [];
   rows.forEach((r) => r.cells.forEach((c, i) => { widths[i] = Math.min(40, Math.max(widths[i] ?? 6, c.length + 2)); }));
   const sheetRows = rows.map((r, ri) => `<row r="${ri + 1}">${r.cells.map((text, ci) => {
@@ -74,7 +76,7 @@ export function buildXlsx(rows, sheetName = 'Dữ liệu') {
     if (v.text !== undefined) return `<c r="${ref}"${bold ? ` s="${bold}"` : ''} t="inlineStr"><is><t>${esc(text)}</t></is></c>`;
     return `<c r="${ref}" s="${v.percent ? (bold ? 5 : 2) : bold || 0}"><v>${v.value}</v></c>`;
   }).join('')}</row>`).join('');
-  const headRows = rows.filter((r) => r.head).length;
+  const headRows = freeze ? rows.filter((r) => r.head).length : 0;
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0">${headRows ? `<pane ySplit="${headRows}" topLeftCell="A${headRows + 1}" activePane="bottomLeft" state="frozen"/>` : ''}</sheetView></sheetViews><cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sheetRows}</sheetData></worksheet>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F7"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="10" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
   const safeName = sheetName.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Dữ liệu';
@@ -121,6 +123,24 @@ export function exportPdf(table, title) {
   </style></head><body><h1>${esc(title)}</h1><p>Report SC ONLINE · xuất lúc ${esc(stamp())}</p>
   <table>${part('thead', rows.filter((r) => r.head))}${part('tbody', rows.filter((r) => !r.head && !r.foot))}${part('tfoot', rows.filter((r) => r.foot))}</table></body></html>`;
   const frame = Object.assign(document.createElement('iframe'), { srcdoc: doc });
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  frame.onload = () => { frame.contentWindow.focus(); frame.contentWindow.print(); setTimeout(() => frame.remove(), 60_000); };
+  document.body.append(frame);
+}
+
+/* ---------- Báo cáo tuần / tháng (khuôn cố định) ---------- */
+const reportRows = (report) => [
+  { cells: [report.title], head: true }, { cells: [report.subtitle] }, { cells: [] },
+  { cells: ['Nhận định chính'], head: true }, ...report.insights.map((t) => ({ cells: [t] })), { cells: [] },
+  ...report.sections.flatMap((sec) => [{ cells: [sec.title], head: true }, { cells: sec.head, head: true }, ...sec.rows.map((cells) => ({ cells })), ...(sec.foot ? [{ cells: sec.foot, foot: true }] : []), { cells: [] }]),
+];
+
+export function exportReportExcel(report) {
+  download(buildXlsx(reportRows(report), 'Báo cáo', { freeze: false }), `${slug(report.title)}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+export function exportReportPdf(report) {
+  const frame = Object.assign(document.createElement('iframe'), { srcdoc: reportHtml(report) });
   frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
   frame.onload = () => { frame.contentWindow.focus(); frame.contentWindow.print(); setTimeout(() => frame.remove(), 60_000); };
   document.body.append(frame);

@@ -1,0 +1,157 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kiểm tra tự động</title>
+<pre id="out">Đang chạy…</pre>
+<script type="module">
+/* Kiểm tra tự động: (1) mọi module nạp được, (2) trang khởi động xong được, (3) vài phép tính quan trọng đúng.
+   Chạy bằng: sh scripts/check.sh   (mở bằng trình duyệt cũng được: tests/smoke.html?root=/) */
+const root = new URLSearchParams(location.search).get('root') ?? '/';
+const lines = [], fails = [];
+const ok = (name) => lines.push(`ok    ${name}`);
+const bad = (name, why) => { lines.push(`FAIL  ${name}: ${why}`); fails.push(name); };
+const test = async (name, fn) => { try { await fn(); ok(name); } catch (e) { bad(name, e?.message ?? e); } };
+const eq = (a, b, what = '') => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${what} mong đợi ${JSON.stringify(b)}, nhận ${JSON.stringify(a)}`); };
+
+// 1. Danh sách module lấy từ sw.js (SHELL) để luôn khớp bản phát hành.
+const sw = await (await fetch(`${root}sw.js`, { cache: 'no-store' })).text();
+const files = [...new Set([...sw.matchAll(/'(js\/[^']+\.js)'/g)].map((m) => m[1]))].filter((f) => !['js/main.js', 'js/mobileShell.js'].includes(f));   // main và mobileShell chạy thẳng vào giao diện: được kiểm qua bước 2
+for (const f of files) await test(`nạp ${f}`, () => import(`${root}${f}`));
+
+// 2. Trang thật khởi động xong (không phiên đăng nhập -> phải hiện màn hình đăng nhập, không kẹt ở màn hình chờ).
+await test('trang khởi động (main.js)', async () => {
+  const frame = document.createElement('iframe');
+  frame.style.cssText = 'width:900px;height:700px';
+  frame.src = `${root}index.html?smoke=1`;
+  document.body.append(frame);
+  await new Promise((r) => { frame.onload = r; });
+  const t0 = Date.now();
+  while (Date.now() - t0 < 8000) {
+    const d = frame.contentDocument;
+    if (d.getElementById('boot')?.hidden && d.getElementById('login') && !d.getElementById('login').hidden) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('màn hình chờ không tắt hoặc không hiện màn hình đăng nhập (main.js có thể bị lỗi)');
+});
+
+// 3. Phép tính quan trọng.
+const sla = await import(`${root}js/sla.js`), det = await import(`${root}js/slaDetail.js`), seg = await import(`${root}js/segment.js`);
+const xfer = await import(`${root}js/transfer.js`), quality = await import(`${root}js/quality.js`), persist = await import(`${root}js/persist.js`);
+const at = (d) => Date.parse(`${d}T08:00:00Z`);
+const rec = (created, modified, status = 'Đã làm') => ({ status, created, createdTs: at(created), modifiedTs: at(modified) });
+const NOW = at('2026-10-30');
+
+await test('SLA: hạn mặc định 7 ngày, ngày 15/10 được 10 ngày', () => {
+  eq(sla.slaDaysFor('2026-10-14'), 7); eq(sla.slaDaysFor('2026-10-15'), 10); eq(sla.slaDaysFor('2026-10-15T09:00'), 10);
+});
+await test('SLA: phân loại theo ngày lịch', () => {
+  eq(det.classify(rec('2026-10-14', '2026-10-21'), NOW).kind, 'ok');
+  eq(det.classify(rec('2026-10-14', '2026-10-22'), NOW).kind, 'late-done');
+  eq(det.classify(rec('2026-10-15', '2026-10-25'), NOW).kind, 'ok');
+  eq(det.classify(rec('2026-10-15', '2026-10-26'), NOW).kind, 'late-done');
+  eq(det.classify(rec('2026-10-15', '2026-10-15', 'Chưa làm'), NOW).kind, 'late-open');
+  eq(det.classify(rec('2026-10-28', '2026-10-28', 'Chưa làm'), NOW).kind, 'ok');
+  eq(det.classify(rec('2026-10-01', '2026-10-30', 'Hủy'), NOW).kind, 'cancel');
+});
+await test('SLA: sắp trễ khi chưa xong và đã qua 5-7 ngày', () => {
+  eq(det.classify(rec('2026-10-24', '2026-10-24', 'Đang làm'), NOW).kind, 'soon');
+});
+
+await test('SLA: đọc ngày gia hạn từ Sheet (nhiều kiểu ngày, 0 là bỏ gia hạn)', () => {
+  eq(sla.parseSlaDate('15/10/2026'), '2026-10-15'); eq(sla.parseSlaDate('2026-10-5'), '2026-10-05'); eq(sla.parseSlaDate('3/11', 2026), '2026-11-03'); eq(sla.parseSlaDate('abc'), null);
+  sla.setSlaExtra([['20/10/2026', '2'], ['15/10/2026', '0'], ['rác', '1'], ['21/10/2026', 'x']]);
+  eq(sla.slaDaysFor('2026-10-20'), 9); eq(sla.slaDaysFor('2026-10-15'), 7); eq(sla.slaDaysFor('2026-10-21'), 7);
+  sla.setSlaExtra([]); eq(sla.slaDaysFor('2026-10-15'), 10);
+});
+
+const header = ['Thời gian tạo', 'Công việc hỗ trợ', 'Retailer ID', 'Nguồn data', 'Mô tả', 'Product', 'Thời gian tương tác', 'Người xử lý', 'Tình trạng xử lý', 'Tỉnh/Thành phố'];
+const row = (retailer, desc, province, status = 'Đã làm') => ['2026-10-17 05:25 AM', 'Tư vấn', retailer, 'NA', desc, 'FnB', '2026-10-18 06:00 AM', '1001 - Nguyễn Văn A', status, province];
+const detail = seg.parseDetail([header, row('111', 'Chuyển đổi từ Offline sang Online', 'Tỉnh Hà Nội'), row('111', 'Chuyển đổi từ Offline sang Online', ''), row('222', 'Chuyển đổi từ Offline sang Online', ''), row('333', 'khác', 'Tỉnh Nghệ An')], 'T10');
+await test('Đọc data chi tiết: nhận dòng chuyển Offline→Online và tỉnh/thành', () => {
+  eq(detail.length, 4); eq(detail.filter((r) => r.transfer).length, 3); eq(detail[0].province, 'Tỉnh Hà Nội'); eq(detail[1].province, '');
+});
+await test('Chuyển data: bổ sung tỉnh/thành theo Retailer ID', () => {
+  const a = xfer.analyzeTransfer(detail, { month: 'all' });
+  eq(a.xferCount, 3); eq(a.filled, 1);
+  eq(a.provs.find((p) => !p.key)?.n, 1, 'dòng còn trống');
+});
+await test('Chất lượng dữ liệu: cảnh báo khi số dòng giảm', () => {
+  const mk = (n) => ({ months: ['TZ'], rows: Array.from({ length: n }, () => ({ month: 'TZ', handler: '1001 - A', province: 'x' })) });
+  localStorage.removeItem('kpi.dq.TZ');
+  eq(quality.qualityWarnings(mk(1000)).length, 0);
+  eq(quality.qualityWarnings(mk(500)).length, 1);
+  quality.acceptQuality(mk(500)); eq(quality.qualityWarnings(mk(500)).length, 0);
+  localStorage.removeItem('kpi.dq.TZ');
+});
+await test('Bộ nhớ lưu lâu: ghi, đọc, hết hạn, xóa', async () => {
+  await persist.persistSet('smoke', [1, 2, 3]);
+  eq(await persist.persistGet('smoke', 60000), [1, 2, 3]); eq(await persist.persistGet('smoke', -1), null);
+  await persist.persistClear(); eq(await persist.persistGet('smoke', 60000), null);
+});
+
+const pr = await import(`${root}js/periodReport.js`), todo = await import(`${root}js/todo.js`);
+const blk = (target, done) => ({ target, done, missing: target - done, rate: target ? done / target : 0 });
+const member = (code, name, k) => ({ code, name, role: 'SC', level: 'L1', kpi: k, need: { ...blk(10, 5), pass: false }, main: blk(100, 60), addon: blk(20, 10), extra: { assigned: 50, actDone: 30, doing: 5, notStarted: 15 }, talk: { target: 3600, actual: 600, pass: false } });
+const kpiData = { month: '2026-10', work: null, teams: [{ id: 'online-hcm', name: 'Team Online HCM', asOf: '2026-10-20', members: [member('1001', 'Nguyễn Văn A', 0.5), member('1002', 'Trần Thị B', 0.7)] }] };
+const rows20 = (n, created) => Array.from({ length: n }, () => ({ month: 'T10', created, createdTs: at(created), modifiedTs: at(created), status: 'Đã làm', handler: '1001 - Nguyễn Văn A', tasks: [], add: [], desc: '', calls: 0 }));
+await test('Báo cáo tuần/tháng: đủ các phần theo khuôn, tuần chỉ lấy 7 ngày', () => {
+  const noDetail = pr.buildPeriodReport({ data: kpiData, period: 'month' });
+  eq(noDetail.sections.map((x) => x.title).slice(0, 2), ['Tổng quan', 'KPI theo nhân sự (lũy kế tháng)']); eq(noDetail.sections.length, 2);
+  const rows = [...rows20(3, '2026-10-19'), ...rows20(4, '2026-10-10')];
+  const wk = pr.buildPeriodReport({ data: kpiData, rows, period: 'week' }), mo = pr.buildPeriodReport({ data: kpiData, rows, period: 'month' });
+  eq(wk.sections.length, 5); eq(wk.title.startsWith('Báo cáo tuần'), true); eq(mo.title.startsWith('Báo cáo tháng'), true);
+  eq(wk.sections.find((x) => x.title.startsWith('Kiểm soát')).foot[1], '3', 'data đã làm trong tuần'); eq(mo.sections.find((x) => x.title.startsWith('Kiểm soát')).foot[1], '7', 'data đã làm trong tháng');
+  eq(wk.sections[1].rows.length, 2);
+});
+await test('Việc cần làm: nhân sự talktime thấp và lỗi Kiểm soát', () => {
+  const me = { role: 'admin', email: 'a@kiotviet.com' }, base = { me, found: null, data: kpiData, report: null, pbi: null, unread: 0 };
+  const items = todo.buildTodo({ ...base, control: { flaggedCount: 4, errRate: 0.1, people: [{ code: '1001', flagged: 4, errRate: 0.1 }] } });
+  eq(items.some((i) => i.tab === 'control' && i.count === 4), true, 'có mục Kiểm soát'); eq(items.some((i) => i.tab === 'report'), true, 'có mục talktime');
+  eq(todo.buildTodo({ ...base, control: null }).some((i) => i.tab === 'control'), false);
+});
+
+await test('Thiết lập: hết phiên đăng nhập thì lần mở sau vẫn tải lại được (không kẹt "Đang tải thiết lập")', async () => {
+  const { createSettings } = await import(`${root}js/settingsController.js`);
+  const realFetch = window.fetch; let sheetCalls = 0, expired = 0;
+  window.fetch = async (url) => String(url).includes('sheets.googleapis.com') ? (sheetCalls++, new Response('{}', { status: 401 })) : new Response('{}', { status: 200 });
+  try {
+    const st = createSettings({ getMe: () => ({ role: 'admin', email: 'a@kiotviet.com' }), getMonths: () => [], rerender() {}, onAuthExpired() { expired++; }, onLinksChanged() {}, onSynced() {}, onHistory() {} });
+    st.view(); await new Promise((r) => setTimeout(r, 300));
+    const first = sheetCalls; eq(expired, 1, 'báo hết phiên');
+    st.view(); await new Promise((r) => setTimeout(r, 300));
+    eq(sheetCalls > first, true, 'tải lại lần hai');
+  } finally { window.fetch = realFetch; }
+});
+
+const cs = await import(`${root}js/callScores.js`);
+await test('Chấm call: đọc lỗi/điểm cộng, tính điểm trừ và tổng hợp theo nhân sự', () => {
+  eq(cs.parseItems('Tư vấn thiếu (-2%), Diễn đạt chưa rõ (-1,5%)').map((x) => x.pct), [-2, -1.5]); eq(cs.parseItems('').length, 0); eq(cs.parseItems('Tốt - Rất bám sát nhu cầu')[0].pct, null);
+  eq(cs.parsePerson('8618 - Mai Thị Hương - Customer Success'), { code: '8618', name: 'Mai Thị Hương' }); eq(cs.parsePerson('8656 - Nguyễn Thị Thương'), { code: '8656', name: 'Nguyễn Thị Thương' });
+  const head = ['Timestamp', 'Nhân sự', 'Retailer ID', 'Thời gian tạo Activity', ' Giai đoạn 1: Tiếp cận', 'Giai đoạn 2: Khảo sát', 'Tương tác tổng thể', 'Điểm cộng (+)', 'Nhận xét (Note)', 'Số liên hệ', 'Góp ý', 'Đánh giá'];
+  const r = (ts, who, g1, g2, bonus, id, act = '9/30/2026', sc = 0) => [ts, who, '501', act, g1, g2, '', bonus, 'ghi chú', '0901234567', '', sc];
+  const rows = cs.parseCallScores([head, r('10/5/2026 16:53:16', '1001 - An - CS', '', '', '', '1', '9/9/2026'), r('10/6/2026 10:00:00', '1001 - An - CS', 'Không giới thiệu tên (-5%)', 'Thiếu khảo sát (-2%)', '', '2', '9/30/2026'), r('11/2/2026 09:00:00', '1002 - Bình - CS', 'Đạt', 'Tốt - Rất bám sát', 'Tư vấn tốt (+2%)', '3', '10/20/2026', 4), r('11/3/2026 09:00:00', '1002 - Bình - CS', '', '', '', '4', '10/21/2026', 5), ['x', '', '', '', '', '', '', '', '', '', '', '']]);
+  eq(rows.length, 4, 'bỏ dòng trống'); eq(rows[1].penalty, 7, 'điểm trừ = 5 + 2'); eq(rows[1].errors.length, 2); eq(rows[0].month, '2026-09', 'tháng theo Thời gian tạo Activity'); eq(rows[2].month, '2026-10'); eq(rows[2].scoredDate, '2026-11-02');
+  const a = cs.analyzeCallScores(rows, {});
+  eq([a.total, a.withErr, a.perfect], [4, 1, 3], 'nhận xét mức đạt không bị tính là lỗi'); eq(a.avgScore, 4.5, 'điểm đánh giá TB bỏ qua call chưa có điểm'); eq(rows[2].ratings.length, 2); eq(rows[2].phone, '0901234567'); eq(a.people[0].code, '1001', 'điểm trừ TB cao nhất đứng đầu'); eq(a.people[0].avgPenalty, 3.5); eq(a.bonusCalls, 1);
+  eq(cs.analyzeCallScores(rows, { month: '2026-10' }).total, 2); eq(cs.analyzeCallScores(rows, { code: '1002' }).total, 2); eq(a.byMonth.map((m) => m.month), ['2026-09', '2026-10']);
+  eq(cs.parseCallScores([['Cột', 'Khác'], ['a', 'b']]), [], 'tab không phải form chấm call');
+});
+
+const ls = await import(`${root}js/listen.js`);
+await test('Nghe lại call: chọn data kết nối nhưng không impact và xếp mức ưu tiên', () => {
+  const mk = (retailer, desc, o = {}) => ({ month: '2026-10', jobType: 'CSKH T15 - DVKH', status: 'Đã làm', contact: 'Kết nối thành công', impact: false, handler: '1001 - An - CS', retailer, desc, satisfaction: 0, modifiedTs: 1, calls: 1, ...o });
+  const long = 'Xác nhận thông tin hợp đồng, khách đang dùng ổn, đã tư vấn payment và hóa đơn điện tử, khách chưa cần thêm - retailer_id: 1 - last_signal_date: x';
+  const rows = [mk('1', 'KNM KH tắt máy ngang'), mk('2', long), mk('3', long, { satisfaction: 2 }), mk('4', long, { impact: true }), mk('5', long, { contact: 'Không nghe máy' }), mk('6', long, { jobType: 'CSKH OI - DVKH' }), mk('7', long, { status: 'Hủy' }), mk('8', 'tư vấn tốt, KH báo gọi nhiều rất khó chịu ' + long)];
+  const a = ls.analyzeListen(rows, { month: '2026-10', job: 'T15' });
+  eq([a.pool, a.conn, a.noImpact], [6, 5, 4], 'chỉ T15, bỏ Hủy, kết nối, không impact');
+  eq(a.items[0].r.retailer, '1', 'ghi chú KNM nhưng kết nối thành công xếp đầu'); eq(a.items[0].level, 'high');
+  eq(a.items.find((i) => i.r.retailer === '3').signals, ['unhappy']); eq(a.items.find((i) => i.r.retailer === '2').level, 'low');
+  eq(a.items.find((i) => i.r.retailer === '8').signals.includes('complaint'), true);
+  eq(ls.writtenPart('Khách ổn 0971849159 20/10 - retailer_id: 501 - x'), 'Khách ổn');
+  eq(ls.analyzeListen(rows, { month: '2026-10', job: 'all' }).conn, 6);
+});
+
+const pass = !fails.length;
+document.getElementById('out').textContent = `${lines.join('\n')}\n\n${pass ? 'TẤT CẢ ĐẠT' : `CÓ ${fails.length} LỖI`} (${lines.length} kiểm tra)`;
+document.documentElement.dataset.result = pass ? 'PASS' : 'FAIL';
+await fetch('/__result', { method: 'POST', body: document.getElementById('out').textContent }).catch(() => {});
+</script>

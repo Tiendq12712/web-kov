@@ -21,12 +21,14 @@ function unpaidDays(report, code, asOf) {
  * item = { tone: 'bad' | 'warn' | 'info', count, text, hint, tab?, timesheet? }.
  * Trả về [] nếu không có gì (view sẽ hiện lời chúc mừng).
  */
-export function buildTodo({ me, found, data, report, pbi, unread }) {
+export function buildTodo({ me, found, data, report, pbi, unread, control }) {
   const asOf = data.teams.map((t) => t.asOf).sort().at(-1);
   const sla = computeSla(data.work, asOf, data.month);
   const items = [];
   const push = (item) => items.push(item);
   const manager = me.role !== 'member';
+  const elapsed = asOf ? elapsedRatio(asOf) : 0;
+  const underTalk = (m) => m.talk?.target > 0 && (m.talk.actual ?? 0) < m.talk.target * elapsed;   // talktime thấp hơn mức cần có theo tiến độ tháng
 
   if (manager) {
     if (asOf && asOf < todayIso()) push({ tone: 'warn', count: null, text: `Số liệu chưa được cập nhật hôm nay (lần cuối ${dm(asOf)})`, hint: 'Chạy Đồng bộ CRM trong Thiết lập', tab: 'settings' });
@@ -34,6 +36,9 @@ export function buildTodo({ me, found, data, report, pbi, unread }) {
     if (sla?.totals.soon) push({ tone: 'warn', count: sla.totals.soon, text: 'data sắp trễ SLA', hint: `${sla.rows.filter((r) => r.soon).length} nhân sự đang giữ`, tab: 'sla' });
     const slow = data.teams.flatMap((t) => t.members.filter((m) => memberStatus(m, t).key === 'bad'));
     if (slow.length) push({ tone: 'bad', count: slow.length, text: 'nhân sự KPI chậm tiến độ', hint: 'Dưới 70% mức thời gian đã qua', tab: 'overview' });
+    if (control?.flaggedCount) push({ tone: 'warn', count: control.flaggedCount, text: 'data đã làm chưa đúng quy trình', hint: `Kiểm soát: ${control.people.filter((p) => p.flagged).length} nhân sự có lỗi · tỉ lệ lỗi ${pct(control.errRate, 1)}`, tab: 'control' });
+    const lowTalk = data.teams.flatMap((t) => t.members.filter(underTalk));
+    if (lowTalk.length) push({ tone: 'warn', count: lowTalk.length, text: 'nhân sự talktime thấp hơn tiến độ tháng', hint: 'Talktime thực tế dưới mức cần có theo ngày đã qua', tab: 'report' });
     if (pbi) {
       const by = new Map();
       for (const a of pbi.acts) { const c = by.get(a.code) ?? { t: 0, n: 0 }; c.t += 1; c.n += a.used ? 0 : 1; by.set(a.code, c); }
@@ -44,6 +49,9 @@ export function buildTodo({ me, found, data, report, pbi, unread }) {
     const mine = sla?.rows.find((r) => r.code === found.member.code);
     if (mine?.late) push({ tone: 'bad', count: mine.late, text: 'data đã trễ SLA', hint: 'Quá 7 ngày chưa xử lý xong — ưu tiên xử lý trước', tab: 'sla' });
     if (mine?.soon) push({ tone: 'warn', count: mine.soon, text: 'data sắp trễ SLA', hint: 'Còn tối đa 2 ngày là tới hạn', tab: 'sla' });
+    const mineCtl = control?.people.find((p) => p.code === found.member.code);
+    if (mineCtl?.flagged) push({ tone: 'warn', count: mineCtl.flagged, text: 'data đã làm chưa đúng quy trình', hint: `Xem chi tiết từng lỗi trong Kiểm soát (tỉ lệ lỗi ${pct(mineCtl.errRate, 1)})`, tab: 'control' });
+    if (underTalk(found.member)) push({ tone: 'warn', count: null, text: 'Talktime đang thấp hơn tiến độ tháng', hint: 'Cần gọi thêm để kịp chỉ tiêu talktime', tab: 'report' });
     const noPay = unpaidDays(report, found.member.code, asOf);
     if (noPay) push({ tone: 'info', count: noPay, text: 'ngày làm việc đã qua chưa có công', hint: 'Ô công trống (không tính Chủ nhật) — kiểm tra bảng công, báo quản lý nếu thiếu', timesheet: `${found.team.id}:${found.member.code}` });
     if (pbi) {

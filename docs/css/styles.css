@@ -793,7 +793,7 @@ table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-s
 .access-table th, .access-table td { padding: 8px 12px; white-space: nowrap; text-align: center; } .access-table td.sticky-col { text-align: left; }
 
 /* Ô chọn tháng nằm trong tab */
-.monthbar { display: flex; align-items: center; gap: 10px; }
+.monthbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .monthbar label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 .monthbar .select { height: 36px; min-width: 150px; font-weight: 600; }
 
@@ -1130,3 +1130,10 @@ sup.half { font-size: 9px; margin-left: 2px; opacity: .85; }
 .dq { display: grid; gap: 6px; margin-bottom: 12px; }
 .dq p { margin: 0; }
 .dq .btn { justify-self: start; }
+
+/* Xuất báo cáo tuần/tháng */
+.monthbar__reports { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-left: auto; }
+.reportbtn { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-size: 13px; }
+
+/* Kiểm soát call: nhận xét dài, giữ xuống dòng */
+.cs-note { white-space: pre-line; max-width: 520px; min-width: 260px; line-height: 1.4; }

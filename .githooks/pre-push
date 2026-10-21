@@ -1,0 +1,7 @@
+#!/bin/sh
+# Chặn push khi bản phát hành (docs/) lỗi hoặc chưa được dựng lại từ mã nguồn.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+if ! diff -rq js docs/js >/dev/null 2>&1 || ! diff -q sw.js docs/sw.js >/dev/null 2>&1 || ! diff -rq css docs/css >/dev/null 2>&1; then
+  echo "docs/ chưa khớp mã nguồn. Chạy: sh scripts/build-pages.sh docs"; exit 1
+fi
+sh scripts/check.sh docs || { echo "Push bị chặn: kiểm tra tự động không đạt."; exit 1; }

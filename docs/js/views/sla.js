@@ -1,6 +1,6 @@
 import { html } from '../dom.js';
 import { num, pct } from '../format.js';
-import { SLA_DAYS, WARN_DAYS, STATUS_LABELS } from '../sla.js';
+import { SLA_DAYS, WARN_DAYS, STATUS_LABELS, extraNote } from '../sla.js';
 
 const TONE = { late: 'bad', soon: 'warn', ok: 'good' };
 const ratio = (a, b) => (b ? a / b : 0);
@@ -85,7 +85,7 @@ function batchTable(batches, asOf) {
         <td>${dm(b.date)} <span class="muted">(${b.age} ngày trước)</span></td><td class="right num strong">${num(b.count)}</td><td>${b.due}</td>
         <td><span class="badge badge--${TONE[b.status]}">${leftText(b)}</span></td></tr>`)}</tbody>
     </table></div>
-    <p class="muted">Tính đến ${dm(asOf)}. Hạn xử lý = ngày chia + ${SLA_DAYS} ngày (lô ngày 15/10 được cộng thêm 3 ngày, hạn 10 ngày).</p>`;
+    <p class="muted">Tính đến ${dm(asOf)}. Hạn xử lý = ngày chia + ${SLA_DAYS} ngày. ${extraNote()}</p>`;
 }
 
 const explain = html`<p class="muted">SLA xử lý data ONL là <strong>${SLA_DAYS} ngày</strong> kể từ ngày được chia.

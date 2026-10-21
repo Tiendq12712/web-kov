@@ -1,7 +1,7 @@
 import { html } from '../dom.js';
 import { num, pct } from '../format.js';
 import { computeSlaDetail } from '../slaDetail.js';
-import { SLA_DAYS, WARN_DAYS } from '../sla.js';
+import { SLA_DAYS, WARN_DAYS, extraNote } from '../sla.js';
 
 const p1 = (v) => (v == null ? '—' : pct(v, 1));
 const dm = (iso) => (iso && iso !== '—' ? iso.split('-').slice(1).reverse().map(Number).join('/') : '—');
@@ -21,7 +21,7 @@ export function slaDetailView(data, { month, manager, code, names }) {
   if (!t.total) return html`<p class="notice">Chưa có data chi tiết của tháng này (tab "Data Txx" của file KPI) để tính SLA theo thời gian tương tác.</p>`;
   return html`
     <div class="toolbar"><h2 class="section-title">SLA theo thời gian tương tác${manager ? '' : ' của bạn'}</h2>
-      <p class="muted">Trễ khi <strong>ngày tương tác − ngày tạo &gt; ${SLA_DAYS} ngày</strong> (tính theo ngày lịch), gồm cả data đã làm. Data chưa xong tính đến hôm nay; data hủy không tính. Sắp trễ: chưa xong, đã qua từ ${SLA_DAYS - WARN_DAYS} đến ${SLA_DAYS} ngày. Data tạo ngày 15/10 được cộng thêm 3 ngày (hạn 10 ngày).</p></div>
+      <p class="muted">Trễ khi <strong>ngày tương tác − ngày tạo &gt; ${SLA_DAYS} ngày</strong> (tính theo ngày lịch), gồm cả data đã làm. Data chưa xong tính đến hôm nay; data hủy không tính. Sắp trễ: chưa xong, đã qua từ ${SLA_DAYS - WARN_DAYS} đến ${SLA_DAYS} ngày. ${extraNote()}</p></div>
     <div class="grid">
       ${stat('Trễ SLA', num(t.late), `Đã làm nhưng trễ ${num(t.late_done)} · chưa xong quá hạn ${num(t.late_open)}`, 'bad', t.lateRate)}
       ${stat('Sắp trễ SLA', num(t.soon), `Chưa xong, đã qua ${SLA_DAYS - WARN_DAYS}–${SLA_DAYS} ngày`, 'warn', t.soonRate)}

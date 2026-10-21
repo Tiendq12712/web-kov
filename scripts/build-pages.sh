@@ -4,6 +4,8 @@
 #   sh scripts/build-pages.sh docs     -> docs/  (GitHub Pages: Settings > Pages > Branch main, thư mục /docs)
 set -e
 OUT="${1:-dist}"
+# Kiểm tra mã nguồn trước khi gom (bỏ qua bằng SKIP_CHECK=1); lỗi thì dừng, không phát hành bản hỏng.
+[ -n "$SKIP_CHECK" ] || sh scripts/check.sh
 rm -rf "$OUT"
 mkdir -p "$OUT"
 cp -r index.html privacy.html terms.html manifest.webmanifest sw.js css js icons "$OUT"/
@@ -12,4 +14,5 @@ if [ "$OUT" = "docs" ]; then
 else
   cp _headers "$OUT"/             # _headers chỉ Cloudflare dùng
 fi
+[ -n "$SKIP_CHECK" ] || sh scripts/check.sh "$OUT"   # kiểm tra lại chính bản vừa gom
 echo "Đã gom $(find "$OUT" -type f | wc -l | tr -d ' ') tệp vào $OUT/"
