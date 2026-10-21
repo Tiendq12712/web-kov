@@ -179,6 +179,75 @@ await test('Tổng quan: bảng nhân sự có cột % Impact (cả kiểu tối
     eq(tb.querySelectorAll('td.impact--good, td.impact--bad, td.impact--warn').length >= 2, true, `${tview}: ô % impact có màu`);
   }
 });
+const hd = await import(`${root}js/heard.js`);
+await test('Đã nghe lại: khóa theo Retailer + thời gian, dòng mới nhất thắng, bỏ dòng sai', () => {
+  eq(hd.heardKey('501', 123), '501|123');
+  const m = hd.mergeHeard([['501', '123', '8407', 'Phong', 'ok', '', 'a@x', '2026-10-20 10:00'], ['501', '123', '8407', 'Phong', 'wrong', '', 'b@x', '2026-10-21 09:00'], ['502', '9', '1', 'An', '', '', '', ''], ['', '1', '', '', 'ok', '', '', ''], ['503', '1', '2', 'B', 'khong-hop-le', '', '', '']]);
+  eq(m.size, 1); eq(m.get('501|123').result, 'wrong', 'lần đánh giá sau thay lần trước'); eq(hd.resultOf('remind').tone, 'warn'); eq(hd.resultOf('x'), null);
+});
+const al = await import(`${root}js/alerts.js`);
+await test('Cảnh báo tự động theo ngưỡng: không nghe máy, không impact, SLA, lỗi, call cần chấn chỉnh; mẫu ít thì bỏ qua', () => {
+  const mk = (handler, contact, impact = false) => ({ month: '2026-10', status: 'Đã làm', handler, contact, impact, add: [] });
+  const A = '1 - An - CS', B = '2 - Bình - CS', C = '3 - Cường - CS';
+  const rows = [...Array(30).fill().map(() => mk(A, 'Không nghe máy')), ...Array(20).fill().map(() => mk(A, 'Kết nối thành công')),
+    ...Array(40).fill().map(() => mk(B, 'Kết nối thành công', true)), ...Array(3).fill().map(() => mk(B, 'Không nghe máy')),
+    ...Array(10).fill().map(() => mk(C, 'Không nghe máy'))];
+  const control = { people: [{ code: '1', name: 'An', live: 100, slaRate: 0.9, done: 50, errRate: 0.2 }, { code: '2', name: 'Bình', live: 100, slaRate: 0.99, done: 50, errRate: 0.01 }] };
+  const sc = [{ code: '1', name: 'An', month: '2026-09', errors: [], ratings: [], bonus: [], penalty: 6, score: 0, note: '', feedback: '', quality: { level: 'urgent', reasons: [] }, ts: 1 }];
+  const out = al.computeAlerts({ rows, month: '2026-10', control, scores: sc });
+  const by = (tab) => out.find((x) => x.tab === tab);
+  eq(by('jobs').count, 1, 'chỉ An không nghe máy cao'); eq(by('jobs').hint.includes('An'), true); eq(by('jobs').hint.includes('Cường'), false, 'mẫu ít không báo');
+  eq(by('sla').count, 1); eq(by('sla').tone, 'bad'); eq(by('control').count, 1); eq(by('callctl').count, 1);
+  eq(al.computeAlerts({ rows: null, month: '2026-10' }).length, 0, 'chưa có dữ liệu thì không cảnh báo');
+  eq(al.computeAlerts({ rows, month: '2026-10', cfg: { noAnswerRate: 0.9 } }).some((x) => x.tab === 'jobs'), false, 'ngưỡng đổi được');
+});
+const xl = await import(`${root}js/export.js`);
+await test('Excel: định dạng hợp lệ, ô tô màu theo mức (xanh/cam/đỏ)', async () => {
+  const blob = xl.buildXlsx([{ cells: ['Chỉ tiêu', 'Giá trị'], head: true }, { cells: ['KPI', '61,2%'], tones: [null, 'good'] }, { cells: ['Trễ', '12'], tones: [null, 'bad'] }, { cells: ['Ghi chú', 'chữ'], tones: [null, 'warn'] }], 'Báo cáo', { freeze: false });
+  const text = await blob.text(), grab = (tag) => { const a = text.indexOf(`<${tag}`), b = text.indexOf(`</${tag}>`, a); return text.slice(a, b + tag.length + 3); };
+  const parse = (xml) => { const d = new DOMParser().parseFromString(xml, 'application/xml'); eq(d.querySelector('parsererror'), null, 'XML hợp lệ'); return d; };
+  const styles = parse(grab('styleSheet')), sheet = parse(grab('worksheet'));
+  eq(styles.querySelectorAll('cellXfs > xf').length, Number(styles.querySelector('cellXfs').getAttribute('count')), 'số kiểu ô khớp'); eq(styles.querySelectorAll('fills > fill').length, Number(styles.querySelector('fills').getAttribute('count'))); eq(styles.querySelectorAll('fonts > font').length, Number(styles.querySelector('fonts').getAttribute('count')));
+  const cell = (ref) => sheet.querySelector(`c[r="${ref}"]`);
+  eq(cell('B2').getAttribute('s'), '9', 'phần trăm xanh'); eq(cell('B3').getAttribute('s'), '8', 'số đỏ'); eq(cell('B4').getAttribute('s'), '7', 'chữ cam');
+});
+const au = await import(`${root}js/audit.js`);
+await test('Nhật ký thao tác: dòng Sheet -> bản ghi, cắt gọn, thời điểm đúng dạng', () => {
+  eq(au.entryOf(['2026-10-21 10:00:00', 'a@kiotviet.com', 'Thêm tài khoản', 'b@kiotviet.com', 'quyền member']), { at: '2026-10-21 10:00:00', by: 'a@kiotviet.com', action: 'Thêm tài khoản', object: 'b@kiotviet.com', detail: 'quyền member' });
+  eq(au.entryOf([]).action, ''); eq(au.clean('a\n  b   c'), 'a b c'); eq(au.clean('x'.repeat(500)).length, 300);
+  eq(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(au.stampNow()), true); eq(au.stampNow(new Date(2026, 9, 5, 7, 3, 9)), '2026-10-05 07:03:09');
+});
+await test('Nhật ký thao tác: giao diện Thiết lập hiện bảng và lọc theo hành động', async () => {
+  const { settingsView } = await import(`${root}js/views/settings.js`), domx = await import(`${root}js/dom.js`);
+  const rowsA = [{ at: '2026-10-21 10:00:00', by: 'a@kiotviet.com', action: 'Xóa tài khoản', object: 'x@kiotviet.com', detail: '' }, { at: '2026-10-21 09:00:00', by: 'b@kiotviet.com', action: 'Chạy đồng bộ CRM', object: 'CRM', detail: '3 tác vụ' }];
+  const ui = { section: 'audit', me: { role: 'admin', email: 'a@kiotviet.com' }, accounts: [], links: [], tasks: [], months: [], access: {}, job: null, editing: null, error: '', busy: false, call: {}, audit: { rows: rowsA, loaded: true, loading: false, error: '', action: 'all', who: 'all', q: '' } };
+  const box = document.createElement('div'); domx.mount(box, settingsView(ui));
+  eq(box.querySelectorAll('tbody tr').length, 2); eq(box.textContent.includes('Chạy đồng bộ CRM'), true);
+  ui.audit.action = 'Xóa tài khoản'; domx.mount(box, settingsView(ui)); eq(box.querySelectorAll('tbody tr').length, 1, 'lọc theo hành động');
+  ui.me.role = 'manager'; domx.mount(box, settingsView(ui)); eq(box.textContent.includes('Nhật ký thao tác'), false, 'Quản trị không thấy nhật ký');
+});
+const td = await import(`${root}js/today.js`), tdv = await import(`${root}js/views/today.js`);
+await test('Hôm nay của tôi: data cần xử lý, chấm call, kiểm soát, xu hướng và giao diện', async () => {
+  const day = (d) => Date.UTC(2026, 9, d, 8);
+  const row = (handler, status, created, retailer) => ({ month: '2026-10', handler, status, created: `2026-10-${String(created).padStart(2, '0')}`, createdTs: day(created), modifiedTs: day(created), retailer, tasks: [], add: [], desc: '', contact: '', impact: false, source: 'x' });
+  const rows = [row('1 - An - CS', 'Chưa làm', 1, 'r1'), row('1 - An - CS', 'Đang làm', 14, 'r2'), row('1 - An - CS', 'Chưa làm', 18, 'r3'), row('1 - An - CS', 'Đã làm', 1, 'r4'), row('2 - Bình - CS', 'Chưa làm', 1, 'r5'), row('1 - An - CS', 'Hủy', 1, 'r6')];
+  const open = td.openItems(rows, '1', day(21));
+  eq([open.total, open.late, open.soon], [3, 1, 1], 'chỉ data của tôi, chưa xong, bỏ Hủy: r1 trễ, r2 (14/10, đủ 7 ngày) sắp trễ, r3 còn rộng');
+  eq(open.list[0].r.retailer, 'r1', 'trễ nhiều nhất đứng đầu'); eq(td.openItems(null, '1', 0), null);
+  const mkScore = (code, level, score, date) => ({ code, name: 'An', month: '2026-10', date, ts: Date.parse(date), errors: [], ratings: [], bonus: [], penalty: level === 'urgent' ? 6 : 0, score, note: '- Lỗi: thiếu giới thiệu tên', feedback: '', quality: { level, reasons: [] } });
+  const sc = td.myScores([mkScore('1', 'urgent', 1, '2026-10-19'), mkScore('1', 'good', 5, '2026-10-18'), mkScore('2', 'weak', 3, '2026-10-17')], '1');
+  eq([sc.total, sc.quality.urgent, sc.quality.good], [2, 1, 1]); eq(sc.recent[0].date, '2026-10-19'); eq(td.myScores(null, '1'), null);
+  const tr = td.myTrend([{ date: '2026-10-19', code: '1', kpi: 0.4 }, { date: '2026-10-20', code: '1', kpi: 0.5 }, { date: '2026-10-20', code: '2', kpi: 0.9 }], '1');
+  eq(tr.values, [0.4, 0.5]); eq(Math.round(tr.delta * 100), 10); eq(td.myTrend(null, '1'), null);
+  const blkt = (t, d) => ({ target: t, done: d, missing: t - d, rate: t ? d / t : 0 });
+  const found = { team: { id: 'a', name: 'Team Online HCM', asOf: '2026-10-20', members: [] }, member: { code: '1', name: 'Nguyễn Văn An', kpi: 0.5, need: blkt(10, 5), main: blkt(100, 50), addon: blkt(10, 5), extra: { assigned: 20, actDone: 10, impactRate: 0.45 }, talk: { target: 3600, actual: 1800 } } };
+  const box = document.createElement('div');
+  domm.mount(box, tdv.todayView({ me: { name: 'Nguyễn Văn An' }, found, report: null, todoItems: [], open, scores: sc, hasScores: true, control: { done: 10, flagged: 2, errRate: 0.2, slaRate: 0.9, slaCut: 30, top: [{ label: 'Chưa gọi đủ', count: 2 }] }, trend: tr, month: '2026-10' }));
+  const text = box.textContent;
+  eq(text.includes('An!'), true, 'chào đúng tên'); eq(text.includes('Data cần xử lý trước'), true); eq(text.includes('r1'), true, 'liệt kê data trễ'); eq(text.includes('Chấm call gần đây'), true); eq(text.includes('Kiểm soát của bạn'), true); eq(box.querySelector('.spark') != null, true, 'có đường xu hướng');
+  domm.mount(box, tdv.todayView({ me: {}, found, report: null, todoItems: [], open: null, scores: null, hasScores: true, control: null, trend: null, month: '2026-10' }));
+  eq(box.textContent.includes('Đang tải'), true, 'phần chưa tải hiện đang tải'); domm.mount(box, tdv.todayView({ found: null })); eq(box.textContent.includes('Đầu số'), true);
+});
 const hist = await import(`${root}js/history.js`), cmpm = await import(`${root}js/compare.js`);
 const hrec = (date, code, name, kpi, late) => ({ date, code, name, kpi, late, need: null, main: null, addon: null, actDone: 10, assigned: 20, soon: 0, backlog: 0, base: 0, cinfoTotal: null, cinfoNot: null });
 const H = ['2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20'].flatMap((d, i) => [hrec(d, '1', 'An', 0.2 + i * 0.1, 5 - i), hrec(d, '2', 'Bình', 0.6 - i * 0.05, 1 + i)]);

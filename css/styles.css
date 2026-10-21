@@ -1222,3 +1222,18 @@ sup.half { font-size: 9px; margin-left: 2px; opacity: .85; }
 
 /* % Impact theo mục tiêu */
 td.impact--good { color: var(--good); font-weight: 700; } td.impact--warn { color: var(--warn); font-weight: 700; } td.impact--bad { color: var(--bad); font-weight: 700; }
+
+/* Trang "Hôm nay của tôi" */
+.today-hero { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 6px 16px; margin: 4px 0 14px; }
+.today-hero p { margin: 0; text-transform: capitalize; } .today-hero p:last-child { text-transform: none; }
+.today-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; align-items: start; }
+.today-wide { grid-column: 1 / -1; }
+.today-counts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 10px; }
+.today-spark { padding: 6px 0; } .today-spark .spark { width: 100%; height: 64px; }
+.today-calls, .today-top { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.today-call { padding: 8px 12px; border-left: 4px solid var(--good-fill); background: var(--surface-2); border-radius: 0 10px 10px 0; }
+.today-call--urgent { border-left-color: var(--bad-fill); } .today-call--weak { border-left-color: var(--warn-fill); } .today-call--none { border-left-color: var(--c4); }
+.today-call p { margin: 4px 0 0; line-height: 1.5; }
+.today-top li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-top: 1px solid var(--border); } .today-top li:first-child { border-top: 0; }
+
+.kv dd.impact--good { color: var(--good); font-weight: 700; } .kv dd.impact--warn { color: var(--warn); font-weight: 700; } .kv dd.impact--bad { color: var(--bad); font-weight: 700; }

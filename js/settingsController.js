@@ -1,3 +1,4 @@
+import { logAction, loadAudit } from './audit.js';
 import { CONFIG } from './config.js';
 import { html } from './dom.js';
 import { sheetId } from './sheet.js';
@@ -21,6 +22,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   const ui = {
     section: 'accounts', accounts: [], links: [], tasks: [], status: null, serverError: '',
     access: { loading: false, error: '', result: null },
+    audit: { rows: [], loaded: false, loading: false, error: '', action: 'all', who: 'all', q: '' },
     job: null, editing: null, error: '', busy: false, loaded: false, loading: false, me: null, months: [],
     call: { gsheet_url: '', tab_name: '', agents: '', cuser: '', date_mode: 'month_to_yesterday', date_from: '', date_to: '' },
   };
@@ -55,6 +57,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
         const bar = byId('crm-progress');
         if (bar) bar.style.width = `${(data.total ? data.done / data.total : 0) * 100}%`;
         if (data.finished) {
+          if (!ui.job.logged) { ui.job.logged = true; note(ui.job.kind === 'crm' ? 'Đồng bộ CRM xong' : 'Xuất call xong', ui.job.kind === 'crm' ? 'CRM' : 'Xuất call', `${data.ok}/${data.total} tác vụ thành công`); }
           await refreshStatus();
           if (ui.job.kind === 'crm' && data.ok > 0) await stampSync();
           return rerender({ keep: true });
@@ -111,15 +114,23 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     rerender();
   }
 
+  async function reloadAudit() {
+    Object.assign(ui.audit, { loading: true, error: '' }); rerender({ keep: true });
+    try { ui.audit.rows = await loadAudit(); ui.audit.loaded = true; }
+    catch (err) { if (err.code === 'auth') return onAuthExpired(err.message); ui.audit.error = err.message; }
+    ui.audit.loading = false; rerender({ keep: true });
+  }
   const fail = (message) => { ui.error = message; rerender(); };
+  /** Ghi nhật ký thao tác (không chờ, không làm hỏng thao tác chính). */
+  const note = (action, object = '', detail = '') => { logAction(getMe()?.email, action, object, detail).catch(() => {}); };
 
   /* ---------- Biểu mẫu ---------- */
   const emailOk = (email) => new RegExp(`^[^\\s@]+@${CONFIG.allowedDomain.replace('.', '\\.')}$`, 'i').test(email);
 
   const FORMS = {
-    cookie: (form) => run(async () => { await crmServer.setCookie(form.elements.cookie.value); await refreshStatus(); }),
+    cookie: (form) => run(async () => { await crmServer.setCookie(form.elements.cookie.value); await refreshStatus(); note('Đặt cookie CRM', 'CRM'); }),
 
-    'call-cookie': (form) => run(async () => { await callServer.setCookie(form.elements.cookie.value); await refreshStatus(); }),
+    'call-cookie': (form) => run(async () => { await callServer.setCookie(form.elements.cookie.value); await refreshStatus(); note('Đặt cookie xuất call', 'Xuất call'); }),
 
     'call-config'(form) {
       const config = {
@@ -131,7 +142,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
       if (!config.agents) return fail('Hãy nhập ít nhất một agent');
       const range = resolveRange(config);
       if (range.error) return fail(range.error);
-      return run(async () => { ui.call = await saveCallConfig(config); });
+      return run(async () => { ui.call = await saveCallConfig(config); note('Lưu cấu hình xuất call', config.tab_name, `${splitAgents(config.agents).length} agent · chế độ ngày ${config.date_mode}`); });
     },
 
     account(form) {
@@ -146,6 +157,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
       const actor = getMe().role;
       return run(async () => {
         ui.accounts = original ? await updateAccount(actor, original, email, role.value, name, gender, code) : await addAccount(actor, email, role.value, name, gender, code);
+        note(original ? 'Sửa tài khoản' : 'Thêm tài khoản', email, `quyền ${role.value} · đầu số ${code || '—'}${original && original !== email ? ` · đổi từ ${original}` : ''}`);
       });
     },
 
@@ -155,6 +167,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
       const index = form.dataset.key;
       return run(async () => {
         ui.links = index === '' ? await addLink(link) : await updateLink(Number(index), link);
+        note(index === '' ? 'Thêm link' : 'Sửa link', link.info, link.tab ? `tab ${link.tab}` : '');
         await onLinksChanged();
       });
     },
@@ -168,6 +181,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
         ui.tasks = await mutateTasks((list) => (index === ''
           ? [...list, { enabled: true, ...fields }]
           : list.map((t, i) => (i === Number(index) ? { ...t, ...fields } : t))));
+        note(index === '' ? 'Thêm tác vụ CRM' : 'Sửa tác vụ CRM', fields.tab_name, fields.description);
       });
     },
   };
@@ -179,6 +193,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     if (range.error) throw new Error(range.error);
     const { jobId } = await callServer.run({ gsheet_url, tab_name, agents: splitAgents(agents), cuser, date_from: range.from, date_to: range.to, dry_run: dryRun });
     resumeJob(jobId);
+    note(dryRun ? 'Chạy thử xuất call' : 'Chạy xuất call', tab_name, `${splitAgents(agents).length} agent · ${range.from} → ${range.to}`);
     await refreshStatus();
   });
 
@@ -187,12 +202,13 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   const remove = (message, action) => (key) => { if (confirm(message(key))) run(action(key)); };
 
   const ACTIONS = {
-    section: (key) => { if (['links', 'crm', 'call'].includes(key) && getMe()?.role !== 'admin') return; Object.assign(ui, { section: key, editing: null, error: '' }); rerender(); },
+    section: (key) => { if (['links', 'crm', 'call', 'audit'].includes(key) && getMe()?.role !== 'admin') return; Object.assign(ui, { section: key, editing: null, error: '' }); if (key === 'audit' && !ui.audit.loaded) reloadAudit(); rerender(); },
+    'audit-reload': () => reloadAudit(),
     cancel: () => { ui.editing = null; ui.error = ''; rerender(); },
     'account-edit': edit('account'),
-    'account-delete': remove((e) => `Xóa tài khoản ${e}?`, (e) => async () => { ui.accounts = await removeAccount(getMe().role, e); }),
+    'account-delete': remove((e) => `Xóa tài khoản ${e}?`, (e) => async () => { ui.accounts = await removeAccount(getMe().role, e); note('Xóa tài khoản', e); }),
     'link-edit': edit('link'),
-    'link-delete': remove((i) => `Xóa link "${ui.links[i]?.info}"?`, (i) => async () => { ui.links = await removeLink(Number(i)); await onLinksChanged(); }),
+    'link-delete': remove((i) => `Xóa link "${ui.links[i]?.info}"?`, (i) => async () => { const gone = ui.links[i]?.info; ui.links = await removeLink(Number(i)); note('Xóa link', gone); await onLinksChanged(); }),
     /** Admin: kiểm tra email nào chưa được chia sẻ các Google Sheet báo cáo (dùng Drive API, cần cho phép một lần). */
     'access-check': async () => {
       ui.access = { loading: true, error: '', result: null };
@@ -222,15 +238,18 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     },
     'task-edit': edit('task'),
     'task-delete': remove((i) => `Xóa tác vụ "${ui.tasks[i]?.tab_name || 'này'}"?`, (i) => async () => {
+      const gone = ui.tasks[i]?.tab_name;
       ui.tasks = await mutateTasks((list) => list.filter((_, k) => k !== Number(i)));
+      note('Xóa tác vụ CRM', gone);
     }),
-    'call-cookie-clear': () => run(async () => { await callServer.clearCookie(); await refreshStatus(); }),
+    'call-cookie-clear': () => run(async () => { await callServer.clearCookie(); await refreshStatus(); note('Xóa cookie xuất call', 'Xuất call'); }),
     'call-run': () => runCall(false),
     'call-dry-run': () => runCall(true),
-    'cookie-clear': () => run(async () => { await crmServer.clearCookie(); await refreshStatus(); }),
+    'cookie-clear': () => run(async () => { await crmServer.clearCookie(); await refreshStatus(); note('Xóa cookie CRM', 'CRM'); }),
     'crm-run': () => run(async () => {
       await getWriteToken();   // xin quyền ghi ngay khi bấm, để cuối job ghi được thời gian cập nhật
       const { jobId } = await crmServer.run(ui.tasks.filter((t) => t.enabled));
+      note('Chạy đồng bộ CRM', 'CRM', `${ui.tasks.filter((t) => t.enabled).length} tác vụ`);
       resumeJob(jobId, 'crm');
       await refreshStatus();
     }),
@@ -267,10 +286,11 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
       form.elements.date_to.disabled = !custom;
       return;
     }
+    if (e.target.matches?.('[data-audit]')) { ui.audit[e.target.dataset.audit] = e.target.value; rerender({ keep: true }); return; }
     const box = e.target.closest('[data-task-toggle]');
     if (!box) return;
     const index = Number(box.dataset.taskToggle);
-    run(async () => { ui.tasks = await mutateTasks((list) => list.map((t, k) => (k === index ? { ...t, enabled: box.checked } : t))); });
+    run(async () => { ui.tasks = await mutateTasks((list) => list.map((t, k) => (k === index ? { ...t, enabled: box.checked } : t))); note(box.checked ? 'Bật tác vụ CRM' : 'Tắt tác vụ CRM', ui.tasks[index]?.tab_name); });
   });
 
   return {

@@ -1,10 +1,11 @@
+import { stampNow } from '../audit.js';
 import { html } from '../dom.js';
 import { badge } from './components.js';
 import { ROLES, GENDERS, canManage } from '../directory.js';
 import { monthLabel } from '../format.js';
 import { DATE_MODES, modeOf, resolveRange } from '../crm.js';
 
-const SECTIONS = [['accounts', 'Tài khoản'], ['links', 'Cấu hình'], ['crm', 'Đồng bộ CRM'], ['call', 'Xuất Call']];
+const SECTIONS = [['accounts', 'Tài khoản'], ['links', 'Cấu hình'], ['crm', 'Đồng bộ CRM'], ['call', 'Xuất Call'], ['audit', 'Nhật ký']];
 const SERVER_COMMAND = '<thư-mục-tool>/venv/bin/python3 server.py 8080';
 const short = (text, n = 40) => (text.length > n ? `${text.slice(0, n)}…` : text);
 const ROLE_TONE = { admin: 'good', manager: 'warn', member: 'neutral' };
@@ -255,8 +256,39 @@ const callSection = (ui) => html`${serverCard(ui.status, ui.serverError)}${cooki
 })}`;
 
 /** Chỉ Admin được vào Cấu hình, Đồng bộ CRM và Xuất Call; Quản trị chỉ thấy Tài khoản. */
-export const ADMIN_ONLY = ['links', 'crm', 'call'];
-const BODY = { accounts: accountsSection, links: linksSection, crm: crmSection, call: callSection };
+export const ADMIN_ONLY = ['links', 'crm', 'call', 'audit'];
+
+/* ---------- Nhật ký thao tác (Admin) ---------- */
+const ACTION_TONE = (a) => (/^Xóa|^Tắt/.test(a) ? 'bad' : /^Thêm|^Bật|^Chạy|^Đồng bộ|^Xuất/.test(a) ? 'good' : /cookie/i.test(a) ? 'warn' : 'neutral');
+const auditSection = (ui) => {
+  const a = ui.audit, opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
+  const actions = [...new Set(a.rows.map((r) => r.action))].sort(), people = [...new Set(a.rows.map((r) => r.by))].sort();
+  const q = a.q.trim().toLowerCase();
+  const rows = a.rows.filter((r) => (a.action === 'all' || r.action === a.action) && (a.who === 'all' || r.by === a.who) && (!q || `${r.object} ${r.detail} ${r.action}`.toLowerCase().includes(q)));
+  const today = stampNow().slice(0, 10), day = (r) => r.at.slice(0, 10);
+  return html`
+    <div class="toolbar"><h2 class="section-title">Nhật ký thao tác</h2>
+      <p class="muted">Ghi lại việc nhạy cảm: đồng bộ CRM, xuất call, thêm/sửa/xóa tài khoản và link, đặt/xóa cookie, tác vụ CRM. Không lưu nội dung cookie. Chỉ Admin xem được; dữ liệu nằm ở tab "Nhật ký thao tác" của Sheet cấu hình.</p></div>
+    ${notice({ error: a.error })}
+    <div class="grid">
+      <div class="card"><h3 class="card__title">Tổng số dòng</h3><p class="big num">${a.rows.length}</p><p class="muted">${a.loaded ? 'Đã tải từ Sheet' : 'Chưa tải'}</p></div>
+      <div class="card"><h3 class="card__title">Hôm nay</h3><p class="big num">${a.rows.filter((r) => day(r) === today).length}</p><p class="muted">Thao tác trong ngày</p></div>
+      <div class="card"><h3 class="card__title">Người thao tác</h3><p class="big num">${people.length}</p><p class="muted">Tài khoản khác nhau</p></div>
+    </div>
+    <div class="filters" aria-label="Lọc nhật ký">
+      <label class="filter"><span>Hành động</span><select class="select" data-audit="action">${opt('all', 'Tất cả', a.action)}${actions.map((x) => opt(x, x, a.action))}</select></label>
+      <label class="filter"><span>Người thực hiện</span><select class="select" data-audit="who">${opt('all', 'Tất cả', a.who)}${people.map((x) => opt(x, x, a.who))}</select></label>
+      <label class="filter filter--grow"><span>Tìm</span><input class="search" type="search" data-audit="q" placeholder="Đối tượng, chi tiết…" value="${a.q}"></label>
+      <button class="btn btn--ghost" type="button" data-act="audit-reload" ${a.loading ? 'disabled' : ''}>${a.loading ? 'Đang tải…' : 'Tải lại'}</button>
+    </div>
+    <p class="muted">${rows.length} dòng${rows.length > 300 ? ' (hiển thị 300 dòng mới nhất)' : ''}.</p>
+    <div class="table-wrap"><table class="connect-table">
+      <thead><tr><th scope="col">Thời điểm</th><th scope="col">Người thực hiện</th><th scope="col">Hành động</th><th scope="col">Đối tượng</th><th scope="col">Chi tiết</th></tr></thead>
+      <tbody>${rows.slice(0, 300).map((r) => html`<tr class="static"><td class="num">${r.at}</td><td>${r.by}</td><td>${badge(ACTION_TONE(r.action), r.action)}</td><td>${r.object || html`<span class="muted">—</span>`}</td><td class="muted">${r.detail}</td></tr>`)}</tbody>
+    </table></div>`;
+};
+
+const BODY = { accounts: accountsSection, links: linksSection, crm: crmSection, call: callSection, audit: auditSection };
 
 export const settingsView = (ui) => html`
   <div class="toolbar">

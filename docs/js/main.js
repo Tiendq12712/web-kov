@@ -12,6 +12,10 @@ import { callScoreView } from './views/callScores.js';
 import { listenView } from './views/listen.js';
 import { loadHeard, saveHeard, heardKey } from './heard.js';
 import { computeAlerts } from './alerts.js';
+import { logAction } from './audit.js';
+import { todayView } from './views/today.js';
+import { openItems, myScores, myControl, myTrend } from './today.js';
+import { wallNow } from './slaDetail.js';
 import { jobTypeView } from './views/jobType.js';
 import { teamView, rowsView } from './views/team.js';
 import { detailView } from './views/detail.js';
@@ -158,7 +162,8 @@ function buildNav() {
   if (manager && hasDetail()) analysis.push(item('segment', 'Phân tích tệp data', 'Tệp data', 'Công việc, kết nối, impact, add-on theo nguồn data'));
   if (manager && (hasCalls() || hasReport(state.month))) analysis.push(item('connect', 'Chất lượng kết nối', 'Kết nối', 'Tỉ lệ kết nối và call đàm thoại ngắn'));
   if (manager && monthList.length > 1) analysis.push(item('compare', 'So sánh tháng', 'So sánh', 'Đặt hai tháng cạnh nhau'));
-  return [item('overview', 'Tổng quan'), group('team', 'Team', 'team', teams), group('ops', 'Vận hành', 'report', reports), group('analysis', 'Phân tích', 'trend', analysis),
+  const me = findMember(state.me.email, d.teams, state.me.name, state.me.code) ? [item('me', 'Hôm nay của tôi', 'Hôm nay')] : [];   // trang riêng cho người có trong báo cáo KPI
+  return [item('overview', 'Tổng quan'), ...me, group('team', 'Team', 'team', teams), group('ops', 'Vận hành', 'report', reports), group('analysis', 'Phân tích', 'trend', analysis),
     hasLibrary() ? item('library', 'Thư viện') : null, item('chat', 'Chia sẻ')].filter(Boolean);
 }
 
@@ -380,6 +385,35 @@ const renderReport = () => lazyTab(state.report, 'report', loadReport, (data) =>
 
 const canSettings = () => canOpenSettings(state.me?.role);
 
+/** Tải dần dữ liệu cho trang "Hôm nay của tôi" (data chi tiết của tháng, chấm call, lịch sử); phần nào xong thì vẽ lại. */
+function ensureTodayData() {
+  const month = state.month;
+  const load = (slice, loader, apply, ok = () => true) => {
+    if (slice.data || slice.loading || slice.error) return;
+    slice.loading = true;
+    loader().then((d) => { if (ok()) apply(d); }).catch((err) => { if (err.code === 'auth') authLost(err.message); else slice.error = err.message; })
+      .finally(() => { slice.loading = false; if (state.tab === 'me') renderView(); });
+  };
+  if (hasDetail()) load(state.segmentM, () => loadDetailFor([month]), (d) => { state.segmentM.data = d; }, () => month === state.month);
+  if (hasScores()) load(state.callctl, loadScores, (d) => { state.callctl.data = d; });
+  load(state.trend, loadHistory, (d) => { state.trend.data = d; });
+}
+
+function renderToday(report) {
+  ensureTodayData();
+  const found = findMember(state.me.email, state.data.teams, state.me.name, state.me.code);
+  if (!found) return todayView({ found: null });
+  const code = found.member.code, detail = state.segmentM.data, now = wallNow();
+  const todoItems = buildTodo({ me: { ...state.me, role: 'member' }, found, data: state.data, report: state.report.data, pbi: state.cinfo.data, unread: chat.unread(), control: null, alerts: [] });   // việc của riêng bạn, kể cả khi bạn là quản lý
+  return todayView({
+    me: state.me, found, report, todoItems, month: state.month, hasScores: hasScores(),
+    open: hasDetail() && !state.segmentM.error ? (detail ? openItems(detail.rows, code, now) : null) : undefined,
+    control: hasDetail() && !state.segmentM.error ? (detail ? myControl(detail.rows, state.month, code) : null) : undefined,
+    scores: hasScores() && !state.callctl.error ? (state.callctl.data ? myScores(state.callctl.data.rows, code) : null) : undefined,
+    trend: state.trend.error ? undefined : (state.trend.data ? myTrend(state.trend.data, code) : null),
+  });
+}
+
 /** Trang đang mở -> { view, title }. */
 function currentPage() {
   const t = team();
@@ -387,6 +421,7 @@ function currentPage() {
     state.todo = buildTodo({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, report: state.report.data, pbi: state.cinfo.data, unread: chat.unread(), control: todoControl(), alerts: todoAlerts() });
   }
   const report = preloadReport();   // ngày công và năng suất lấy từ file năng suất, nên luôn tải nền
+  if (state.tab === 'me') return { view: renderToday(report), title: 'Hôm nay của tôi' };
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
   if (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'xfer', loadDetail, (d) => withQuality('xfer', d, transferView({ rows: d.rows, months: d.months }, state.xfer))), title: 'Chuyển Offline → Online' };
@@ -420,7 +455,7 @@ function currentPage() {
 }
 
 /** Tab phụ thuộc vào tháng đang xem (Tổng quan, các team, Công việc, SLA, Năng suất) mới có ô chọn tháng; các tab khác (Customer Info, Xu hướng, So sánh, Chia sẻ, Thiết lập) thì không. */
-const isMonthly = (tab) => ['overview', 'work', 'sla', 'report', 'control'].includes(tab) || (tab === 'connect' && !hasCalls()) || Boolean(state.data?.teams.some((t) => t.id === tab));
+const isMonthly = (tab) => ['overview', 'me', 'work', 'sla', 'report', 'control'].includes(tab) || (tab === 'connect' && !hasCalls()) || Boolean(state.data?.teams.some((t) => t.id === tab));
 
 /** Ô chọn tháng nằm trong nội dung của tab (không đặt ở thanh trên cùng). */
 function monthBar() {
@@ -485,7 +520,7 @@ async function setMonth(ym, { boot = false } = {}) {
   Object.assign(state.report, { data: report, error: '', query: '' });
   Object.assign(state.segmentM, { data: null, error: '', loading: false });   // chi tiết data theo tháng: tải lại cho tháng mới
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
+  const validTab = (state.tab === 'me' && findMember(state.me.email, state.data.teams, state.me.name, state.me.code)) || (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -821,7 +856,7 @@ async function saveHistory() {
   return n;
 }
 async function recordHistoryNow() {
-  try { await saveHistory(); } catch (err) { state.trend.error = `Không lưu được lịch sử: ${err.message}`; }
+  try { const n = await saveHistory(); logAction(state.me?.email, 'Lưu lịch sử số liệu', latestAsOf(state.data), `${n} nhân sự (thủ công)`).catch(() => {}); } catch (err) { state.trend.error = `Không lưu được lịch sử: ${err.message}`; }
   renderView();
 }
 
@@ -970,7 +1005,7 @@ async function startApp() {
     // Ưu tiên đường dẫn được gửi (#/tháng/tab), rồi tới nơi đã xem lần trước, cuối cùng là Tổng quan. Tab không hợp lệ sẽ tự về Tổng quan.
     const hash = readHash(), last = readLast(state.me.email);
     const month = hash.month || last.month;
-    state.tab = hash.tab || last.tab || 'overview';
+    state.tab = hash.tab || last.tab || (state.me.role === 'member' ? 'me' : 'overview');   // nhân sự vào trang riêng của mình (nếu không hợp lệ thì tự về Tổng quan)
     await setMonth(months.some((m) => m.month === month) ? month : months[0].month, { boot: true });
   } catch (err) {
     if (err.code === 'auth') showLogin(err.message); else showError(err.message);
