@@ -10,6 +10,7 @@ import { qualityWarnings, acceptQuality } from './quality.js';
 import { analyzeControl } from './control.js';
 import { callScoreView } from './views/callScores.js';
 import { listenView } from './views/listen.js';
+import { jobTypeView } from './views/jobType.js';
 import { teamView, rowsView } from './views/team.js';
 import { detailView } from './views/detail.js';
 import { workView, workRowsView } from './views/work.js';
@@ -73,6 +74,7 @@ const state = {
   calls: { data: null, loading: false, error: '' },
   segment: { data: null, loading: false, error: '', key: '', month: 'all' },
   xfer: { month: 'all' },   // data chuyển Offline → Online (dùng chung dữ liệu chi tiết)
+  jobs: { month: null, product: 'all', job: 'T15' },   // thống kê theo loại công việc (dùng chung dữ liệu chi tiết)
   listen: { month: null, job: 'T15', person: 'all', level: 'attn' },   // gợi ý nghe lại call (dùng chung dữ liệu chi tiết)
   callctl: { data: null, loading: false, error: '', month: 'all', person: 'all' },   // kết quả chấm call (Sheet Chấm call)
   control: { rule: 'all', person: 'all' },   // kiểm soát data theo quy trình (dùng chung dữ liệu chi tiết Data Txx)
@@ -148,6 +150,7 @@ function buildNav() {
   const analysis = [];
   if (manager) analysis.push(item('trend', 'Xu hướng', 'Xu hướng', 'Biến động theo ngày'));
   if (manager && hasDetail()) analysis.push(item('xfer', 'Chuyển Offline → Online', 'Chuyển data', 'Data chuyển theo tháng, nguồn và tỉnh/thành'));
+  if (manager && hasDetail()) analysis.push(item('jobs', 'Theo loại công việc', 'Loại CV', 'So sánh CSKH T15, OI, NA: liên hệ, impact, add-on'));
   if (manager && hasDetail()) analysis.push(item('listen', 'Chọn call nghe lại', 'Nghe lại', 'Data kết nối thành công nhưng không impact, xếp mức ưu tiên'));
   if (manager && hasDetail()) analysis.push(item('segment', 'Phân tích tệp data', 'Tệp data', 'Công việc, kết nối, impact, add-on theo nguồn data'));
   if (manager && (hasCalls() || hasReport(state.month))) analysis.push(item('connect', 'Chất lượng kết nối', 'Kết nối', 'Tỉ lệ kết nối và call đàm thoại ngắn'));
@@ -355,6 +358,7 @@ function currentPage() {
   if (state.tab === 'settings') return { view: settings.view(), title: 'Thiết lập' };
   if (state.tab === 'report') return { view: renderReport(), title: 'Năng suất' };
   if (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'xfer', loadDetail, (d) => withQuality('xfer', d, transferView({ rows: d.rows, months: d.months }, state.xfer))), title: 'Chuyển Offline → Online' };
+  if (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'jobs', loadDetail, (d) => withQuality('jobs', d, jobTypeView(d, state.jobs, { names: kpiNames() }))), title: 'Theo loại công việc' };
   if (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'listen', loadDetail, (d) => withQuality('listen', d, listenView(d, state.listen, { names: kpiNames() }))), title: 'Chọn call nghe lại' };
   if (state.tab === 'callctl' && hasScores()) return { view: lazyTab(state.callctl, 'callctl', loadScores, (d) => callScoreView(d, state.callctl, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Kiểm soát call' };
   if (state.tab === 'control' && hasDetail()) return { view: lazyTab(state.segment, 'control', loadDetail, (d) => withQuality('control', d, controlView(d, state.control, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month }))), title: 'Kiểm soát' };
@@ -446,7 +450,7 @@ async function setMonth(ym, { boot = false } = {}) {
   }
   Object.assign(state.report, { data: report, error: '', query: '' });
   state.work.query = '';
-  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
+  const validTab = (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -601,6 +605,9 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('change', (e) => {
   if (e.target.id === 'xfer-month') { state.xfer.month = e.target.value; return renderView(); }
+  if (e.target.id === 'jt-month') { state.jobs.month = e.target.value; return renderView(); }
+  if (e.target.id === 'jt-product') { state.jobs.product = e.target.value; return renderView(); }
+  if (e.target.id === 'jt-job') { state.jobs.job = e.target.value; return renderView(); }
   if (e.target.id === 'ls-month') { state.listen.month = e.target.value; return renderView(); }
   if (e.target.id === 'ls-job') { state.listen.job = e.target.value; return renderView(); }
   if (e.target.id === 'ls-person') { state.listen.person = e.target.value; return renderView(); }

@@ -1137,3 +1137,27 @@ sup.half { font-size: 9px; margin-left: 2px; opacity: .85; }
 
 /* Kiểm soát call: nhận xét dài, giữ xuống dòng */
 .cs-note { white-space: pre-line; max-width: 520px; min-width: 260px; line-height: 1.4; }
+
+/* Kiểm soát call: thẻ call dễ đọc, nhận xét dài tách ý */
+.cs-list { display: grid; gap: 12px; max-width: 920px; }
+.cs-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--good-fill); border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow); }
+.cs-card--err { border-left-color: var(--bad-fill); }
+.cs-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 6px; }
+.cs-who { font-size: 15px; } .cs-when { font-weight: 600; }
+.cs-score { margin-left: auto; color: var(--warn-fill); letter-spacing: 1px; white-space: nowrap; } .cs-score .muted { opacity: .35; }
+.cs-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.cs-sec { margin-top: 8px; }
+.cs-sec h4 { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.cs-sec p { margin: 0; line-height: 1.6; }
+.cs-sec--fb { background: var(--accent-soft); border-radius: 8px; padding: 8px 12px; }
+.cs-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cs-n { line-height: 1.6; padding: 6px 10px; border-left: 3px solid var(--border); background: var(--surface-2); border-radius: 0 8px 8px 0; }
+.cs-n--pos { border-left-color: var(--good-fill); } .cs-n--neg { border-left-color: var(--warn-fill); }
+.cs-n--intro { background: none; border-left: 0; padding-left: 0; color: var(--muted); }
+.cs-n strong { color: var(--text); }
+.cs-more > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 6px 10px; background: var(--surface-2); border-radius: 8px; line-height: 1.55; }
+.cs-more > summary::-webkit-details-marker { display: none; }
+.cs-prev { color: var(--muted); flex: 1 1 320px; }
+.cs-open, .cs-close { color: var(--accent); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.cs-more[open] > summary { margin-bottom: 8px; } .cs-more[open] .cs-prev, .cs-more[open] .cs-open { display: none; } .cs-more:not([open]) .cs-close { display: none; }
+.cs-none { font-size: 13px; margin: 6px 0 0; }

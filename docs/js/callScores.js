@@ -88,3 +88,25 @@ export function analyzeCallScores(rows, { month = 'all', code = null } = {}) {
     list: [...scoped].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0)), months: [...new Set(rows.map((r) => r.month).filter(Boolean))].sort(),
   };
 }
+
+/* ---------- Trình bày nhận xét dài ---------- */
+const plain = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
+const NEG = /thieu|loi |loi:|vi pham|bao bien|can (thay doi|luu y|rut kinh nghiem)|diem can|chua |khong (ghi|luu|nhay)|sai|nen |lap lai|anh huong/;
+const POS = /\btot\b|chuan|dat\b|day du|kheo|thanh cong|dung |ghi nhan tot|lien ket boi canh tot/;
+
+/** Làm sạch ký tự thừa trong nhận xét (số trích dẫn [5], dấu ** của markdown, "&;"). */
+export const cleanNote = (text) => String(text ?? '').replace(/\[\d+\]/g, '').replace(/\*+/g, '').replace(/&;/g, '&').replace(/[ \t]{2,}/g, ' ').trim();
+
+/**
+ * Tách nhận xét thành các ý để dễ đọc: dòng đầu không gạch đầu dòng là phần mở đầu; mỗi dòng "- Nhãn: nội dung" là một ý có nhãn.
+ * Trả về [{ label, text, tone: 'pos' | 'neg' | '' , intro }].
+ */
+export function noteBlocks(text) {
+  return cleanNote(text).split(/\n+/).map((l) => l.trim()).filter(Boolean).map((line) => {
+    const bullet = /^[-•]\s*/.test(line), body = line.replace(/^[-•]\s*/, '');
+    const m = /^([^:：]{3,70}?):\s+(.+)$/s.exec(body);
+    const label = m && bullet ? m[1].trim() : '', rest = label ? m[2].trim() : body;
+    const key = plain(label || rest.slice(0, 80));
+    return { intro: !bullet, label, text: rest, tone: NEG.test(key) ? 'neg' : POS.test(key) ? 'pos' : '' };
+  });
+}

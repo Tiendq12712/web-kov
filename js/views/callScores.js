@@ -1,6 +1,7 @@
 import { html } from '../dom.js';
 import { num, pct } from '../format.js';
-import { analyzeCallScores } from '../callScores.js';
+import { analyzeCallScores, noteBlocks } from '../callScores.js';
+import { maskPhone as maskInText } from '../control.js';   // che số điện thoại khách ghi trong nhận xét
 
 const maskPhone = (t) => (t.length > 5 ? `${t.slice(0, 2)}••••${t.slice(-3)}` : t);   // số khách chỉ hiện dạng che bớt
 const score = (v) => (v == null ? '—' : v.toFixed(1).replace('.', ','));
@@ -11,6 +12,18 @@ const dmy = (iso) => (iso ? iso.split('-').reverse().join('/') : '—');
 const stat = (title, value, sub, tone = '') => html`<div class="card sla-stat ${tone ? `sla-stat--${tone}` : ''}"><h3 class="card__title">${title}</h3><p class="big num">${value}</p><p class="muted">${sub}</p></div>`;
 const bar = (v, max, tone = '') => html`<div class="bar ${tone ? `bar--${tone}` : ''}"><div class="bar__fill" style="width:${max ? Math.min(100, (v / max) * 100) : 0}%"></div></div>`;
 const errBadge = (rate) => (rate == null ? html`<span class="muted">—</span>` : html`<span class="badge badge--${rate === 0 ? 'good' : rate <= 0.3 ? 'warn' : 'bad'}">${p1(rate)}</span>`);
+
+const noteList = (blocks) => html`<ul class="cs-notes">${blocks.map((b) => html`<li class="cs-n ${b.tone ? `cs-n--${b.tone}` : ''} ${b.intro ? 'cs-n--intro' : ''}">${b.label ? html`<strong>${b.label}:</strong> ` : ''}${b.text}</li>`)}</ul>`;
+/** Nhận xét: ngắn thì hiện thẳng, dài (trên ~350 ký tự) thì gập lại, bấm "Xem đầy đủ" để mở. */
+const noteView = (text) => {
+  const blocks = noteBlocks(maskInText(text));
+  if (!blocks.length) return '';
+  const total = blocks.reduce((n, b) => n + b.label.length + b.text.length, 0);
+  if (total <= 350) return noteList(blocks);
+  const first = blocks[0], preview = `${first.label ? `${first.label}: ` : ''}${first.text}`;
+  return html`<details class="cs-more"><summary><span class="cs-prev">${preview.length > 150 ? `${preview.slice(0, 150)}…` : preview}</span><span class="cs-open">Xem đầy đủ (${blocks.length} ý)</span><span class="cs-close">Thu gọn</span></summary>${noteList(blocks)}</details>`;
+};
+const stars = (v) => (v ? html`<span class="cs-score" title="Điểm đánh giá ${v}">${'★'.repeat(v)}<span class="muted">${'★'.repeat(Math.max(0, 5 - v))}</span></span>` : '');
 
 /** Tab Kiểm soát call: kết quả chấm chất lượng cuộc gọi (Sheet "Chấm call"); nhân sự chỉ thấy các call của mình. */
 export function callScoreView(data, ui, { manager, code, names }) {
@@ -61,12 +74,16 @@ export function callScoreView(data, ui, { manager, code, names }) {
       <tbody>${a.items.slice(0, 20).map((i) => html`<tr class="static"><td class="sticky-col"><strong>${i.text}</strong></td><td class="muted">${i.cat}</td><td class="right">${i.pct ? `${i.pct}%` : '—'}</td><td class="right num strong">${num(i.count)}</td><td>${bar(i.count, maxItem, 'warn')}</td></tr>`)}</tbody>
     </table></div>` : html`<p class="notice notice--good">Chưa có lỗi nào được ghi nhận trong kỳ này. 🎉</p>`}
     <div class="toolbar"><h2 class="section-title">Chi tiết call đã chấm</h2><p class="muted">${num(a.list.length)} call${a.list.length > shown.length ? ` (hiển thị ${num(shown.length)} call mới nhất)` : ''}, gồm lỗi, nhận xét và góp ý của người chấm.</p></div>
-    <div class="table-wrap"><table class="connect-table">
-      <thead><tr><th scope="col">Tạo Activity</th>${manager ? html`<th scope="col" class="sticky-col">Nhân sự</th>` : ''}<th scope="col">Số liên hệ</th><th scope="col" class="right">Điểm</th><th scope="col">Lỗi · đánh giá</th><th scope="col">Nhận xét · Góp ý</th></tr></thead>
-      <tbody>${shown.map((r) => html`<tr class="static"><td class="num">${dmy(r.date)}${r.scoredDate && r.scoredDate !== r.date ? html`<br><small class="muted">chấm ${dmy(r.scoredDate)}</small>` : ''}</td>${manager ? html`<td class="sticky-col"><strong>${nameOf(r)}</strong></td>` : ''}
-        <td class="num muted">${r.phone ? maskPhone(r.phone) : r.activityId}${r.retailer ? html`<br><small>Retailer ${r.retailer}</small>` : ''}</td>
-        <td class="right num strong">${r.score || html`<span class="muted">—</span>`}</td>
-        <td>${r.errors.map((e) => html`<span class="badge badge--bad" title="${e.cat}">${e.text} (${e.pct}%)</span> `)}${r.ratings.map((x) => html`<span class="badge badge--good" title="${x.cat}">${x.text}</span> `)}${r.bonus.map((b) => html`<span class="badge badge--good">+ ${b.text}${b.pct ? ` (+${b.pct}%)` : ''}</span> `)}${!r.errors.length && !r.ratings.length && !r.bonus.length ? html`<span class="muted">—</span>` : ''}</td>
-        <td class="muted cs-note">${r.note}${r.note && r.feedback ? html`<br>` : ''}${r.feedback ? html`<em>${r.feedback}</em>` : ''}</td></tr>`)}</tbody>
-    </table></div>`;
+    <div class="cs-list">${shown.map((r) => html`<article class="cs-card ${r.errors.length ? 'cs-card--err' : ''}">
+      <header class="cs-head">
+        <span class="cs-when num">${dmy(r.date)}${r.scoredDate && r.scoredDate !== r.date ? html`<small class="muted"> · chấm ${dmy(r.scoredDate)}</small>` : ''}</span>
+        ${manager ? html`<strong class="cs-who">${nameOf(r)}</strong>` : ''}
+        <span class="muted num">${r.phone ? maskPhone(r.phone) : r.activityId}${r.retailer ? ` · Retailer ${r.retailer}` : ''}</span>
+        ${stars(r.score)}
+      </header>
+      ${r.errors.length || r.ratings.length || r.bonus.length ? html`<div class="cs-tags">${r.errors.map((e) => html`<span class="badge badge--bad" title="${e.cat}">${e.text} (${e.pct}%)</span> `)}${r.ratings.map((x) => html`<span class="badge badge--good" title="${x.cat}">${x.text}</span> `)}${r.bonus.map((b) => html`<span class="badge badge--good">+ ${b.text}${b.pct ? ` (+${b.pct}%)` : ''}</span> `)}</div>` : ''}
+      ${r.note ? html`<div class="cs-sec"><h4>Nhận xét</h4>${noteView(r.note)}</div>` : ''}
+      ${r.feedback ? html`<div class="cs-sec cs-sec--fb"><h4>Góp ý</h4><p>${maskInText(r.feedback)}</p></div>` : ''}
+      ${!r.note && !r.feedback ? html`<p class="muted cs-none">Chưa có nhận xét hoặc góp ý.</p>` : ''}
+    </article>`)}</div>`;
 }

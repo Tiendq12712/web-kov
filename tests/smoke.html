@@ -136,6 +136,24 @@ await test('Chấm call: đọc lỗi/điểm cộng, tính điểm trừ và t�
   eq(cs.parseCallScores([['Cột', 'Khác'], ['a', 'b']]), [], 'tab không phải form chấm call');
 });
 
+await test('Chấm call: tách nhận xét dài thành từng ý, bỏ ký tự thừa', () => {
+  const b = cs.noteBlocks('Case này gọi 2 lần\n- Liên kết bối cảnh tốt: SC nhớ vấn đề cũ[5][24].\n- Điểm cần lưu ý: KH chưa vận hành, **nên** ghi lịch hẹn &; hỗ trợ');
+  eq(b.length, 3); eq(b[0].intro, true); eq(b[1].label, 'Liên kết bối cảnh tốt'); eq(b[1].tone, 'pos'); eq(b[2].tone, 'neg');
+  eq(b[1].text.includes('['), false, 'bỏ số trích dẫn'); eq(b[2].text, 'KH chưa vận hành, nên ghi lịch hẹn & hỗ trợ'); eq(cs.noteBlocks('').length, 0);
+});
+
+const jt = await import(`${root}js/jobType.js`);
+await test('Theo loại công việc: nhóm T15/OI, ngành hàng, tỉ lệ không nghe máy', () => {
+  const mk = (job, product, contact, o = {}) => ({ month: '2026-10', jobType: job, product, status: 'Đã làm', contact, impact: false, handler: '1001 - An - CS', tasks: [], add: [], ...o });
+  const rows = [mk('CSKH T15 - DVKH', 'Fnb', 'Kết nối thành công', { impact: true, tasks: ['Tư vấn tính năng'] }), mk('CSKH T15 - DVKH', 'FnB', 'Không nghe máy'), mk('CSKH T15 - DVKH', 'FnB', ''), mk('CSKH T15 - DVKH', 'Retail', 'Không nghe máy'), mk('CSKH OI - DVKH', 'FnB', 'Kết nối thành công'), mk('CSKH T15 - DVKH', 'FnB', 'Không nghe máy', { status: 'Hủy' })];
+  eq(jt.jobKey('CSKH T15 - DVKH'), 'T15'); eq(jt.industryOf('Fnb'), 'FnB'); eq(jt.industryOf(''), 'Chưa phân loại');
+  const a = jt.analyzeJobTypes(rows, { month: '2026-10', product: 'FnB', job: 'T15' });
+  const t15 = a.byJob.find((j) => j.job === 'T15');
+  eq([t15.n, t15.contacted, t15.noAnswer, t15.cancel], [4, 2, 1, 1], 'T15 FnB: 4 data (kể cả 1 hủy), 2 đã liên hệ, 1 không nghe máy; data hủy không tính liên hệ');
+  eq(t15.noAnswerRate, 0.5); eq(a.matrix.find((m) => m.job === 'T15').cells.Retail.noAnswerRate, 1);
+  eq(a.tasks.map((t) => t.task), ['(Chưa ghi công việc hỗ trợ)', 'Tư vấn tính năng']); eq(a.tasks[1].impactRate, 1); eq(a.byJob.length, 2);
+});
+
 const ls = await import(`${root}js/listen.js`);
 await test('Nghe lại call: chọn data kết nối nhưng không impact và xếp mức ưu tiên', () => {
   const mk = (retailer, desc, o = {}) => ({ month: '2026-10', jobType: 'CSKH T15 - DVKH', status: 'Đã làm', contact: 'Kết nối thành công', impact: false, handler: '1001 - An - CS', retailer, desc, satisfaction: 0, modifiedTs: 1, calls: 1, ...o });
