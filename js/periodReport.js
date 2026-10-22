@@ -11,6 +11,7 @@ import { series } from './history.js';
 import { analyzeCallScores, QUALITY } from './callScores.js';
 import { analyzeListen } from './listen.js';
 import { heardKey } from './heard.js';
+import { taskStats } from './tasks.js';
 
 const nf = new Intl.NumberFormat('vi-VN');
 const n = (v) => (v == null ? '' : nf.format(v));
@@ -34,6 +35,7 @@ export function buildPeriodReport({ data, rows = null, period = 'month', now = n
   const inRange = (iso) => iso && iso >= from && iso <= (week ? asOf : `${data.month}-31`);
   const sc = scores ? analyzeCallScores(scores.filter((r) => inRange(r.date)), {}) : null;   // call chấm theo thời gian tạo Activity trong kỳ
   const ls = scoped ? analyzeListen(scoped, { month: 'all', job: 'all' }) : null;           // data kết nối nhưng không impact trong kỳ
+  const tk = scoped ? taskStats(scoped.filter((r) => r.status !== 'Hủy')) : null;   // công việc hỗ trợ trong kỳ
   const heardCount = ls ? ls.items.filter((i) => heard?.has(heardKey(i.r.retailer, i.r.modifiedTs))).length : 0;
   const range = week ? `${dmy(from)} – ${dmy(asOf)}` : mlabel(data.month);
   const sections = [], charts = [], insights = [], cards = [];
@@ -79,6 +81,7 @@ export function buildPeriodReport({ data, rows = null, period = 'month', now = n
   if (scores) insights.push(sc?.total
     ? `Chấm call trong kỳ: ${n(sc.total)} call, ${n(sc.quality.urgent)} call cần chấn chỉnh ngay và ${n(sc.quality.weak)} call chưa tốt${sc.avgScore != null ? `; điểm đánh giá trung bình ${sc.avgScore.toFixed(1).replace('.', ',')}` : ''}.`
     : 'Chưa có call nào được chấm trong kỳ báo cáo.');
+  if (tk?.list.length) insights.push(`${n(tk.withTask)} / ${n(tk.done)} data đã làm có ghi công việc hỗ trợ (${p(tk.withTaskRate)}); công việc nhiều nhất: ${tk.list[0].task} (${n(tk.list[0].n)} lần).`);
   if (ls?.conn) insights.push(`${n(ls.noImpact)} / ${n(ls.conn)} data kết nối thành công nhưng không impact (${p(ls.noImpact / ls.conn)}); ${n(ls.high)} data mức Cao nên nghe lại${ls.contradict ? `, trong đó ${n(ls.contradict)} data ghi chú như chưa nghe máy nhưng chọn "Kết nối thành công"` : ''}${heard ? `; đã nghe ${n(heardCount)} data` : ''}.`);
 
   /* ---- Biểu đồ ---- */
@@ -87,6 +90,7 @@ export function buildPeriodReport({ data, rows = null, period = 'month', now = n
     if (pts.length >= 2) charts.push({ kind: 'line', title, note, labels: pts.map((x) => dmy(x.date).slice(0, 5)), values: pts.map((x) => x.value), pct: pctFmt });
   };
   dayLine('kpi', 'KPI toàn đội theo ngày', 'Trung bình KPI các nhân sự, theo bản chụp mỗi lần đồng bộ', true);
+  if (tk?.list.length) charts.push({ title: 'Công việc hỗ trợ', note: `${n(tk.withTask)} / ${n(tk.done)} data đã làm có ghi công việc`, scale: tk.list[0].n, items: tk.list.slice(0, 8).map((t) => ({ label: t.task, value: t.n, text: n(t.n), tone: 'info' })), wide: true });
   dayLine('late', 'Data trễ SLA theo ngày', 'Tổng data trễ SLA toàn đội (càng thấp càng tốt)', false);
   charts.push({ title: 'KPI theo nhân sự', note: `Vạch đứng = thời gian đã qua (${p(s.elapsed, 0)})`, scale: Math.max(1, ...people.map((x) => x.m.kpi ?? 0)), mark: s.elapsed,
     items: ranked.map((x) => ({ label: nameOf(x.m), value: x.m.kpi ?? 0, text: p(x.m.kpi, 0), tone: x.status.key })) });
@@ -129,6 +133,10 @@ export function buildPeriodReport({ data, rows = null, period = 'month', now = n
       foot: ['Toàn đội', n(ctl.total), n(ctl.flaggedCount), p(ctl.errRate)] });
     sections.push({ title: 'Lỗi theo quy tắc', head: ['Quy tắc', 'Số data'], rows: ctl.byRule.map((r) => [r.rule.label ?? r.rule.id, n(r.count)]) });
   }
+  if (tk?.list.length) sections.push({ title: `Công việc hỗ trợ (${range})`, head: ['Công việc hỗ trợ', 'Số lần', '% data đã làm', 'Tỉ lệ kết nối', 'Tỉ lệ impact'],
+    rows: tk.list.slice(0, 15).map((t) => [t.task, n(t.n), p(t.share), p(t.connRate), p(t.impactRate)]),
+    tones: tk.list.slice(0, 15).map((t) => [null, null, null, null, t.impactRate == null ? null : t.impactRate >= 0.9 ? 'good' : t.impactRate < 0.5 ? 'warn' : null]),
+    foot: ['Tổng', n(tk.totalTasks), p(tk.withTaskRate), '', ''] });
   if (sc?.total) {
     const byUrgent = [...sc.people].sort((a, b) => b.urgent - a.urgent || b.weak - a.weak || (b.avgPenalty ?? 0) - (a.avgPenalty ?? 0));
     sections.push({ title: `Kiểm soát call (${range})`, head: ['Nhân sự', 'Call đã chấm', 'Cần chấn chỉnh', 'Chưa tốt', 'Điểm trừ TB', 'Điểm đánh giá TB'],

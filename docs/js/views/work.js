@@ -4,6 +4,8 @@ import { chartCard, groupedColumns, lineChart } from './charts.js';
 import { heatClass, heatLegend, mean } from './heat.js';
 import { stackRow, legendList as legend } from './components.js';
 import { contactDonut, sourceDonut } from './donuts.js';
+import { taskStats } from '../tasks.js';
+import { taskChart } from './tasks.js';
 
 /** Các bảng ma trận (nhân sự × ngày) có thể chuyển qua lại. */
 const MATRICES = {
@@ -92,6 +94,12 @@ function dailyChart(work, selected) {
 
 /** Ngành hàng theo cột Product của data chi tiết (gộp FnB/Fnb; ô trống là "Chưa phân loại"). */
 const industryOf = (r) => { const p = (r.product || '').trim().toLowerCase(); return p === 'fnb' ? 'FnB' : p === 'retail' ? 'Retail' : p === 'booking' ? 'Booking' : p ? r.product : 'Chưa phân loại'; };
+/** Công việc hỗ trợ của data trong tháng (lọc theo nhân sự đang chọn như biểu đồ ngành hàng). */
+const codeOfHandler = (h) => /^(\d+)\s*-/.exec(h)?.[1] ?? '';
+export const tasksChart = (industry, selectedCode) => {
+  if (!industry?.rows) return taskChart(industry === undefined ? undefined : null);
+  return taskChart(taskStats(industry.rows.filter((r) => r.month === industry.month && (!codeOfHandler(r.handler) ? selectedCode('') : selectedCode(codeOfHandler(r.handler))) && r.status !== 'Hủy')));
+};
 export const industryChart = (work, industry, selectedCode) => {
   if (!industry?.rows) return html`<p class="muted">${industry === undefined ? 'Chưa có dữ liệu chi tiết (tab "Data Txx") để thống kê ngành hàng.' : 'Đang tải dữ liệu chi tiết…'}</p>`;
   const codeOf = (h) => /^(\d+)\s*-/.exec(h)?.[1] ?? '';
@@ -248,6 +256,7 @@ export function workView(work, ui, people, teams, industry) {
       ${chartCard('Tiến độ xử lý theo nhân sự', progressChart(rows), 'Tỉ lệ data đã làm / đang làm / chưa làm trên tổng data được chia.')}
       ${chartCard('Tình trạng liên hệ theo nhóm CSKH', contactChart(work.contact), 'Kết quả cuộc gọi của data đã làm; số bên phải là tỉ lệ kết nối thành công.')}
       ${chartCard('Data được chia và còn tồn theo ngày', dailyChart(work, selected), 'Cột vàng càng thấp so với cột xanh là ngày đó được xử lý càng tốt.')}
+      ${chartCard('Công việc hỗ trợ', tasksChart(industry, selected), 'Công việc nhân sự đã làm cho data (cột Công việc hỗ trợ), theo bộ lọc team/nhân sự đang chọn.')}
       ${chartCard('Data theo ngành hàng', industryChart(work, industry, selected), 'Theo cột Product của data chi tiết: số data tạo mỗi ngày và kết quả xử lý từng ngành hàng (FnB và Fnb được gộp).')}
       ${chartCard('Số cuộc gọi trên mỗi ACT', callsDistribution(work, selected), 'Tỉ lệ ACT cần 1, 2, 3… cuộc gọi để xử lý xong.')}
       ${chartCard('Nguồn data theo nhân sự', sourcesChart(work, rows), 'Data nhận từ các nhóm CSKH T15, NA, OI.')}

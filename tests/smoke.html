@@ -69,6 +69,30 @@ const detail = seg.parseDetail([header, row('111', 'Chuyển đổi từ Offline
 await test('Đọc data chi tiết: nhận dòng chuyển Offline→Online và tỉnh/thành', () => {
   eq(detail.length, 4); eq(detail.filter((r) => r.transfer).length, 3); eq(detail[0].province, 'Tỉnh Hà Nội'); eq(detail[1].province, '');
 });
+await test('Chuyển data: kết nối thành công và impact của data chuyển so với data thường', () => {
+  const mkx = (transfer, contact, impact, status = 'Đã làm', month = 'T10') => ({ month, transfer, contact, impact, status, province: 'Tỉnh Hà Nội', retailer: String(Math.random()), source: 'NA', product: 'FnB', jobType: 'CSKH T15 - DVKH', created: '2026-10-05' });
+  const rows = [mkx(true, 'Kết nối thành công', true), mkx(true, 'Kết nối thành công', false), mkx(true, 'Không nghe máy', false), mkx(true, '', false, 'Chưa làm'), mkx(false, 'Kết nối thành công', true), mkx(false, 'Không nghe máy', false)];
+  const a = xfer.analyzeTransfer(rows, { month: 'all' });
+  eq([a.quality.xfer.conn, a.quality.xfer.contacted, a.quality.xfer.impact, a.quality.xfer.done], [2, 3, 1, 3]); eq(Math.round(a.quality.xfer.connRate * 100), 67); eq(Math.round(a.quality.xfer.impactRate * 100), 33);
+  eq(a.quality.other.conn, 1); eq(a.quality.other.contacted, 2); eq(a.byMonth[0].q.conn, 2); eq(a.sources[0].q.impact, 1); eq(a.provs[0].q.conn, 2); eq(a.industries[0].q.conn, 2); eq(a.jobs[0].label, 'T15'); eq(a.jobs[0].q.contacted, 3);
+});
+await test('Chuyển data: chia 2 team SC Offline theo địa bàn (từ Đà Nẵng ra bắc là Miền Bắc)', () => {
+  eq(['Thành phố Hà Nội', 'Tỉnh Thanh Hóa', 'Tỉnh Nghệ An', 'Thành phố Huế', 'Thành phố Đà Nẵng', 'Thành phố Hải Phòng'].map(xfer.teamOf), Array(6).fill('Miền Bắc'));
+  eq(['Tỉnh Quảng Ngãi', 'Tỉnh Gia Lai', 'Tỉnh Khánh Hòa', 'Tỉnh Lâm Đồng', 'Thành phố Hồ Chí Minh', 'Thành phố Cần Thơ', 'Tỉnh Cà Mau', 'Tỉnh Tây Ninh'].map(xfer.teamOf), Array(8).fill('Miền Nam'));
+  eq(xfer.teamOf(''), 'Chưa có thông tin'); eq(xfer.teamOf('Tỉnh Lạ Hoắc'), 'Miền Nam', 'tên lạ xếp Miền Nam');
+  const mkt = (province, transfer = true, impact = false) => ({ month: 'T10', transfer, province, contact: 'Kết nối thành công', impact, status: 'Đã làm', tasks: impact ? ['Tư vấn tính năng'] : [], retailer: String(Math.random()), source: 'NA', product: 'FnB', jobType: 'CSKH T15 - DVKH', created: '2026-10-05' });
+  const rows = [mkt('Thành phố Hà Nội', true, true), mkt('Tỉnh Thanh Hóa'), mkt('Tỉnh Gia Lai'), mkt('Thành phố Hồ Chí Minh', true, true), mkt('Tỉnh Gia Lai', false), mkt('Thành phố Hà Nội', false)];
+  const t = Object.fromEntries(xfer.analyzeTransfer(rows, { month: 'all' }).teams.map((x) => [x.team, x]));
+  eq([t['Miền Bắc'].n, t['Miền Bắc'].total, t['Miền Nam'].n, t['Miền Nam'].total], [2, 3, 2, 3], 'data chuyển và tổng data địa bàn từng team'); eq(t['Miền Bắc'].q.impact, 1); eq(t['Miền Nam'].tasks.list[0].task, 'Tư vấn tính năng'); eq(t['Miền Bắc'].provinces.map((x) => x.n), [1, 1]); eq(t['Miền Nam'].sources[0].label, 'NA');
+});
+await test('Chuyển data: thống kê công việc hỗ trợ của data chuyển', () => {
+  const mkt = (transfer, tasks, impact, contact = 'Kết nối thành công') => ({ month: 'T10', transfer, tasks, impact, contact, status: 'Đã làm', province: '', retailer: String(Math.random()), source: 'NA', product: 'FnB', jobType: 'CSKH T15 - DVKH', created: '2026-10-05' });
+  const rows = [mkt(true, ['Tư vấn tính năng', 'Tạo ticket QA support'], true), mkt(true, ['Tư vấn tính năng'], true), mkt(true, [], false), mkt(false, ['Tư vấn tính năng'], true), mkt(false, [], false)];
+  const t = xfer.analyzeTransfer(rows, { month: 'all' }).tasks;
+  eq([t.xfer.done, t.xfer.withTask, t.xfer.totalTasks], [3, 2, 3]); eq(Math.round(t.xfer.withTaskRate * 100), 67);
+  eq(t.xfer.list.map((x) => [x.task, x.n]), [['Tư vấn tính năng', 2], ['Tạo ticket QA support', 1]], 'không liệt kê data chưa ghi công việc'); eq(t.xfer.list[0].impactRate, 1);
+  eq(t.other.withTask, 1); eq(t.other.list.find((x) => x.task === 'Tư vấn tính năng').share, 0.5);
+});
 await test('Chuyển data: bổ sung tỉnh/thành theo Retailer ID', () => {
   const a = xfer.analyzeTransfer(detail, { month: 'all' });
   eq(a.xferCount, 3); eq(a.filled, 1);
@@ -98,7 +122,7 @@ await test('Báo cáo tuần/tháng: đủ các phần theo khuôn, tuần chỉ
   eq(noDetail.sections.map((x) => x.title).slice(0, 2), ['Tổng quan', 'KPI theo nhân sự (lũy kế tháng)']); eq(noDetail.sections.length, 2);
   const rows = [...rows20(3, '2026-10-19'), ...rows20(4, '2026-10-10')];
   const wk = pr.buildPeriodReport({ data: kpiData, rows, period: 'week' }), mo = pr.buildPeriodReport({ data: kpiData, rows, period: 'month' });
-  eq(wk.sections.length, 5); eq(wk.title.startsWith('Báo cáo tuần'), true); eq(mo.title.startsWith('Báo cáo tháng'), true);
+  eq(wk.sections.length, 5, 'data mẫu không có công việc hỗ trợ nên không có phần này'); eq(wk.title.startsWith('Báo cáo tuần'), true); eq(mo.title.startsWith('Báo cáo tháng'), true);
   eq(wk.sections.find((x) => x.title.startsWith('Kiểm soát')).foot[1], '3', 'data đã làm trong tuần'); eq(mo.sections.find((x) => x.title.startsWith('Kiểm soát')).foot[1], '7', 'data đã làm trong tháng');
   eq(wk.sections[1].rows.length, 2);
 });
@@ -113,6 +137,15 @@ await test('Báo cáo tuần/tháng: thêm xu hướng, chấm call và nghe l�
   eq(wk.cards.some((c) => c.title === 'Call chấm cần chấn chỉnh'), true); eq(wk.insights.some((t) => t.includes('Chấm call trong kỳ')), true);
   const none = pr.buildPeriodReport({ data: kpiData, rows, period: 'week' });
   eq(none.charts.some((c) => c.kind === 'line'), false, 'không có lịch sử thì không vẽ xu hướng'); eq(none.sections.some((x) => x.title.startsWith('Kiểm soát call')), false);
+});
+const tk = await import(`${root}js/tasks.js`);
+await test('Công việc hỗ trợ: thống kê chung và có trong báo cáo tuần/tháng', () => {
+  const mkr = (tasks, impact, status = 'Đã làm') => ({ status, tasks, impact, contact: 'Kết nối thành công', month: 'T10', created: '2026-10-19', createdTs: Date.UTC(2026, 9, 19), modifiedTs: Date.UTC(2026, 9, 19), handler: '1001 - An - CS', add: [], desc: '' });
+  const rows = [mkr(['Tư vấn tính năng'], true), mkr(['Tư vấn tính năng', 'Tạo ticket QA support'], true), mkr([], false), mkr([], false, 'Chưa làm'), mkr(['Tư vấn setting'], true, 'Hủy')];
+  const t = tk.taskStats(rows);
+  eq([t.done, t.withTask, t.totalTasks], [3, 2, 3]); eq(t.list[0].task, 'Tư vấn tính năng'); eq(t.list[0].n, 2); eq(t.list.map((x) => x.task), ['Tư vấn tính năng', 'Tạo ticket QA support'], 'data chưa ghi công việc không thành một dòng'); eq(tk.taskStats([]).done, 0);
+  const rep = pr.buildPeriodReport({ data: kpiData, rows: rows.filter((r) => r.status !== 'Hủy'), period: 'week' });
+  eq(rep.sections.some((x) => x.title.startsWith('Công việc hỗ trợ')), true, 'báo cáo có phần công việc hỗ trợ'); eq(rep.charts.some((c) => c.title === 'Công việc hỗ trợ'), true); eq(rep.insights.some((x) => x.includes('công việc hỗ trợ')), true);
 });
 await test('Việc cần làm: nhân sự talktime thấp và lỗi Kiểm soát', () => {
   const me = { role: 'admin', email: 'a@kiotviet.com' }, base = { me, found: null, data: kpiData, report: null, pbi: null, unread: 0 };
@@ -277,7 +310,7 @@ await test('Theo loại công việc: nhóm T15/OI, ngành hàng, tỉ lệ khô
   const t15 = a.byJob.find((j) => j.job === 'T15');
   eq([t15.n, t15.contacted, t15.noAnswer, t15.cancel], [4, 2, 1, 1], 'T15 FnB: 4 data (kể cả 1 hủy), 2 đã liên hệ, 1 không nghe máy; data hủy không tính liên hệ');
   eq(t15.noAnswerRate, 0.5); eq(a.matrix.find((m) => m.job === 'T15').cells.Retail.noAnswerRate, 1);
-  eq(a.tasks.map((t) => t.task), ['(Chưa ghi công việc hỗ trợ)', 'Tư vấn tính năng']); eq(a.tasks[1].impactRate, 1); eq(a.byJob.length, 2);
+  eq(a.tasks.map((t) => t.task), ['Tư vấn tính năng'], 'không liệt kê data chưa ghi công việc'); eq(a.tasks[0].impactRate, 1); eq(a.byJob.length, 2);
 });
 
 const ls = await import(`${root}js/listen.js`);
@@ -292,6 +325,52 @@ await test('Nghe lại call: chọn data kết nối nhưng không impact và x�
   eq(a.items.find((i) => i.r.retailer === '8').signals.includes('complaint'), true);
   eq(ls.writtenPart('Khách ổn 0971849159 20/10 - retailer_id: 501 - x'), 'Khách ổn');
   eq(ls.analyzeListen(rows, { month: '2026-10', job: 'all' }).conn, 6);
+});
+
+// 4. Cả ứng dụng với phiên đăng nhập giả và Google Sheets giả (dữ liệu bịa): mở lần lượt các tab, không được có lỗi chạy.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { bootApp } = await import(`${root}tests/app-harness.js`), { CONFIG: CFG } = await import(`${root}js/config.js`);
+await test('Ứng dụng (Admin): khởi động và mở mọi tab không lỗi', async () => {
+  const app = await bootApp({ root, email: 'admin@kiotviet.com', configId: CFG.configSheet });
+  try {
+    eq(app.ok, true, `khởi động xong (lỗi: ${app.errors().join(' | ')})`);
+    eq(app.doc.getElementById('tabs').textContent.includes('Vận hành'), true, 'có nhóm Vận hành'); eq(app.doc.getElementById('tabs').textContent.includes('Phân tích'), true);
+    const expect = { overview: 'Toàn bộ nhân sự', work: 'Công việc hỗ trợ', sla: 'SLA', 'online-hcm': 'Nguyễn Văn An', control: 'Kiểm soát', callctl: 'Kiểm soát call', jobs: 'loại công việc', listen: 'nghe lại', xfer: 'Offline', segment: 'tệp data', trend: 'Xu hướng', settings: 'Thiết lập' };
+    for (const [tab, text] of Object.entries(expect)) {
+      const before = app.errors().length, done = await app.open(tab);
+      eq(done, true, `tab ${tab} vẽ xong`); eq(app.errors().slice(before), [], `tab ${tab} không lỗi`);
+      eq(app.view().textContent.toLowerCase().includes(text.toLowerCase()), true, `tab ${tab} có nội dung "${text}": ${app.view().textContent.slice(0, 120)}`);
+    }
+  } finally { app.stop(); }
+});
+await test('Ứng dụng (Nhân sự): vào trang "Hôm nay của tôi", xem Tổng quan, Kiểm soát, Kiểm soát call', async () => {
+  const app = await bootApp({ root, email: 'member@kiotviet.com', configId: CFG.configSheet });
+  try {
+    eq(app.ok, true, `khởi động xong (lỗi: ${app.errors().join(' | ')})`);
+    await sleep(1500);   // các khối của trang riêng tải dần
+    eq(app.view().textContent.includes('KPI tháng của bạn'), true, 'trang mặc định của nhân sự là Hôm nay của tôi'); eq(app.view().textContent.includes('Nguyễn Văn An') || app.view().textContent.includes('An!'), true);
+    for (const tab of ['overview', 'control', 'callctl']) { const before = app.errors().length; eq(await app.open(tab), true, `tab ${tab} vẽ xong`); eq(app.errors().slice(before), [], `tab ${tab} không lỗi`); }
+    eq(app.doc.getElementById('tabs').textContent.includes('Phân tích'), false, 'nhân sự không thấy nhóm Phân tích');
+    eq(app.errors(), [], 'không lỗi chạy nào trong cả phiên');
+  } finally { app.stop(); }
+});
+
+await test('Ứng dụng (Admin): bộ lọc dùng chung, đánh dấu đã nghe, báo cáo Excel, Nhật ký, cảnh báo nền', async () => {
+  const app = await bootApp({ root, email: 'admin@kiotviet.com', configId: CFG.configSheet });
+  const change = (sel, value) => { const el = app.doc.querySelector(sel); el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); };
+  try {
+    eq(app.ok, true, 'khởi động xong');
+    await sleep(4500);   // các phần tải nền (chi tiết data, chấm call, cảnh báo) chạy xong
+    eq(app.view().textContent.includes('Việc cần làm hôm nay'), true, 'Tổng quan có thẻ Việc cần làm'); eq(app.errors(), [], 'không lỗi sau khi tải nền');
+    eq(app.view().querySelector('[data-prep]') != null, true, 'có nút xuất báo cáo'); app.click('[data-prep="month:xlsx"]'); await sleep(2500); eq(app.errors(), [], 'xuất báo cáo Excel không lỗi');
+    eq(await app.open('listen'), true, 'mở Nghe lại'); change('#ls-person', '9001'); await sleep(300);
+    eq(await app.open('callctl'), true, 'mở Kiểm soát call'); eq(app.doc.querySelector('#cs-person').value, '9001', 'nhân sự chọn ở Nghe lại được dùng chung sang Kiểm soát call');
+    await app.open('listen'); const sel = app.doc.querySelector('[data-heard-select]');
+    eq(sel != null, true, 'có data gợi ý nghe lại'); change('[data-heard-select]', 'ok'); await sleep(600); eq(app.doc.querySelector('[data-heard-select]').value, 'ok', 'kết quả nghe được giữ lại sau khi vẽ lại');
+    eq(await app.open('settings'), true); app.click('[data-act="section"][data-key="audit"]'); await sleep(900);
+    eq(app.view().textContent.includes('Nhật ký thao tác'), true, 'mở được mục Nhật ký');
+    eq(app.errors(), [], 'không lỗi chạy nào trong cả phiên');
+  } finally { app.stop(); }
 });
 
 const pass = !fails.length;

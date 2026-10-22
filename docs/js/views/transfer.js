@@ -8,6 +8,11 @@ const mlabel = (ym) => `T${Number(ym.slice(5))}/${ym.slice(2, 4)}`;
 const dm = (iso) => iso.split('-').slice(1).reverse().map(Number).join('/');
 const stat = (title, value, sub) => html`<div class="card"><h3 class="card__title">${title}</h3><p class="big num">${value}</p><p class="muted">${sub}</p></div>`;
 const bar = (v, max) => html`<div class="bar"><div class="bar__fill" style="width:${max ? (v / max) * 100 : 0}%"></div></div>`;
+/** So với data thường (không chuyển) cùng kỳ: " · cao hơn 5,2 điểm so với data thường". */
+const vs = (a, b) => (a == null || b == null ? '' : ` · ${a === b ? 'bằng' : a > b ? 'cao hơn' : 'thấp hơn'} ${a === b ? '' : `${(Math.abs(a - b) * 100).toFixed(1).replace('.', ',')} điểm `}so với data thường (${p1(b)})`);
+const tone = (a, b) => (a == null || b == null || a === b ? '' : a > b ? 'good' : 'bad');
+const q = (m) => html`<td class="right num">${num(m.conn)}</td><td class="right num">${p1(m.connRate)}</td><td class="right num">${num(m.impact)}</td><td class="right num strong">${p1(m.impactRate)}</td>`;
+const QHEAD = html`<th scope="col" class="right">Kết nối TC</th><th scope="col" class="right">Tỉ lệ kết nối</th><th scope="col" class="right">Impact</th><th scope="col" class="right">Tỉ lệ impact</th>`;
 /** Chênh lệch số data giữa tháng này và tháng liền trước. */
 const delta = (cur, prev) => { if (prev == null) return ''; const d = cur - prev; return d === 0 ? html`<small class="muted"> =</small>` : html`<small class="${d > 0 ? 'talk-bad' : 'talk-ok'}"> ${d > 0 ? '▲' : '▼'}${num(Math.abs(d))}</small>`; };
 
@@ -28,31 +33,67 @@ export function transferView(data, ui) {
     <div class="grid">
       ${stat('Data chuyển sang Online', num(a.xferCount), `${p1(a.rate)} trên ${num(a.total)} data`)}
       ${stat('Đã xử lý', num(a.done), `${p1(a.doneRate)} data chuyển đã làm`)}
+      ${stat('Kết nối thành công', num(a.quality.xfer.conn), `${p1(a.quality.xfer.connRate)} trên ${num(a.quality.xfer.contacted)} data đã liên hệ${vs(a.quality.xfer.connRate, a.quality.other.connRate)}`, tone(a.quality.xfer.connRate, a.quality.other.connRate))}
+      ${stat('Tỉ lệ impact', p1(a.quality.xfer.impactRate), `${num(a.quality.xfer.impact)} / ${num(a.quality.xfer.done)} data đã làm${vs(a.quality.xfer.impactRate, a.quality.other.impactRate)}`, tone(a.quality.xfer.impactRate, a.quality.other.impactRate))}
       ${stat('Số tỉnh/thành có data chuyển', num(a.provCount), noProvince ? `${num(noProvince.n)} data chưa có thông tin tỉnh/thành${a.filled ? ` (đã bổ sung ${num(a.filled)} data theo Retailer ID)` : ''}` : 'Tất cả data đều có tỉnh/thành')}
       ${stat('Nguồn chuyển nhiều nhất', a.sources[0]?.label ?? '—', a.sources[0] ? `${num(a.sources[0].n)} data (${p1(a.sources[0].share)} data chuyển)` : '')}
     </div>
+    <div class="toolbar"><h2 class="section-title">Theo team SC Offline: Miền Bắc và Miền Nam</h2>
+      <p class="muted">SC Offline chia 2 team theo địa bàn: từ Đà Nẵng trở ra phía bắc là <strong>Miền Bắc</strong>, phía nam Đà Nẵng là <strong>Miền Nam</strong> (theo tỉnh/thành ghi trong data). Data chưa có tỉnh/thành chưa xếp được team. "Tổng data địa bàn" là mọi data của các tỉnh thuộc team đó.</p></div>
+    <div class="table-wrap"><table class="connect-table">
+      <thead><tr><th scope="col" class="sticky-col">Team</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">% data chuyển</th><th scope="col" class="right">Tổng data địa bàn</th><th scope="col" class="right">Tỉ lệ chuyển</th><th scope="col" class="right">Đã làm</th>${QHEAD}<th scope="col" class="right">Có ghi công việc hỗ trợ</th>${data.months.map((m) => html`<th scope="col" class="right">${mlabel(m)}</th>`)}</tr></thead>
+      <tbody>${a.teams.map((t) => html`<tr class="static"><td class="sticky-col"><strong>${t.team}</strong></td><td class="right num strong">${num(t.n)}</td><td class="right num">${p1(t.share)}</td><td class="right num">${t.rate == null ? '—' : num(t.total)}</td><td class="right num">${p1(t.rate)}</td><td class="right num">${num(t.done)}</td>${q(t.q)}<td class="right num">${num(t.tasks.withTask)} <small class="muted">(${p1(t.tasks.withTaskRate)})</small></td>${data.months.map((m) => html`<td class="right num">${num(t.byMonth[m] ?? 0)}</td>`)}</tr>`)}</tbody>
+      <tfoot><tr><td class="sticky-col">Tổng</td><td class="right num">${num(a.xferCount)}</td><td class="right num">100%</td><td></td><td></td><td class="right num">${num(a.done)}</td><td></td><td></td><td></td><td></td><td></td>${data.months.map((m) => html`<td class="right num">${num(a.teams.reduce((n, t) => n + (t.byMonth[m] ?? 0), 0))}</td>`)}</tr></tfoot>
+    </table></div>
+    <div class="toolbar"><h2 class="section-title">Kết nối thành công và impact</h2><p class="muted">So data chuyển từ Offline với data thường cùng kỳ. Tỉ lệ kết nối tính trên data đã có tình trạng liên hệ (không tính Hủy); tỉ lệ impact tính trên data đã làm.</p></div>
+    <div class="table-wrap"><table class="connect-table">
+      <thead><tr><th scope="col" class="sticky-col">Nhóm data</th><th scope="col" class="right">Tổng data</th><th scope="col" class="right">Đã làm</th><th scope="col" class="right">Đã liên hệ</th>${QHEAD}<th scope="col" class="right">Kết nối không impact</th></tr></thead>
+      <tbody>${[['Data chuyển từ Offline', a.quality.xfer], ['Data thường (không chuyển)', a.quality.other]].map(([label, m]) => html`<tr class="static"><td class="sticky-col"><strong>${label}</strong></td><td class="right num">${num(m.n)}</td><td class="right num">${num(m.done)}</td><td class="right num">${num(m.contacted)}</td>${q(m)}<td class="right num">${num(m.connNoImpact)}</td></tr>`)}</tbody>
+    </table></div>
     <div class="toolbar"><h2 class="section-title">Theo tháng</h2></div>
     <div class="charts">
       ${chartCard('Data chuyển theo tháng', groupedColumns({ categories: a.byMonth.map((m) => mlabel(m.month)), series: [{ name: 'Data chuyển', cls: 's3', values: a.byMonth.map((m) => m.xfer) }], ratio: false, format: (v) => num(v), values: true }), 'Số data có dấu hiệu chuyển từ Offline sang Online mỗi tháng.')}
       ${a.days.length > 1 ? chartCard('Data chuyển theo ngày tạo', lineChart({ labels: a.days.map((d) => dm(d.iso)), series: [{ name: 'Data chuyển', cls: 's3', values: a.days.map((d) => d.n) }], format: (v) => num(v), values: a.days.length <= 14 }), 'Số data chuyển được tạo mỗi ngày.') : ''}
     </div>
     <div class="table-wrap"><table class="connect-table">
-      <thead><tr><th scope="col" class="sticky-col">Tháng</th><th scope="col" class="right">Tổng data</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">Tỉ lệ chuyển</th><th scope="col" class="right">Đã làm</th><th scope="col" class="right">Tỉ lệ đã làm</th></tr></thead>
-      <tbody>${a.byMonth.map((m, i) => html`<tr class="static"><td class="sticky-col"><strong>${mlabel(m.month)}</strong></td><td class="right num">${num(m.total)}</td><td class="right num strong">${num(m.xfer)}${delta(m.xfer, i ? a.byMonth[i - 1].xfer : null)}</td><td class="right num">${p1(m.rate)}</td><td class="right num">${num(m.done)}</td><td class="right num">${p1(m.doneRate)}</td></tr>`)}</tbody>
+      <thead><tr><th scope="col" class="sticky-col">Tháng</th><th scope="col" class="right">Tổng data</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">Tỉ lệ chuyển</th><th scope="col" class="right">Đã làm</th><th scope="col" class="right">Tỉ lệ đã làm</th>${QHEAD}</tr></thead>
+      <tbody>${a.byMonth.map((m, i) => html`<tr class="static"><td class="sticky-col"><strong>${mlabel(m.month)}</strong></td><td class="right num">${num(m.total)}</td><td class="right num strong">${num(m.xfer)}${delta(m.xfer, i ? a.byMonth[i - 1].xfer : null)}</td><td class="right num">${p1(m.rate)}</td><td class="right num">${num(m.done)}</td><td class="right num">${p1(m.doneRate)}</td>${q(m.q)}</tr>`)}</tbody>
     </table></div>
     <div class="toolbar"><h2 class="section-title">Theo khu vực (tỉnh/thành phố)</h2><p class="muted">Cột "Tỉ lệ" là data chuyển / tổng data của tỉnh đó (chỉ tính data có ghi tỉnh/thành). Ô tỉnh/thành trống trong Sheet được bổ sung từ dòng khác có cùng Retailer ID nếu có.</p></div>
-    <div class="charts">
+    <div class="charts region-split">
       ${chartCard('Top tỉnh/thành có data chuyển', html`<div class="hist">${topProv.map((p) => html`<div class="hist__row"><span title="${p.label}">${p.label}</span>${bar(p.n, maxProv)}<span class="num">${num(p.n)} <small class="muted">(${p1(p.share)})</small></span></div>`)}</div>`, '12 tỉnh/thành có nhiều data chuyển nhất trong kỳ.')}
+      ${chartCard('Theo team SC Offline', html`<div class="team-split">${a.teams.filter((t) => t.team !== 'Chưa có thông tin').map((t) => html`<div class="team-split__col"><h3 class="card__title">${t.team} <small class="muted">· ${num(t.n)} data chuyển</small></h3>
+        <p class="muted">Tỉnh/thành có nhiều data chuyển nhất</p><div class="hist">${t.provinces.slice(0, 5).map((r) => html`<div class="hist__row"><span title="${r.label}">${r.label}</span>${bar(r.n, t.provinces[0].n)}<span class="num">${num(r.n)} <small class="muted">(${p1(r.share)})</small></span></div>`)}</div>
+        <p class="muted">Nguồn data</p><div class="hist">${t.sources.slice(0, 5).map((r) => html`<div class="hist__row"><span title="${r.label}">${r.label}</span>${bar(r.n, t.sources[0].n)}<span class="num">${num(r.n)} <small class="muted">(${p1(r.share)})</small></span></div>`)}</div></div>`)}</div>`, 'Miền Bắc: từ Đà Nẵng trở ra bắc; Miền Nam: phía nam Đà Nẵng.')}
     </div>
     <div class="table-wrap"><table class="connect-table sortable">
-      <thead><tr><th scope="col" class="sticky-col">Tỉnh/Thành phố</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">% data chuyển</th><th scope="col" class="right">Tổng data của tỉnh</th><th scope="col" class="right">Tỉ lệ</th>${data.months.map((m) => html`<th scope="col" class="right">${mlabel(m)}</th>`)}</tr></thead>
-      <tbody>${a.provs.map((p) => html`<tr class="static"><td class="sticky-col"><strong>${p.label}</strong></td><td class="right num strong">${num(p.n)}</td><td class="right num">${p1(p.share)}</td><td class="right num">${p.total == null ? '—' : num(p.total)}</td><td class="right num">${p1(p.rate)}</td>${data.months.map((m, i) => html`<td class="right num">${num(p.byMonth[m] ?? 0)}${i ? delta(p.byMonth[m] ?? 0, p.byMonth[data.months[i - 1]] ?? 0) : ''}</td>`)}</tr>`)}</tbody>
-      <tfoot><tr><td class="sticky-col">Tổng</td><td class="right num">${num(a.xferCount)}</td><td class="right num">100%</td><td></td><td></td>${data.months.map((m) => html`<td class="right num">${num(a.provs.reduce((t, p) => t + (p.byMonth[m] ?? 0), 0))}</td>`)}</tr></tfoot>
+      <thead><tr><th scope="col" class="sticky-col">Tỉnh/Thành phố</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">% data chuyển</th><th scope="col" class="right">Tổng data của tỉnh</th><th scope="col" class="right">Tỉ lệ</th>${data.months.map((m) => html`<th scope="col" class="right">${mlabel(m)}</th>`)}${QHEAD}</tr></thead>
+      <tbody>${a.provs.map((p) => html`<tr class="static"><td class="sticky-col"><strong>${p.label}</strong></td><td class="right num strong">${num(p.n)}</td><td class="right num">${p1(p.share)}</td><td class="right num">${p.total == null ? '—' : num(p.total)}</td><td class="right num">${p1(p.rate)}</td>${data.months.map((m, i) => html`<td class="right num">${num(p.byMonth[m] ?? 0)}${i ? delta(p.byMonth[m] ?? 0, p.byMonth[data.months[i - 1]] ?? 0) : ''}</td>`)}${q(p.q)}</tr>`)}</tbody>
+      <tfoot><tr><td class="sticky-col">Tổng</td><td class="right num">${num(a.xferCount)}</td><td class="right num">100%</td><td></td><td></td>${data.months.map((m) => html`<td class="right num">${num(a.provs.reduce((t, p) => t + (p.byMonth[m] ?? 0), 0))}</td>`)}<td></td><td></td><td></td><td></td></tr></tfoot>
     </table></div>
     <div class="toolbar"><h2 class="section-title">Theo nguồn data</h2><p class="muted">"% của nguồn" là phần data của nguồn đó bị đánh dấu chuyển từ Offline.</p></div>
     <div class="table-wrap"><table class="connect-table sortable">
-      <thead><tr><th scope="col" class="sticky-col">Nguồn data</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">% data chuyển</th><th scope="col"></th><th scope="col" class="right">Tổng data của nguồn</th><th scope="col" class="right">% của nguồn</th></tr></thead>
-      <tbody>${a.sources.map((s) => html`<tr class="static"><td class="sticky-col"><strong>${s.label}</strong></td><td class="right num strong">${num(s.n)}</td><td class="right num">${p1(s.share)}</td><td style="min-width:120px">${bar(s.n, maxSrc)}</td><td class="right num">${num(s.total)}</td><td class="right num">${p1(s.rate)}</td></tr>`)}</tbody>
+      <thead><tr><th scope="col" class="sticky-col">Nguồn data</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">% data chuyển</th><th scope="col"></th><th scope="col" class="right">Tổng data của nguồn</th><th scope="col" class="right">% của nguồn</th>${QHEAD}</tr></thead>
+      <tbody>${a.sources.map((s) => html`<tr class="static"><td class="sticky-col"><strong>${s.label}</strong></td><td class="right num strong">${num(s.n)}</td><td class="right num">${p1(s.share)}</td><td style="min-width:120px">${bar(s.n, maxSrc)}</td><td class="right num">${num(s.total)}</td><td class="right num">${p1(s.rate)}</td>${q(s.q)}</tr>`)}</tbody>
+    </table></div>
+    <div class="toolbar"><h2 class="section-title">Công việc hỗ trợ của data chuyển</h2><p class="muted">Tính trên data đã làm; một data có thể có nhiều công việc hỗ trợ nên tổng số lần lớn hơn số data. Tỉ lệ impact là data có công việc đó mà KH có impact.</p></div>
+    <div class="grid">
+      ${stat('Data đã làm có ghi công việc hỗ trợ', num(a.tasks.xfer.withTask), `${p1(a.tasks.xfer.withTaskRate)} trên ${num(a.tasks.xfer.done)} data chuyển đã làm · data thường ${p1(a.tasks.other.withTaskRate)}`, tone(a.tasks.xfer.withTaskRate, a.tasks.other.withTaskRate))}
+      ${stat('Tổng số công việc hỗ trợ', num(a.tasks.xfer.totalTasks), `${a.tasks.xfer.withTask ? (a.tasks.xfer.totalTasks / a.tasks.xfer.withTask).toFixed(1).replace('.', ',') : '—'} công việc mỗi data có ghi`)}
+      ${stat('Công việc nhiều nhất', a.tasks.xfer.list[0]?.task ?? '—', a.tasks.xfer.list[0] ? `${num(a.tasks.xfer.list[0].n)} lần (${p1(a.tasks.xfer.list[0].share)} data đã làm)` : '')}
+    </div>
+    <div class="table-wrap"><table class="connect-table sortable">
+      <thead><tr><th scope="col" class="sticky-col">Công việc hỗ trợ</th><th scope="col" class="right">Số lần</th><th scope="col" class="right">% data đã làm</th><th scope="col"></th><th scope="col" class="right">Tỉ lệ kết nối</th><th scope="col" class="right">Tỉ lệ impact</th><th scope="col" class="right">% ở data thường</th></tr></thead>
+      <tbody>${a.tasks.xfer.list.map((t) => html`<tr class="static"><td class="sticky-col"><strong>${t.task}</strong></td><td class="right num strong">${num(t.n)}</td><td class="right num">${p1(t.share)}</td><td style="min-width:120px">${bar(t.n, a.tasks.xfer.list[0].n)}</td><td class="right num">${p1(t.connRate)}</td><td class="right num">${p1(t.impactRate)}</td><td class="right num muted">${p1(a.tasks.other.list.find((o) => o.task === t.task)?.share ?? 0)}</td></tr>`)}</tbody>
+    </table></div>
+    <div class="toolbar"><h2 class="section-title">Theo ngành hàng và loại công việc</h2><p class="muted">Kết nối thành công và impact của data chuyển, chia theo ngành hàng (Product) và loại công việc.</p></div>
+    <div class="table-wrap"><table class="connect-table sortable">
+      <thead><tr><th scope="col" class="sticky-col">Ngành hàng</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">% data chuyển</th>${QHEAD}</tr></thead>
+      <tbody>${a.industries.map((r) => html`<tr class="static"><td class="sticky-col"><strong>${r.label}</strong></td><td class="right num strong">${num(r.n)}</td><td class="right num">${p1(r.share)}</td>${q(r.q)}</tr>`)}</tbody>
+    </table></div>
+    <div class="table-wrap"><table class="connect-table sortable">
+      <thead><tr><th scope="col" class="sticky-col">Loại công việc</th><th scope="col" class="right">Data chuyển</th><th scope="col" class="right">% data chuyển</th>${QHEAD}</tr></thead>
+      <tbody>${a.jobs.map((r) => html`<tr class="static"><td class="sticky-col"><strong>CSKH ${r.label}</strong></td><td class="right num strong">${num(r.n)}</td><td class="right num">${p1(r.share)}</td>${q(r.q)}</tr>`)}</tbody>
     </table></div>
     <div class="charts">
       ${chartCard('Theo ngành hàng (Product)', html`<div class="hist">${a.industries.map((r) => html`<div class="hist__row"><span>${r.label}</span>${bar(r.n, a.industries[0].n)}<span class="num">${num(r.n)} <small class="muted">(${p1(r.share)})</small></span></div>`)}</div>`, 'Ngành hàng của data chuyển (FnB và Fnb được gộp).')}

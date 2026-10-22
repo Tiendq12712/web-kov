@@ -9,6 +9,7 @@ import { workdaysByCode } from '../report.js';
 import { findMember } from '../welcome.js';
 import { computeSla } from '../sla.js';
 import { CONFIG } from '../config.js';
+import { taskChart } from './tasks.js';
 import { todoCard } from './todo.js';
 
 const sum = (list, pick) => list.reduce((a, m) => a + (pick(m) ?? 0), 0);
@@ -391,6 +392,7 @@ export function overviewView(data, ui, report) {
     <div class="charts">
       ${chartCard('So sánh tỷ lệ hoàn thành giữa các team', teamCompare(data.teams, data.teams.map(summarize)))}
       ${chartCard('Cơ cấu act theo team', actStructure(data.teams, all), 'Đã làm / đang làm / chưa làm trên tổng act được phân công.')}
+      ${ui.tasks !== undefined ? chartCard('Công việc hỗ trợ', taskChart(ui.tasks), 'Nhân sự ghi lại đã làm gì cho data đã làm trong tháng (theo tab Data Txx); impact là data có công việc đó mà KH có impact.') : ''}
       ${data.work?.contact ? chartCard('Tình trạng kết nối', contactDonut(data.work.contact), 'Kết quả cuộc gọi của data đã làm, gộp các nhóm CSKH.') : ''}
       ${data.work?.dataBySource ? chartCard('Nguồn data (T15 · NA · OI)', sourceDonut(data.work), 'Số data được chia theo nhóm CSKH từ đầu tháng.') : ''}
       ${data.work?.status ? chartCard('Tình trạng xử lý', statusDonut(data.work), 'Đã làm / đang làm / chưa làm trên tổng data được chia.') : ''}

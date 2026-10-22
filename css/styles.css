@@ -1237,3 +1237,17 @@ td.impact--good { color: var(--good); font-weight: 700; } td.impact--warn { colo
 .today-top li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-top: 1px solid var(--border); } .today-top li:first-child { border-top: 0; }
 
 .kv dd.impact--good { color: var(--good); font-weight: 700; } .kv dd.impact--warn { color: var(--warn); font-weight: 700; } .kv dd.impact--bad { color: var(--bad); font-weight: 700; }
+
+/* Chuyển data: hai team SC Offline cạnh nhau trong một thẻ */
+.team-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.team-split__col .card__title { margin: 0 0 4px; } .team-split__col .muted { margin: 8px 0 4px; font-size: 12px; }
+@media (max-width: 900px) { .team-split { grid-template-columns: 1fr; } }
+.team-split .hist__row { grid-template-columns: minmax(70px, 96px) minmax(30px, 1fr) auto; gap: 8px; font-size: 12.5px; }
+.team-split .hist__row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-split .hist__row .num { white-space: nowrap; } .team-split .hist__row small { font-size: 11px; }
+
+/* Top tỉnh/thành và Theo team SC Offline: hai thẻ chia đều chiều ngang (thẻ team rộng hơn), không dồn về bên trái */
+.charts.region-split { display: grid; column-width: auto; columns: auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 16px; align-items: start; }
+.charts.region-split > * { margin: 0; }
+@media (max-width: 900px) { .charts.region-split { grid-template-columns: minmax(0, 1fr); } }
+.team-split .hist__row { grid-template-columns: minmax(80px, 130px) minmax(40px, 1fr) auto; }

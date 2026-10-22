@@ -7,14 +7,15 @@ const STORAGE_KEY = 'kpi.session';
 const DAY_KEY = 'kpi.day';   // nhớ đăng nhập trong ngày: { email, date } (không chứa token)
 const EXPIRY_MARGIN_MS = 60_000;
 
+/** Ngày hiện tại theo giờ máy (YYYY-MM-DD); qua nửa đêm là "hôm sau" và phải đăng nhập lại. */
+export const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
 let tokenClient = null;
-let session = readSession();
+let session = readSession();   // today() phải khai báo trước dòng này, nếu không readSession lỗi (vùng chết tạm thời) và phiên đã lưu không bao giờ được dùng lại
 const WRITE_FLAG = 'kpi.write';   // đã từng đồng ý quyền ghi (để gửi tin nhắn / sửa cấu hình): các token sau xin kèm quyền ghi luôn
 const wantsWrite = () => { try { return localStorage.getItem(WRITE_FLAG) === '1'; } catch { return false; } };
 const rememberWrite = (on) => { try { on ? localStorage.setItem(WRITE_FLAG, '1') : localStorage.removeItem(WRITE_FLAG); } catch {} };
 
-/** Ngày hiện tại theo giờ máy (YYYY-MM-DD); qua nửa đêm là "hôm sau" và phải đăng nhập lại. */
-export const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 /** Token (sống ~1 giờ) giữ ở localStorage để mở lại web trong ngày không phải đăng nhập; chỉ dùng được trong đúng ngày đăng nhập. */
 function readSession() {

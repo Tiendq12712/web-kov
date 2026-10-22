@@ -5,7 +5,7 @@
 DIR="${1:-.}"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 if [ ! -x "$CHROME" ]; then echo "Không tìm thấy Chrome ($CHROME) nên bỏ qua kiểm tra tự động."; exit 0; fi
-[ "$DIR" = "." ] || { mkdir -p "$DIR/tests" && cp tests/smoke.html "$DIR/tests/"; }
+[ "$DIR" = "." ] || { mkdir -p "$DIR/tests" && cp tests/*.html tests/*.js "$DIR/tests/"; }
 TMP=$(mktemp -d); RESULT="$TMP/result.txt"
 PORT=$((20000 + $$ % 20000))
 python3 scripts/check_server.py "$DIR" "$PORT" "$RESULT" &

@@ -42,7 +42,7 @@ export function analyzeJobTypes(rows, { month = 'all', product = 'all', code = n
   const selRows = sel ? rowsOf(sel) : [];
   const doneSel = selRows.filter((r) => r.status === 'Đã làm');
   const taskMap = new Map();
-  for (const r of doneSel) for (const t of (r.tasks.length ? r.tasks : ['(Chưa ghi công việc hỗ trợ)'])) {
+  for (const r of doneSel) for (const t of r.tasks) {   // data chưa ghi công việc hỗ trợ thì chưa có impact nên không liệt kê
     const x = taskMap.get(t) ?? taskMap.set(t, { task: t, n: 0, contacted: 0, conn: 0, impact: 0, add: 0 }).get(t);
     x.n += 1; x.contacted += r.contact ? 1 : 0; x.conn += r.contact === 'Kết nối thành công' ? 1 : 0; x.impact += r.impact ? 1 : 0; x.add += r.add?.length ? 1 : 0;
   }
