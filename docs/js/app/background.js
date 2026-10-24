@@ -3,7 +3,8 @@ import { hasDetail, hasScores, loadDetailFor, loadScores } from '../data.js';
 import { analyzeControl } from '../control.js';
 import { computeAlerts } from '../alerts.js';
 import { CONFIG } from '../config.js';
-import { state, myCode, kpiNames } from './state.js';
+import { computeSla, computeSlaFromDetail } from '../sla.js';
+import { state, myCode, kpiNames, latestAsOf } from './state.js';
 import { hooks } from './hooks.js';
 
 /** Kết quả Kiểm soát cho "Việc cần làm": quản lý thấy toàn đội, nhân sự chỉ phần của mình; chỉ có khi data chi tiết đã tải xong. */
@@ -40,3 +41,10 @@ export function preloadDetail() {
   setTimeout(() => loadDetailFor([month]).then((d) => { if (month === state.month && !state.segmentM.data) { state.segmentM.data = d; if (state.tab === 'overview') hooks.renderView(); } }).catch(() => {}), 2500);
 }
 
+
+/** SLA của tháng đang xem: ưu tiên tính từ data chi tiết (đúng theo thời điểm đóng từng data), chưa có thì dùng bảng tồn trong tab KPI. */
+export function currentSla() {
+  const detail = state.segmentM.data ?? state.segment.data;
+  if (detail && state.data?.work?.backlogAll) { const fromDetail = computeSlaFromDetail(detail.rows, latestAsOf(state.data), state.month); if (fromDetail) return fromDetail; }
+  return computeSla(state.data.work, latestAsOf(state.data), state.month);
+}

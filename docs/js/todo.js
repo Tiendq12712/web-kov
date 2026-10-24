@@ -21,9 +21,9 @@ function unpaidDays(report, code, asOf) {
  * item = { tone: 'bad' | 'warn' | 'info', count, text, hint, tab?, timesheet? }.
  * Trả về [] nếu không có gì (view sẽ hiện lời chúc mừng).
  */
-export function buildTodo({ me, found, data, report, pbi, unread, control, alerts = [] }) {
+export function buildTodo({ me, found, data, report, pbi, unread, control, alerts = [], sla: slaIn = null }) {
   const asOf = data.teams.map((t) => t.asOf).sort().at(-1);
-  const sla = computeSla(data.work, asOf, data.month);
+  const sla = slaIn ?? computeSla(data.work, asOf, data.month);   // slaIn: SLA tính từ data chi tiết (chính xác hơn bảng tồn khi chưa kịp đồng bộ)
   const items = [];
   const push = (item) => items.push(item);
   const manager = me.role !== 'member';

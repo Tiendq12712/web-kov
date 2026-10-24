@@ -96,7 +96,7 @@ const explain = html`<p class="muted">SLA xử lý data ONL là <strong>${SLA_DA
  */
 export function slaView(sla, { manager, code }) {
   if (!sla) return html`<p class="notice">Chưa có bảng tồn theo ngày trong tab công việc nên chưa thống kê được SLA.</p>`;
-  const asOfNote = html`<p class="muted">Hạn tính đến <strong>${dm(sla.now)}</strong>${sla.now !== sla.asOf ? html` · số liệu đồng bộ ngày ${dm(sla.asOf)}` : ''}.</p>`;
+  const asOfNote = html`<p class="muted">Hạn tính đến <strong>${dm(sla.now)}</strong>${sla.fromDetail ? html` · tính từ data chi tiết: data đã làm không còn nằm trong số trễ, kể cả khi đóng đúng ngày thứ 7` : sla.now !== sla.asOf ? html` · số liệu đồng bộ ngày ${dm(sla.asOf)} (chưa có data chi tiết nên dùng bảng tồn, có thể chưa tính data vừa đóng)` : ''}.</p>`;
   if (manager) {
     return html`
       <div class="toolbar"><h2 class="section-title">SLA data còn tồn (chưa làm + đang làm)</h2>${asOfNote}</div>

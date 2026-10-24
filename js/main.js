@@ -6,7 +6,7 @@ import { taskStats } from './tasks.js';
 import { shareMonth, sharePerson } from './app/filters.js';
 import { ensureHeard, markHeard } from './app/heard.js';
 import { prepareReport } from './app/reportExport.js';
-import { todoControl, todoAlerts, preloadDetail } from './app/background.js';
+import { todoControl, todoAlerts, preloadDetail, currentSla } from './app/background.js';
 import { renderToday } from './app/today.js';
 import { readHash, readLast, writeHash } from './app/route.js';
 import { state, saveCoachPref, latestAsOf, myCode, team, kpiNames, kpiPeople } from './app/state.js';
@@ -35,7 +35,6 @@ import { transferView } from './views/transfer.js';
 import { workdaysByCode } from './report.js';
 import { createSettings } from './settingsController.js';
 import { createChat } from './chatController.js';
-import { computeSla } from './sla.js';
 import { slaView } from './views/sla.js';
 import { cinfoView, DEFAULT_FILTERS } from './views/cinfo.js';
 import { trendView } from './views/trend.js';
@@ -239,7 +238,7 @@ function overviewTasks() {
 function currentPage() {
   const t = team();
   if (state.tab === 'overview') {
-    state.todo = buildTodo({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, report: state.report.data, pbi: state.cinfo.data, unread: chat.unread(), control: todoControl(), alerts: todoAlerts() });
+    state.todo = buildTodo({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, report: state.report.data, pbi: state.cinfo.data, unread: chat.unread(), control: todoControl(), alerts: todoAlerts(), sla: state.data.work?.backlogAll ? currentSla() : null });
   }
   const report = preloadReport();   // ngày công và năng suất lấy từ file năng suất, nên luôn tải nền
   if (state.tab === 'me') return { view: renderToday(report), title: 'Hôm nay của tôi' };
@@ -268,11 +267,12 @@ function currentPage() {
   if (state.tab === 'sla') {
     const manager = state.me.role !== 'member';
     const detail = hasDetail() ? lazyTab(state.segmentM, 'sla', (m) => loadDetailFor([m]), (d) => withQuality('sla', d, slaDetailView(d, { month: state.month, manager, code: myCode(), names: kpiNames() }))) : '';
-    return { view: html`${detail}${slaView(computeSla(state.data.work, latestAsOf(state.data), state.month), { manager, code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code })}`, title: 'SLA' };
+    return { view: html`${detail}${slaView(currentSla(), { manager, code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code })}`, title: 'SLA' };
   }
   if (state.tab === 'work') return { view: renderWork(), title: 'Theo dõi công việc' };
   if (t) return { view: teamView(t, state), title: t.name };
   state.tasks = overviewTasks();
+  state.slaNow = state.data.work?.backlogAll ? currentSla() : null;
   return { view: overviewView(state.data, state, report), title: 'Tổng quan' };
 }
 

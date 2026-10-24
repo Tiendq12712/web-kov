@@ -100,3 +100,40 @@ function dayRows(rows) {
 /** Câu mô tả các ngày được gia hạn, ví dụ "Data tạo ngày 15/10 được cộng thêm 3 ngày (hạn 10 ngày)."; rỗng nếu không có. */
 export const extraNote = () => Object.entries(SLA_EXTRA).filter(([, n]) => n > 0).sort()
   .map(([iso, n]) => `Data tạo ngày ${iso.slice(8)}/${iso.slice(5, 7)} được cộng thêm ${n} ngày (hạn ${SLA_DAYS + n} ngày).`).join(' ');
+
+/**
+ * SLA tính thẳng từ data chi tiết (Data Txx): data chưa xong (không phải "Đã làm" hoặc "Hủy") của tháng, tuổi theo ngày lịch từ ngày tạo đến hôm nay,
+ * hạn 7 ngày (+ ngày được gia hạn). Cùng quy tắc với báo cáo SLA từng data nên không lệch khi bảng tồn trong tab KPI chưa kịp đồng bộ
+ * (ví dụ data đóng đúng ngày thứ 7 nhưng bảng tồn cũ vẫn tính là còn mở và đã sang ngày thứ 8).
+ * Trả về cùng dạng với computeSla; `now` mặc định là giờ địa phương hiện tại.
+ */
+export function computeSlaFromDetail(rows, asOf, month, { now = Date.now() - new Date().getTimezoneOffset() * 60_000 } = {}) {
+  if (!rows || !asOf) return null;
+  const dayNo = (ts) => Math.floor(ts / DAY_MS), nowDay = dayNo(now);
+  const nowIso = new Date(nowDay * DAY_MS).toISOString().slice(0, 10);
+  const people = new Map();
+  const codeOf = (h) => /^(\d+)\s*-/.exec(h)?.[1] ?? '';
+  const nameOf = (h) => (/^\d+\s*-/.test(h) ? h.replace(/^(\d+)\s*-\s*([^-]+?)(\s*-.*)?$/, '$2').trim() : '(Chưa giao nhân sự)');
+  for (const r of rows) {
+    if (r.month !== month || r.status === 'Hủy' || r.createdTs == null) continue;
+    const code = codeOf(r.handler) || '(pool)';
+    const p = people.get(code) ?? people.set(code, { code: code === '(pool)' ? '' : code, name: nameOf(r.handler), assigned: 0, open: new Map() }).get(code);
+    p.assigned += 1;
+    if (r.status === 'Đã làm') continue;
+    const day = Number(r.created.slice(8, 10));
+    p.open.set(day, { date: r.created, count: (p.open.get(day)?.count ?? 0) + 1, age: nowDay - dayNo(r.createdTs) });
+  }
+  const out = [...people.values()].map((p) => {
+    const batches = [...p.open].map(([day, b]) => {
+      const limit = slaDaysFor(b.date), due = new Date(Date.parse(`${b.date}T00:00:00Z`) + limit * DAY_MS);
+      return { day, date: b.date, count: b.count, age: b.age, limit, left: limit - b.age, due: `${pad(due.getUTCDate())}/${pad(due.getUTCMonth() + 1)}`, status: slaStatus(b.age, limit) };
+    }).filter((b) => b.age >= 0).sort((a, b) => a.day - b.day);
+    const by = (st) => sum(batches.filter((b) => b.status === st).map((b) => b.count)), total = sum(batches.map((b) => b.count));
+    return { code: p.code, name: p.name, batches, late: by('late'), soon: by('soon'), ok: by('ok'), total, assigned: p.assigned, base: p.assigned || total };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  const totals = { late: sum(out.map((r) => r.late)), soon: sum(out.map((r) => r.soon)), ok: sum(out.map((r) => r.ok)), total: sum(out.map((r) => r.total)), assigned: sum(out.map((r) => r.assigned)) };
+  totals.base = out.reduce((a, r) => a + r.base, 0);
+  const ranges = [['0–2 ngày', 0, 2], ['3–4 ngày', 3, 4], [`5–${SLA_DAYS} ngày`, 5, SLA_DAYS], [`Trên ${SLA_DAYS} ngày`, SLA_DAYS + 1, Infinity]];
+  const buckets = ranges.map(([label, lo, hi]) => ({ label, status: slaStatus(lo), count: sum(out.flatMap((r) => r.batches.filter((b) => b.age >= lo && b.age <= hi).map((b) => b.count))) }));
+  return { asOf, now: nowIso, rows: out, totals, buckets, days: dayRows(out), fromDetail: true };
+}

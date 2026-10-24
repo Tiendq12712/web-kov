@@ -367,14 +367,15 @@ function myCard({ team, member: m }, report, sla) {
 
 /** Nhân sự (quyền Thành viên) chỉ xem KPI cá nhân và bảng nhân sự; chỉ số tổng hợp và biểu đồ dành cho Quản trị/Admin. */
 /** SLA của chính nhân sự (nếu tab công việc có bảng tồn theo ngày). */
-function mySla(data, { member }) {
+function mySla(data, { member }, slaNow = null) {
+  if (slaNow) return slaNow.rows.find((r) => r.code === member.code) ?? null;
   const asOf = data.teams.map((t) => t.asOf).sort().at(-1);
   return computeSla(data.work, asOf, data.month)?.rows.find((r) => r.code === member.code) ?? null;
 }
 
 function memberOverview(data, ui, report) {
   const mine = findMember(ui.me.email, data.teams, ui.me.name, ui.me.code);
-  return html`${updatedBanner(data.teams)}${ui.todo ? todoCard(ui.todo) : ''}${mine ? html`<div class="grid">${myCard(mine, report, mySla(data, mine))}</div>` : ''}${memberTable(data, ui, report)}`;
+  return html`${updatedBanner(data.teams)}${ui.todo ? todoCard(ui.todo) : ''}${mine ? html`<div class="grid">${myCard(mine, report, mySla(data, mine, ui.slaNow))}</div>` : ''}${memberTable(data, ui, report)}`;
 }
 
 export function overviewView(data, ui, report) {

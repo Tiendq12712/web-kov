@@ -8,6 +8,7 @@ import { openItems, myScores, myControl, myTrend } from '../today.js';
 import { wallNow } from '../slaDetail.js';
 import { state } from './state.js';
 import { hooks } from './hooks.js';
+import { currentSla } from './background.js';
 
 /** Tải dần dữ liệu cho trang "Hôm nay của tôi" (data chi tiết của tháng, chấm call, lịch sử); phần nào xong thì vẽ lại. */
 export function ensureTodayData() {
@@ -28,7 +29,7 @@ export function renderToday(report) {
   const found = findMember(state.me.email, state.data.teams, state.me.name, state.me.code);
   if (!found) return todayView({ found: null });
   const code = found.member.code, detail = state.segmentM.data, now = wallNow();
-  const todoItems = buildTodo({ me: { ...state.me, role: 'member' }, found, data: state.data, report: state.report.data, pbi: state.cinfo.data, unread: hooks.unread(), control: null, alerts: [] });   // việc của riêng bạn, kể cả khi bạn là quản lý
+  const todoItems = buildTodo({ me: { ...state.me, role: 'member' }, found, data: state.data, report: state.report.data, pbi: state.cinfo.data, unread: hooks.unread(), control: null, alerts: [], sla: state.data.work?.backlogAll ? currentSla() : null });   // việc của riêng bạn, kể cả khi bạn là quản lý
   return todayView({
     me: state.me, found, report, todoItems, month: state.month, hasScores: hasScores(),
     open: hasDetail() && !state.segmentM.error ? (detail ? openItems(detail.rows, code, now) : null) : undefined,

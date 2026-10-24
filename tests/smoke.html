@@ -56,6 +56,17 @@ await test('SLA: sắp trễ khi chưa xong và đã qua 5-7 ngày', () => {
   eq(det.classify(rec('2026-10-24', '2026-10-24', 'Đang làm'), NOW).kind, 'soon');
 });
 
+await test('SLA từ data chi tiết: data đóng đúng ngày thứ 7 không bị tính trễ dù bảng tồn cũ', () => {
+  const day = (d, h = 8) => Date.UTC(2026, 9, d, h), mk = (created, status, who = 'A') => ({ month: '2026-10', status, created: `2026-10-${String(created).padStart(2, '0')}`, createdTs: day(created), handler: `1 - ${who} - CS` });
+  const rows = [mk(16, 'Đã làm'), mk(16, 'Đã làm'), mk(16, 'Chưa làm'), mk(15, 'Đang làm'), mk(20, 'Chưa làm'), mk(16, 'Hủy'), { ...mk(16, 'Chưa làm'), month: '2026-09' }];
+  const r = sla.computeSlaFromDetail(rows, '2026-10-24', '2026-10', { now: day(24, 17) });   // đang là 24/10
+  const a = r.rows[0];
+  eq([a.late, a.soon, a.ok, a.total], [1, 1, 1, 3], 'chỉ data chưa xong; 16/10 chưa làm = trễ (8 ngày), 15/10 được gia hạn 10 ngày nên mới sắp trễ');
+  eq(a.base, 5, 'mẫu số = data không Hủy của tháng (hai data đóng ngày 23 không còn nằm trong số trễ)');
+  const closed23 = sla.computeSlaFromDetail([mk(16, 'Đã làm'), mk(16, 'Đã làm'), mk(16, 'Đã làm'), mk(16, 'Đã làm')], '2026-10-24', '2026-10', { now: day(24, 17) });
+  eq(closed23.totals.late, 0, '4 data tạo 16/10 đã đóng thì không trễ'); eq(sla.computeSlaFromDetail(null, 'x', '2026-10'), null);
+  eq(r.days.map((d) => d.status), ['soon', 'late'], 'bảng theo ngày: lô cũ nhất ở trên'); eq(r.fromDetail, true);
+});
 await test('SLA: đọc ngày gia hạn từ Sheet (nhiều kiểu ngày, 0 là bỏ gia hạn)', () => {
   eq(sla.parseSlaDate('15/10/2026'), '2026-10-15'); eq(sla.parseSlaDate('2026-10-5'), '2026-10-05'); eq(sla.parseSlaDate('3/11', 2026), '2026-11-03'); eq(sla.parseSlaDate('abc'), null);
   sla.setSlaExtra([['20/10/2026', '2'], ['15/10/2026', '0'], ['rác', '1'], ['21/10/2026', 'x']]);

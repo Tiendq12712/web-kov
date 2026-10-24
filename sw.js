@@ -1,6 +1,6 @@
 /* Service worker: chỉ cache "vỏ" ứng dụng (HTML/CSS/JS/icon cùng origin).
    Dữ liệu KPI và đăng nhập Google (khác origin) KHÔNG bao giờ được cache. */
-const CACHE = 'kpi-shell-v232';
+const CACHE = 'kpi-shell-v233';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/main.js', 'js/config.js', 'js/auth.js', 'js/sheet.js', 'js/persist.js', 'js/quality.js', 'js/periodReport.js', 'js/callScores.js', 'js/listen.js', 'js/tasks.js', 'js/views/tasks.js', 'js/app/state.js', 'js/app/route.js', 'js/app/nav.js', 'js/app/hooks.js', 'js/app/filters.js', 'js/app/heard.js', 'js/app/reportExport.js', 'js/app/background.js', 'js/app/today.js', 'js/today.js', 'js/views/today.js', 'js/audit.js', 'js/heard.js', 'js/jobType.js', 'js/views/jobType.js', 'js/views/listen.js', 'js/views/callScores.js', 'js/reportPdf.js', 'js/data.js',
