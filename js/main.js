@@ -29,6 +29,7 @@ import { connectView } from './views/connect.js';
 import { connectCallsView } from './views/connectCalls.js';
 import { segmentView } from './views/segment.js';
 import { addonView } from './views/addons.js';
+import { addonDetailView } from './views/addonDetail.js';
 import { slaDetailView } from './views/slaDetail.js';
 import { controlView } from './views/control.js';
 import { transferView } from './views/transfer.js';
@@ -250,6 +251,7 @@ function currentPage() {
   if (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'listen', loadDetail, (d) => withQuality('listen', d, listenView(d, state.listen, { names: kpiNames() }))), title: 'Chọn call nghe lại' };
   if (state.tab === 'callctl' && hasScores()) return { view: lazyTab(state.callctl, 'callctl', loadScores, (d) => callScoreView(d, state.callctl, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Kiểm soát call' };
   if (state.tab === 'control' && hasDetail()) return { view: lazyTab(state.segmentM, 'control', (m) => loadDetailFor([m]), (d) => withQuality('control', d, controlView(d, state.control, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month }))), title: 'Kiểm soát' };
+  if (state.tab === 'addondetail' && hasDetail()) return { view: lazyTab(state.segmentM, 'addondetail', (m) => loadDetailFor([m]), (d) => addonDetailView(d, state.addonD, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month, members: state.data.teams.flatMap((t) => t.members) })), title: 'Chi tiết Add-on' };
   if (state.tab === 'addon' && hasAddons()) return { view: lazyTab(state.addons, 'addon', loadAddons, (d) => addonView(d, state.addons, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Add-on' };
   if (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'segment', loadDetail, (data) => withQuality('segment', data, segmentView(data, state.segment))), title: 'Phân tích tệp data' };
   if (state.tab === 'connect' && state.me.role !== 'member') {
@@ -277,7 +279,7 @@ function currentPage() {
 }
 
 /** Tab phụ thuộc vào tháng đang xem (Tổng quan, các team, Công việc, SLA, Năng suất) mới có ô chọn tháng; các tab khác (Customer Info, Xu hướng, So sánh, Chia sẻ, Thiết lập) thì không. */
-const isMonthly = (tab) => ['overview', 'me', 'work', 'sla', 'report', 'control'].includes(tab) || (tab === 'connect' && !hasCalls()) || Boolean(state.data?.teams.some((t) => t.id === tab));
+const isMonthly = (tab) => ['overview', 'me', 'work', 'sla', 'report', 'control', 'addondetail'].includes(tab) || (tab === 'connect' && !hasCalls()) || Boolean(state.data?.teams.some((t) => t.id === tab));
 
 /** Ô chọn tháng nằm trong nội dung của tab (không đặt ở thanh trên cùng). */
 function monthBar() {
@@ -337,7 +339,7 @@ async function setMonth(ym, { boot = false } = {}) {
   Object.assign(state.report, { data: report, error: '', query: '' });
   Object.assign(state.segmentM, { data: null, error: '', loading: false });   // chi tiết data theo tháng: tải lại cho tháng mới
   state.work.query = '';
-  const validTab = (state.tab === 'me' && findMember(state.me.email, state.data.teams, state.me.name, state.me.code)) || (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
+  const validTab = (state.tab === 'me' && findMember(state.me.email, state.data.teams, state.me.name, state.me.code)) || (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'addondetail' && hasDetail()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -415,6 +417,7 @@ document.addEventListener('click', (e) => {
   if (hit('[data-close]') || e.target === els.detail) return els.detail.close();
   if (hit('[data-tab]')) { e.preventDefault(); els.detail.close(); return setTab(hit('[data-tab]').dataset.tab); }
   if (hit('[data-timesheet]')) return openMember(hit('[data-timesheet]').dataset.timesheet, { timesheet: true });
+  if (hit('[data-addon-person]')) { sharePerson(hit('[data-addon-person]').dataset.addonPerson); return renderView(); }
   if (hit('[data-member]')) return openMember(hit('[data-member]').dataset.member);
   if (hit('[data-heat]')) {
     state.heat = hit('[data-heat]').dataset.heat;
@@ -513,6 +516,8 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'cs-month') { shareMonth(e.target.value); return renderView(); }
   if (e.target.id === 'cs-person') { sharePerson(e.target.value); return renderView(); }
   if (e.target.id === 'ctl-rule') { state.control.rule = e.target.value; return renderView(); }
+  if (e.target.id === 'ad-person') { sharePerson(e.target.value); return renderView(); }
+  if (e.target.id === 'ad-type') { state.addonD.type = e.target.value; return renderView(); }
   if (e.target.id === 'ctl-person') { sharePerson(e.target.value); return renderView(); }
   if (e.target.id === 'addon-month') { state.addons.month = e.target.value; state.addons.person = 'all'; state.addons.type = 'all'; return renderView(); }
   if (e.target.id === 'addon-type') { state.addons.type = e.target.value; return renderView(); }

@@ -365,7 +365,7 @@ await test('Ứng dụng (Admin): khởi động và mở mọi tab không lỗi
   try {
     eq(app.ok, true, `khởi động xong (lỗi: ${app.errors().join(' | ')})`);
     eq(app.doc.getElementById('tabs').textContent.includes('Vận hành'), true, 'có nhóm Vận hành'); eq(app.doc.getElementById('tabs').textContent.includes('Phân tích'), true);
-    const expect = { overview: 'Toàn bộ nhân sự', hr: 'Nhận định', work: 'Công việc hỗ trợ', sla: 'SLA', 'online-hcm': 'Nguyễn Văn An', control: 'Kiểm soát', callctl: 'Kiểm soát call', jobs: 'loại công việc', listen: 'nghe lại', xfer: 'Offline', segment: 'tệp data', trend: 'Xu hướng', settings: 'Thiết lập' };
+    const expect = { overview: 'Toàn bộ nhân sự', hr: 'Nhận định', work: 'Công việc hỗ trợ', sla: 'SLA', 'online-hcm': 'Nguyễn Văn An', control: 'Kiểm soát', addondetail: 'Chi tiết Add-on', callctl: 'Kiểm soát call', jobs: 'loại công việc', listen: 'nghe lại', xfer: 'Offline', segment: 'tệp data', trend: 'Xu hướng', settings: 'Thiết lập' };
     for (const [tab, text] of Object.entries(expect)) {
       const before = app.errors().length, done = await app.open(tab);
       eq(done, true, `tab ${tab} vẽ xong`); eq(app.errors().slice(before), [], `tab ${tab} không lỗi`);
@@ -407,6 +407,22 @@ await test('Ứng dụng (Nhân sự): vào trang "Hôm nay của tôi", xem T�
     await app.open('overview'); eq(app.view().textContent.includes('Add-on trừ'), true, 'bảng Tổng quan có cột Add-on trừ'); eq(app.view().textContent.includes('−9'), true, 'nhân sự 9001 bị trừ 9đ');
     eq(app.errors(), [], 'không lỗi chạy nào trong cả phiên');
   } finally { app.stop(); }
+});
+
+await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {
+  const as = await import(`${root}js/addonScore.js`), ad = await import(`${root}js/addonDetail.js`), fx = await import(`${root}tests/fixtures.js`);
+  const tabs = fx.buildFixtures('cfg', 'x@kiotviet.com')[fx.IDS.addon];
+  const parsed = as.parseAddonScores([tabs.Payment, tabs.HDDT, tabs.Kship]);
+  const mk = (code, name) => ({ code, name, kpi: 0.5, main: { rate: 0.5 }, addon: { target: 60, done: 30, missing: 30, rate: 0.5 } });
+  const members = [mk('9001', 'An'), mk('9002', 'Bình'), mk('9003', 'Cường')];
+  as.applyAddonScores([{ members }], parsed, '2026-10');
+  const rows = [{ month: '2026-10', created: '2026-10-12', handler: '9001 - An - CS', retailer: '1', add: ['Mua phần cứng', 'Giới thiệu Kship'], status: 'Đã làm' }, { month: '2026-10', created: '2026-10-13', handler: '9002 - Bình - CS', retailer: '2', add: ['Mua phần cứng'], status: 'Đã làm' }];
+  const r = ad.analyzeAddonDetail(rows, members, { month: '2026-10' });
+  const by = Object.fromEntries(r.byType.map((t) => [t.kind, t]));
+  eq(by['Kích hoạt payment thành công'].acts, 3, 'Payment: 3 act từ Sheet Addon (không đếm trùng với data chi tiết)'); eq([by['Giới thiệu Kship'].earned, by['Giới thiệu Kship'].lost], [6, 4], 'Kship: 1đ + 5đ, trừ 4');
+  eq(by['Mua phần cứng'].acts, 2, 'đếm số act'); eq([by['Mua phần cứng'].earned, by['Mua phần cứng'].lost], [10, 0], 'loại khác mặc định đủ 5đ mỗi act');
+  eq(r.people.find((p) => p.code === '9001').lost, 9, 'tổng điểm trừ của 9001'); eq(r.total.full, (r.total.acts) * 5, 'tổng điểm đủ = 5đ × số act'); eq(r.total.lost, 9 + 5, 'tổng trừ của cả team (9001: 9, 9003: HDDT 5)');
+  eq(ad.analyzeAddonDetail(rows, members, { month: '2026-10', code: '9002' }).acts.length, 3, 'xem một nhân sự chỉ thấy act của người đó (2 Payment/Kship + 1 phần cứng)'.length ? 3 : 0);
 });
 
 await test('Ứng dụng (Admin): bộ lọc dùng chung, đánh dấu đã nghe, báo cáo Excel, Nhật ký, cảnh báo nền', async () => {

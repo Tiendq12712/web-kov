@@ -39,6 +39,7 @@ export function buildNav(monthList) {
   if (hasPbi()) reports.push(item('cinfo', 'Customer Info', 'C-Info', 'Tỉ lệ SC dùng Customer Info'));
   if (hasScores()) reports.push(item('callctl', 'Kiểm soát call', 'Chấm call', 'Kết quả chấm chất lượng cuộc gọi'));
   if (hasDetail()) reports.push(item('control', 'Kiểm soát', 'Kiểm soát', 'Data điền đúng quy trình, SLA và mức trừ'));
+  if (hasDetail()) reports.push(item('addondetail', 'Chi tiết Add-on', 'Add-on', 'Thống kê toàn bộ add-on theo loại, team và nhân sự'));
   if (hasAddons()) reports.push(item('addon', 'Add-on', 'Add-on', 'Add-on đã chọn và được ghi nhận'));
   if (hasReport(state.month)) reports.push(item('report', 'Năng suất', 'Năng suất', 'Cuộc gọi, talktime, ngày công'));
   const analysis = [];

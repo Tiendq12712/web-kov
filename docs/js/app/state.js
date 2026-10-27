@@ -35,6 +35,7 @@ export const state = {
   jobs: { month: null, product: 'all', job: 'T15' },   // thống kê theo loại công việc (dùng chung dữ liệu chi tiết)
   listen: { month: null, job: 'T15', person: 'all', level: 'attn', heard: new Map(), heardLoaded: false, heardLoading: false, heardFilter: 'all', heardNotice: '', hasScores: false },   // gợi ý nghe lại call (dùng chung dữ liệu chi tiết)
   callctl: { data: null, loading: false, error: '', month: 'all', person: 'all', q: 'all', stars: 'all', has: 'all', err: 'all', sort: 'priority', text: '' },   // kết quả chấm call (Sheet Chấm call)
+  addonD: { person: 'all', type: 'all' },   // chi tiết add-on theo loại / nhân sự (dùng chung dữ liệu chi tiết Data Txx)
   control: { rule: 'all', person: 'all' },   // kiểm soát data theo quy trình (dùng chung dữ liệu chi tiết Data Txx)
   addons: { data: null, loading: false, error: '', month: 'all', type: 'all', person: 'all', status: 'all', q: '' },   // add-on nhân sự chọn và được ghi nhận (Sheet PBI, tab Chi tiết addon)   // phân tích tệp data (tab Data Txx)   // từng cuộc gọi (Sheet "Dữ liệu call")
   hr: { data: null, loading: false, error: '', q: '', region: 'all', status: 'all' },   // nhân sự và phép năm
