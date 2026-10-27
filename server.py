@@ -40,6 +40,7 @@ SHEETS_HOST = 'docs.google.com'
 SHEET_ID = re.compile(r'^[\w-]{20,}$')
 
 import call_report  # noqa: E402  (xuất dữ liệu call-report, cùng thư mục)
+import job_errors  # noqa: E402  (phân loại lỗi: cookie hết hạn…)
 
 # --- Nạp tool CRM (không bắt buộc: thiếu thì web báo "chưa sẵn sàng") ---------------------------
 crm = None
@@ -58,6 +59,8 @@ class State:
         self.lock = threading.Lock()
         self.cookie = ''          # cookie CRM
         self.call_cookie = ''     # cookie call-report
+        self.cookie_at = None     # thời điểm nhập cookie CRM (epoch giây)
+        self.call_cookie_at = None
         self.job = None
 
 
@@ -118,6 +121,8 @@ class Job:
         self.ok = 0
         self.finished = False
         self.stop = False
+        self.error = None      # {'code', 'message', 'hint'} khi phải dừng sớm (ví dụ cookie hết hạn)
+        self.failed = []       # các tác vụ thất bại: [{'label', 'message'}]
 
     def log(self, message):
         self.logs.append(str(message))
@@ -145,6 +150,12 @@ class Job:
                 self.log(f'Hoàn tất {label}: {max(len(rows) - 1, 0):,} dòng.')
             except Exception as exc:
                 self.log(f'THẤT BẠI {label}: {exc}')
+                self.failed.append({'label': label, 'message': str(exc)})
+                if job_errors.should_abort(str(exc), self.ok):
+                    self.error = {'code': 'cookie_expired', 'message': str(exc), 'hint': job_errors.friendly(str(exc), 'crm')}
+                    self.done = i
+                    self.log(f'DỪNG ĐỒNG BỘ: cookie CRM có thể đã hết hạn nên các tác vụ còn lại cũng sẽ thất bại. {self.error["hint"]}')
+                    break
             self.done = i
             time.sleep(0.2)
         self.finished = True
@@ -176,6 +187,10 @@ class CallJob(Job):
                 raise ValueError(explain_sheet_failure(credentials, self.params['gsheet_url']))
         except Exception as exc:
             self.log(f'THẤT BẠI: {exc}')
+            self.failed.append({'label': 'Call report', 'message': str(exc)})
+            if job_errors.classify(str(exc)) == 'cookie':
+                self.error = {'code': 'cookie_expired', 'message': str(exc), 'hint': job_errors.friendly(str(exc), 'call')}
+                self.log(f'DỪNG XUẤT CALL: {self.error["hint"]}')
         self.done = 1
         self.finished = True
 
@@ -321,14 +336,14 @@ def stop_job(job):
 
 def job_status(job, since):
     return {'id': job.id, 'logs': job.logs[since:], 'next': len(job.logs), 'done': job.done,
-            'total': len(job.tasks), 'ok': job.ok, 'finished': job.finished}
+            'total': len(job.tasks), 'ok': job.ok, 'finished': job.finished, 'error': job.error, 'failed': job.failed, 'stopped': job.stop}
 
 
 # --- Các API ------------------------------------------------------------------------------------
 def api_status(_payload):
     return {
         'ready': crm is not None, 'error': crm_error,
-        'cookieSet': bool(state.cookie), 'callCookieSet': bool(state.call_cookie), 'serviceAccount': service_account_email(),
+        'cookieSet': bool(state.cookie), 'callCookieSet': bool(state.call_cookie), 'cookieAt': state.cookie_at, 'callCookieAt': state.call_cookie_at, 'serviceAccount': service_account_email(),
         'running': bool(state.job and not state.job.finished),
         'jobId': state.job.id if state.job else None,
     }
@@ -339,11 +354,13 @@ def api_set_cookie(payload):
     if 'KVCRM_PHPSESSID' not in cookie and 'current_user' not in cookie:
         raise ValueError('Cookie không đúng định dạng (cần có KVCRM_PHPSESSID hoặc current_user).')
     state.cookie = cookie
+    state.cookie_at = time.time()
     return {'cookieSet': True}
 
 
 def api_clear_cookie(_payload):
     state.cookie = ''
+    state.cookie_at = None
     return {'cookieSet': False}
 
 
@@ -373,11 +390,13 @@ def api_set_call_cookie(payload):
     if not COOKIE_NAME.match(cookie):
         raise ValueError('Cookie không đúng định dạng (dạng JSESSIONID=giá_trị hoặc chỉ giá trị JSESSIONID).')
     state.call_cookie = cookie
+    state.call_cookie_at = time.time()
     return {'callCookieSet': True}
 
 
 def api_clear_call_cookie(_payload):
     state.call_cookie = ''
+    state.call_cookie_at = None
     return {'callCookieSet': False}
 
 

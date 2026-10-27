@@ -13,6 +13,7 @@ import { parseCalls } from './calls.js';
 import { parseCallScores } from './callScores.js';
 import { parseDetail } from './segment.js';
 import { parseAddons } from './addons.js';
+import { parseAddonScores, applyAddonScores, findMissing } from './addonScore.js';
 import { CONFIG } from './config.js';
 import { persistGet, persistSet, persistClear } from './persist.js';
 
@@ -24,6 +25,7 @@ let pbiLink = null;      // link Power BI (dòng "PBI" trong tab Danh sách link
 let hrLink = null;       // link "Danh sách nhân sự SC" (tab Danh sách + tab Phép năm)
 let scoreLink = null;    // link "Chấm call" (Google Form chấm chất lượng cuộc gọi)
 let callLink = null;     // link "Dữ liệu call" (từng cuộc gọi do mục Xuất Call ghi ra)
+let addonLink = null;    // link "Addon" (điểm thực đạt Payment, Kship, HDDT)
 let libraryLink = null;  // link "Thư viện" (dòng Thư viện trong tab Danh sách link)
 
 /** Danh sách tháng được dựng từ tab "Danh sách link" của Sheet cấu hình. */
@@ -31,10 +33,12 @@ const isPbi = (l) => l.info.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLo
 const isHr = (l) => /nhan su/.test(l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase());
 const isCalls = (l) => /^du lieu call/.test(l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase());
 const isScore = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'cham call';
+const isAddonScore = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'addon';
 const isLibrary = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'thu vien';
 export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
   pbiLink = links.find(isPbi) ?? null;
   libraryLink = links.find(isLibrary) ?? null;
+  addonLink = links.find(isAddonScore) ?? null;
   hrLink = links.find(isHr) ?? null;
   callLink = links.find(isCalls) ?? null;
   scoreLink = links.find(isScore) ?? null;
@@ -65,8 +69,23 @@ function memo(key, load) {
 /** Tab tháng: bảng KPI Team Online, kèm các báo cáo theo dõi công việc nằm bên dưới (nếu có). */
 export const loadMonth = (ym) => memo(ym, () => {
   const { kpi } = entryOf(ym);
-  return Promise.all([fetchRows(kpi.id, getToken(), { tab: kpi.tab }), memo('sync', loadSyncTime)])
-    .then(([rows, synced]) => applySyncTime({ ...parseKpi(rows, ym), work: tryParseWork(rows) }, synced));
+  return Promise.all([fetchRows(kpi.id, getToken(), { tab: kpi.tab }), memo('sync', loadSyncTime), loadAddonScores().catch(() => null)])
+    .then(([rows, synced, scores]) => {
+      const data = applySyncTime({ ...parseKpi(rows, ym), work: tryParseWork(rows) }, synced);
+      // Sheet KPI tính đủ 5đ cho mỗi add-on; trừ phần Payment/Kship/HDDT không đạt theo Sheet Addon.
+      if (scores) data.addonOrphans = applyAddonScores(data.teams, scores, ym, findMissing(store.get(`detail:${ym}`), scores, ym)).orphans;
+      return data;
+    });
+});
+
+/** Điểm thực đạt của Payment, Kship, HDDT: mỗi tab của Sheet Addon là một loại; không đọc được thì giữ nguyên số của Sheet KPI. */
+export const hasAddonScores = () => Boolean(addonLink);
+const loadAddonScores = () => memo('addonScore', async () => {
+  if (!addonLink) return null;
+  const token = getToken();
+  const tabs = addonLink.tab ? [addonLink.tab] : await fetchTabs(addonLink.id, token);
+  const sets = await Promise.all(tabs.map((tab) => fetchRows(addonLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:Z3000', render: 'FORMATTED_VALUE' })));
+  return parseAddonScores(sets);
 });
 
 export const hasReport = (ym) => Boolean(months.find((m) => m.month === ym)?.productivity);
@@ -156,12 +175,20 @@ const DETAIL_TTL = 12 * 3_600_000;   // tháng đã qua ít đổi: dùng lại 
 /** Chi tiết của một tháng, đọc song song theo tháng. Tháng mới nhất luôn tải mới; các tháng cũ dùng bản lưu nếu còn hạn. */
 const loadDetailMonth = (m, isLatest) => memo(`detail:${m.month}`, async () => {
   const key = `detail:${m.detail.id}:${m.detail.tab}:${m.month}`;
-  if (!isLatest) { const saved = await persistGet(key, DETAIL_TTL); if (saved) return saved; }
+  if (!isLatest) { const saved = await persistGet(key, DETAIL_TTL); if (saved) { await completeAddon(m.month, saved); return saved; } }
   const set = await fetchRows(m.detail.id, getToken(), { tab: `'${m.detail.tab.replace(/'/g, "''")}'`, range: 'A1:AK30000', timeout: 180_000 });
   const rows = parseDetail(set, m.month);
   if (!isLatest) persistSet(key, rows);
+  await completeAddon(m.month, rows);
   return rows;
 });
+/** Data chi tiết đã tải: bổ sung điểm trừ cho act có Payment/Kship/HDDT mà retailer không có trong Sheet Addon (cập nhật ngay trên dữ liệu tháng đã tải). */
+async function completeAddon(ym, rows) {
+  try {
+    const [data, scores] = await Promise.all([cache.get(ym), loadAddonScores()]);
+    if (data?.teams && scores) data.addonOrphans = applyAddonScores(data.teams, scores, ym, findMissing(rows, scores, ym)).orphans;
+  } catch { /* giữ nguyên số đã tính từ Sheet Addon */ }
+}
 /** Chi tiết chỉ của các tháng được chọn (SLA, Kiểm soát, Công việc chỉ cần tháng đang xem): nhanh hơn vì không tải các tháng khác. */
 export const loadDetailFor = async (wanted) => {
   const all = months.filter((m) => m.detail), latest = all[0]?.month;
@@ -179,10 +206,11 @@ export const loadDetail = () => memo('detail', async () => {
 export const clearCache = () => { cache.clear(); store.clear(); persistClear(); };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
-export const snapshotData = () => ({ months, pbi: pbiLink, library: libraryLink, hr: hrLink, calls: callLink, scores: scoreLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'scores' && !key.startsWith('detail')) });
-export function restoreData({ months: saved, pbi, library, hr, calls, scores, entries }) {
+export const snapshotData = () => ({ months, pbi: pbiLink, addon: addonLink, library: libraryLink, hr: hrLink, calls: callLink, scores: scoreLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'scores' && !key.startsWith('detail')) });
+export function restoreData({ months: saved, pbi, addon, library, hr, calls, scores, entries }) {
   months = saved;
   pbiLink = pbi ?? null;
+  addonLink = addon ?? null;
   libraryLink = library ?? null;
   hrLink = hr ?? null;
   callLink = calls ?? null;

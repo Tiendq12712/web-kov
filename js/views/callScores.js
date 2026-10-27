@@ -101,7 +101,7 @@ export function callScoreView(data, ui, { manager, code, names }) {
     <div class="cs-list">${shown.map((r) => html`<article class="cs-card cs-card--${r.quality.level}">
       <header class="cs-head">
         <span class="cs-verdict cs-verdict--${r.quality.level}">${QUALITY[r.quality.level].label}</span>
-        ${manager ? html`<strong class="cs-who">${nameOf(r)}</strong>` : ''}
+        ${manager ? html`<strong class="cs-who">${nameOf(r)}</strong>${r.code ? html` <small class="muted">${r.code}</small>` : ''}` : ''}
         <span class="cs-when num">${dmy(r.date)}${r.scoredDate && r.scoredDate !== r.date ? html`<small class="muted"> · chấm ${dmy(r.scoredDate)}</small>` : ''}</span>
         <span class="muted num">${r.phone ? maskPhone(r.phone) : r.activityId}${r.retailer ? ` · Retailer ${r.retailer}` : ''}</span>
         ${stars(r.score)}

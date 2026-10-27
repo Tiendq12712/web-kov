@@ -121,6 +121,13 @@ const withBar = (inner, value, reference, { mark } = {}) => html`
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
+/** Hai ô Add-on thực đạt / không đạt (Payment, Kship, HDDT): "đạt / đủ" và phần điểm bị trừ khỏi KPI. */
+const addonScoreCells = (m) => {
+  const a = m.addonScore;
+  if (!a) return html`<td class="right num muted">—</td><td class="right num muted">—</td>`;
+  return html`<td class="right num" title="${a.acts} act Payment/Kship/HDDT, ${a.full} act đủ 5đ">${num(a.earned)}/${num(a.acts * 5)}</td><td class="right num ${a.lost ? 'addon-lost' : 'is-done'}">${a.lost ? `−${num(a.lost)}` : '✓'}</td>`;
+};
+
 function memberRow({ team, member: m }, workdays, mode, podium) {
   const rank = podium.indexOf(m.kpi);   // 0, 1, 2 = top 1, 2, 3; -1 = ngoài top
   const elapsed = elapsedRatio(team.asOf);
@@ -142,6 +149,7 @@ function memberRow({ team, member: m }, workdays, mode, podium) {
       ${cell(rateCell_(rateCell(m.need), m.need.rate), paint(m.need.rate, elapsed))}
       ${cell(rateCell_(rateCell(m.main), m.main.rate), paint(m.main.rate, elapsed))}
       ${cell(rateCell_(rateCell(m.addon), m.addon.rate), paint(m.addon.rate, elapsed))}
+      ${addonScoreCells(m)}
       ${cell(rateCell_(`${num(m.extra.actDone)}/${num(m.extra.assigned)}`, actRate), paint(actRate, elapsed))}
       ${cell(bars ? withBar(`${hm(m.talk.actual)} / ${hm(m.talk.target)}`, talkRate, 1) : `${hm(m.talk.actual)} / ${hm(m.talk.target)}`, paint(m.talk.actual, m.talk.target))}
       ${cell(pct(m.extra.impactRate, 1), impactClass(m.extra.impactRate))}
@@ -175,6 +183,7 @@ function fullRow({ team, member: m }, workdays, mode, podium) {
       <td class="right num ${paint(m.kpi, elapsed)}">${bars ? withBar(pct(m.kpi, 1), m.kpi, elapsed, { mark: elapsed }) : pct(m.kpi, 1)}</td>
       <td>${badgeFor()}</td>
       ${cells}
+      ${addonScoreCells(m)}
       <td class="right num grp ${impactClass(m.extra.impactRate)}">${pct(m.extra.impactRate, 1)}</td>
       <td class="right num grp">${num(workdays.get(m.code) ?? m.extra.workdays)}</td>
     </tr>`;
@@ -189,6 +198,7 @@ const fullHead = (osort) => html`
     ${sortHead('name', 'Nhân sự', osort, 'sticky-col', 'rowspan="2"')}${sortHead('team', 'Team', osort, '', 'rowspan="2"')}
     ${sortHead('kpi', 'KPI tổng', osort, 'right', 'rowspan="2"')}${sortHead('status', 'Tiến độ', osort, '', 'rowspan="2"')}
     ${METRICS.map(([, label]) => html`<th scope="colgroup" colspan="4" class="group-head">${label}</th>`)}
+    ${sortHead('addonEarned', 'Add-on đạt', osort, 'right grp', 'rowspan="2"')}${sortHead('addonLost', 'Add-on trừ', osort, 'right', 'rowspan="2"')}
     ${sortHead('impact', '% Impact', osort, 'right grp', 'rowspan="2"')}${sortHead('workdays', 'Ngày công', osort, 'right grp', 'rowspan="2"')}
   </tr>
   <tr>${METRICS.map(([id]) => SUBS.map(([sub, label], i) => sortHead(`${id}_${sub}`, label, osort, `right sub-head ${i === 0 ? 'grp' : ''}`)))}</tr>`;
@@ -222,6 +232,8 @@ const MEMBER_COLUMNS = [
   { key: 'need', label: 'Điều kiện cần', value: ({ member }) => member.need.rate },
   { key: 'main', label: 'Điểm tổng', value: ({ member }) => member.main.rate },
   { key: 'addon', label: 'Add-on', value: ({ member }) => member.addon.rate },
+  { key: 'addonEarned', label: 'Add-on đạt', value: ({ member }) => member.addonScore?.earned },
+  { key: 'addonLost', label: 'Add-on trừ', value: ({ member }) => member.addonScore?.lost },
   { key: 'act', label: 'Act đã làm', value: ({ member }) => ratio(member.extra.actDone, member.extra.assigned) },
   { key: 'talk', label: 'Talk time', value: ({ member }) => ratio(member.talk.actual, member.talk.target) },
   { key: 'impact', label: '% Impact', value: ({ member }) => member.extra.impactRate },
@@ -264,6 +276,8 @@ const avgOf = (list) => { const v = list.filter((x) => x != null && !Number.isNa
 function averageRow(rows, workdays, full) {
   const ms = rows.map((r) => r.member);
   const wd = avgOf(ms.map((m) => workdays.get(m.code) ?? m.extra.workdays));
+  const scored = ms.filter((m) => m.addonScore);
+  const addonAvg = scored.length ? html`<td class="right num">${num(Math.round(avgOf(scored.map((m) => m.addonScore.earned))))}/${num(Math.round(avgOf(scored.map((m) => m.addonScore.acts * 5))))}</td><td class="right num">−${num(Math.round(avgOf(scored.map((m) => m.addonScore.lost))))}</td>` : html`<td></td><td></td>`;
   const lead = html`<td class="sticky-col"><span class="person"><strong>Trung bình</strong><small>${rows.length} nhân sự</small></span></td><td></td><td class="right num">${pct(avgOf(ms.map((m) => m.kpi)), 1)}</td><td></td>`;
   if (full) {
     const cells = METRICS.flatMap(([, , read]) => {
@@ -271,12 +285,12 @@ function averageRow(rows, workdays, full) {
       const t = avgOf(xs.map((x) => x.target)), d = avgOf(xs.map((x) => x.done)), r0 = (v) => (xs[0]?.time ? v : Math.round(v));
       return [html`<td class="right num grp">${fmt(r0(t))}</td>`, html`<td class="right num">${fmt(r0(d))}</td>`, html`<td class="right num">${fmt(r0(avgOf(xs.map(missingOf))))}</td>`, html`<td class="right num">${pct(avgOf(xs.map((x) => x.rate)))}</td>`];
     });
-    return html`<tr class="static avg-row">${lead}${cells}<td class="right num grp ${impactClass(avgOf(ms.map((m) => m.extra.impactRate)))}">${pct(avgOf(ms.map((m) => m.extra.impactRate)), 1)}</td><td class="right num grp">${num(wd)}</td></tr>`;
+    return html`<tr class="static avg-row">${lead}${cells}${addonAvg}<td class="right num grp ${impactClass(avgOf(ms.map((m) => m.extra.impactRate)))}">${pct(avgOf(ms.map((m) => m.extra.impactRate)), 1)}</td><td class="right num grp">${num(wd)}</td></tr>`;
   }
   const rnd = (v) => (v == null ? v : Math.round(v));
   const block = (key) => ({ done: rnd(avgOf(ms.map((m) => m[key].done))), target: rnd(avgOf(ms.map((m) => m[key].target))), rate: avgOf(ms.map((m) => m[key].rate)) });
   const cell = (inner) => html`<td class="right num">${inner}</td>`;
-  return html`<tr class="static avg-row">${lead}${['need', 'main', 'addon'].map((k) => cell(rateCell(block(k))))}
+  return html`<tr class="static avg-row">${lead}${['need', 'main', 'addon'].map((k) => cell(rateCell(block(k))))}${addonAvg}
     ${cell(`${num(rnd(avgOf(ms.map((m) => m.extra.actDone))))}/${num(rnd(avgOf(ms.map((m) => m.extra.assigned))))}`)}
     ${cell(`${hm(avgOf(ms.map((m) => m.talk.actual)))} / ${hm(avgOf(ms.map((m) => m.talk.target)))}`)}${cell(pct(avgOf(ms.map((m) => m.extra.impactRate)), 1), impactClass(avgOf(ms.map((m) => m.extra.impactRate))))}${cell(num(wd))}</tr>`;
 }
@@ -289,7 +303,7 @@ export function memberRowsView(data, ui, report) {
   const podium = [...new Set(data.teams.flatMap((t) => t.members.map((m) => m.kpi ?? 0)).filter((k) => k > 0))].sort((a, b) => b - a).slice(0, 3);
   const full = ui.tview === 'full';
   return rows.length ? html`${rows.map((row) => (full ? fullRow : memberRow)(row, workdays, mode, podium))}${averageRow(rows, workdays, full)}`
-    : html`<tr class="static"><td colspan="${full ? 26 : 11}" class="muted">Không có nhân sự nào khớp bộ lọc.</td></tr>`;
+    : html`<tr class="static"><td colspan="${full ? 28 : 13}" class="muted">Không có nhân sự nào khớp bộ lọc.</td></tr>`;
 }
 
 function memberTable(data, ui, report) {

@@ -143,9 +143,28 @@ const serverCard = (status, error) => (status
     </section>`);
 
 /** Ô nhập cookie dùng chung cho CRM và call-report; cookie chỉ nằm trong bộ nhớ máy chủ cục bộ. */
-const cookieCard = (status, { title, formName, clearAct, isSet, placeholder, help }) => html`
+/** "Nhập lúc 09:15 (3 giờ trước)" từ mốc epoch giây do máy chủ cục bộ trả về; quá 8 giờ thì nhắc cookie đã cũ. */
+const COOKIE_OLD_H = 8;
+const cookieAge = (at) => {
+  if (!at) return null;
+  const hours = (Date.now() / 1000 - at) / 3600, clock = new Date(at * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const ago = hours < 1 ? `${Math.max(1, Math.round(hours * 60))} phút trước` : `${Math.round(hours * 10) / 10} giờ trước`;
+  return { text: `Nhập lúc ${clock} (${ago})`, old: hours >= COOKIE_OLD_H };
+};
+
+/** Thông báo kết quả/lỗi của lượt chạy gần nhất (cookie hết hạn, thất bại, đã dừng, mất kết nối). */
+const alertBox = (ui, scope) => {
+  const a = ui.alert;
+  if (!a || a.scope !== scope) return '';
+  return html`<div class="alert alert--${a.tone}" role="alert"><div class="alert__body"><strong>${a.tone === 'good' ? '✅' : a.tone === 'warn' ? '⚠️' : '⛔'} ${a.title}</strong>
+    ${a.text ? html`<p>${a.text}</p>` : ''}${a.hint ? html`<p class="alert__hint">${a.hint}</p>` : ''}</div>
+    <div class="alert__actions">${a.cookie ? html`<button class="btn" type="button" data-act="focus-cookie">Nhập cookie mới</button>` : ''}<button class="btn btn--ghost" type="button" data-act="alert-close">Đóng</button></div></div>`;
+};
+
+const cookieCard = (status, { title, formName, clearAct, isSet, at, placeholder, help }) => html`
   <section class="card">
-    <div class="card__head"><h3 class="card__title">${title}</h3>${isSet ? badge('good', 'Đã nhập') : badge('warn', 'Chưa nhập')}</div>
+    <div class="card__head"><h3 class="card__title">${title}</h3>${isSet ? (cookieAge(at)?.old ? badge('warn', 'Đã cũ, nên nhập lại') : badge('good', 'Đã nhập')) : badge('warn', 'Chưa nhập')}</div>
+    ${isSet && cookieAge(at) ? html`<p class="${cookieAge(at).old ? 'is-warn' : 'muted'}" role="status">${cookieAge(at).text}${cookieAge(at).old ? ` — cookie nhập hơn ${COOKIE_OLD_H} giờ có thể đã hết hiệu lực, nếu đồng bộ báo lỗi hãy lấy cookie mới.` : ''}</p>` : ''}
     <form class="inline-form" data-sform="${formName}">
       <input name="cookie" type="password" autocomplete="off" placeholder="${placeholder}" aria-label="${title}" ${status?.ready ? '' : 'disabled'}>
       <button class="btn" type="submit" ${status?.ready ? '' : 'disabled'}>Lưu</button>
@@ -205,13 +224,13 @@ const runCard = (ui, run) => {
         ${running ? html`<button class="btn btn--ghost" type="button" data-act="crm-stop">Dừng</button>` : ''}
       </div>
       ${status?.ready && !run.cookieSet ? html`<p class="muted">${run.needCookie}</p>` : ''}
-      ${running ? html`<p class="muted" id="crm-elapsed" role="status">Đang chạy… bước lấy dữ liệu từ CRM thường mất 1–2 phút, vui lòng chờ và đừng bấm Dừng.</p>` : ''}
+      ${running ? html`<p class="muted ${job.stalled ? 'is-stalled' : ''}" id="crm-elapsed" role="status">Đang chạy… bước lấy dữ liệu từ CRM thường mất 1–2 phút, vui lòng chờ và đừng bấm Dừng.</p>` : ''}
       <div class="bar" role="progressbar" aria-valuenow="${Math.round(progress * 100)}"><div class="bar__fill" id="crm-progress" style="width:${progress * 100}%"></div></div>
       <pre class="code log" id="crm-log" aria-live="polite">${job ? job.lines.join('\n') : 'Nhật ký sẽ hiện ở đây khi chạy.'}</pre>
     </section>`;
 };
 
-const crmSection = (ui) => html`${serverCard(ui.status, ui.serverError)}${cookieCard(ui.status, { ...CRM_COOKIE, isSet: ui.status?.cookieSet })}${taskTable(ui)}${runCard(ui, {
+const crmSection = (ui) => html`${alertBox(ui, 'crm')}${serverCard(ui.status, ui.serverError)}${cookieCard(ui.status, { ...CRM_COOKIE, isSet: ui.status?.cookieSet, at: ui.status?.cookieAt })}${taskTable(ui)}${runCard(ui, {
   act: 'crm-run', label: `Chạy ${ui.tasks.filter((t) => t.enabled).length} tác vụ đã bật`, ready: ui.tasks.some((t) => t.enabled),
   cookieSet: ui.status?.cookieSet, needCookie: 'Cần nhập cookie CRM trước khi chạy.',
 })}`;
@@ -250,7 +269,7 @@ const callConfigCard = (ui) => {
   </section>`;
 };
 
-const callSection = (ui) => html`${serverCard(ui.status, ui.serverError)}${cookieCard(ui.status, { ...CALL_COOKIE, isSet: ui.status?.callCookieSet })}${callConfigCard(ui)}${runCard(ui, {
+const callSection = (ui) => html`${alertBox(ui, 'call')}${serverCard(ui.status, ui.serverError)}${cookieCard(ui.status, { ...CALL_COOKIE, isSet: ui.status?.callCookieSet, at: ui.status?.callCookieAt })}${callConfigCard(ui)}${runCard(ui, {
   act: 'call-run', dryAct: 'call-dry-run', dryReady: Boolean(ui.call.agents && !resolveRange(ui.call).error), label: 'Xuất dữ liệu call', ready: Boolean(ui.call.agents && ui.call.gsheet_url && !resolveRange(ui.call).error),
   cookieSet: ui.status?.callCookieSet, needCookie: 'Cần nhập cookie call-report trước khi chạy.',
 })}`;

@@ -10,6 +10,8 @@ import { loadAccounts, addAccount, updateAccount, removeAccount, loadLinks, addL
 import { settingsView } from './views/settings.js';
 
 const POLL_MS = 1000;
+const STALL_MS = 180_000;       // quá 3 phút không có dòng nhật ký hay tiến độ mới thì cảnh báo có thể bị treo
+const MAX_POLL_FAILS = 3;       // mất kết nối máy chủ cục bộ liên tiếp bấy nhiêu lần mới báo lỗi
 const CRM_LINK = /^https:\/\/kvcrm\.kiotviet\.vn\//;
 const SHEET_LINK = /^(https:\/\/docs\.google\.com\/spreadsheets\/d\/|[\w-]{20,}$)/;
 const byId = (id) => document.getElementById(id);
@@ -23,7 +25,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     section: 'accounts', accounts: [], links: [], tasks: [], status: null, serverError: '',
     access: { loading: false, error: '', result: null },
     audit: { rows: [], loaded: false, loading: false, error: '', action: 'all', who: 'all', q: '' },
-    job: null, editing: null, error: '', busy: false, loaded: false, loading: false, me: null, months: [],
+    alert: null, job: null, editing: null, error: '', busy: false, loaded: false, loading: false, me: null, months: [],
     call: { gsheet_url: '', tab_name: '', agents: '', cuser: '', date_mode: 'month_to_yesterday', date_from: '', date_to: '' },
   };
   let timer = null;
@@ -32,6 +34,28 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   async function refreshStatus() {
     try { ui.status = await crmServer.status(); ui.serverError = ''; } catch (err) { ui.status = null; ui.serverError = err.message; }
   }
+
+  /** Thông báo kết quả một lượt chạy: cookie hết hạn (đã dừng), bị dừng, có tác vụ thất bại hoặc hoàn tất. */
+  const scopeOf = (job) => (job.kind === 'crm' ? 'crm' : 'call');
+  const runName = (scope) => (scope === 'crm' ? 'đồng bộ CRM' : 'xuất call');
+  function buildAlert(job, data) {
+    const scope = scopeOf(job), failed = data.failed ?? [];
+    if (data.error?.code === 'cookie_expired') {
+      return { scope, tone: 'bad', cookie: true, title: `Cookie ${scope === 'crm' ? 'CRM' : 'call-report'} có thể đã hết hạn: đã dừng ${runName(scope)}`, text: data.error.message, hint: data.error.hint };
+    }
+    if (data.stopped) return { scope, tone: 'warn', title: `Đã dừng ${runName(scope)} theo yêu cầu`, text: `${data.ok}/${data.total} tác vụ đã chạy xong trước khi dừng.` };
+    if (failed.length) {
+      return { scope, tone: 'bad', title: `${failed.length} tác vụ thất bại (${data.ok}/${data.total} thành công)`, text: failed.map((f) => `${f.label}: ${f.message}`).join(' · '), hint: 'Xem chi tiết trong nhật ký bên dưới.' };
+    }
+    return { scope, tone: 'good', title: `Hoàn tất ${runName(scope)}: ${data.ok}/${data.total} tác vụ thành công`, text: '' };
+  }
+  /** Báo cho người đang ở tab khác: đổi tiêu đề trang và (nếu đã cho phép) hiện thông báo của trình duyệt. */
+  function notifyDone(alert) {
+    if (!document.hidden) return;
+    try { document.title = `${alert.tone === 'good' ? '✅' : '⚠️'} ${alert.title}`; } catch { /* bỏ qua */ }
+    try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(alert.title, { body: alert.text || alert.hint || '' }); } catch { /* bỏ qua */ }
+  }
+  const askNotify = () => { try { if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission(); } catch { /* bỏ qua */ } };
 
   /** Hỏi tiến độ tuần tự (xong lượt này mới hỏi lượt sau) và ghi log theo chỉ số tuyệt đối nên không bị lặp dòng. */
   let pollGen = 0;   // mỗi lần bắt đầu hỏi tiến độ là một "thế hệ" mới; vòng hỏi cũ tự dừng để không chạy chồng và lặp dòng
@@ -48,23 +72,35 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
       try {
         const data = await crmServer.job(jobId, since);
         if (gen !== pollGen || !ui.job || ui.job.id !== jobId) return;
-        const clock = byId('crm-elapsed');
-        if (clock && !data.finished) clock.textContent = elapsedText();
+        ui.job.pollFails = 0;
         data.logs.forEach((line, i) => { ui.job.lines[since + i] = line; });
-        Object.assign(ui.job, { next: Math.max(ui.job.next, data.next), done: data.done, total: data.total, ok: data.ok, finished: data.finished });
+        if (data.logs.length || data.done !== ui.job.done) ui.job.lastProgressAt = Date.now();
+        Object.assign(ui.job, { next: Math.max(ui.job.next, data.next), done: data.done, total: data.total, ok: data.ok, finished: data.finished, error: data.error ?? null, failed: data.failed ?? [] });
+        const idle = Date.now() - ui.job.lastProgressAt, stalled = !data.finished && idle > STALL_MS;
+        ui.job.stalled = stalled;
+        const clock = byId('crm-elapsed');
+        if (clock && !data.finished) {
+          clock.textContent = stalled ? `⚠ Chưa có tiến triển trong ${Math.floor(idle / 60_000)} phút. Có thể cookie hết hạn hoặc CRM đang treo: bạn nên bấm Dừng rồi kiểm tra cookie.` : elapsedText();
+          clock.classList.toggle('is-stalled', stalled);
+        }
         const log = byId('crm-log');
         if (log) { log.textContent = ui.job.lines.join('\n'); log.scrollTop = log.scrollHeight; }
         const bar = byId('crm-progress');
         if (bar) bar.style.width = `${(data.total ? data.done / data.total : 0) * 100}%`;
         if (data.finished) {
+          ui.alert = buildAlert(ui.job, data); notifyDone(ui.alert);
           if (!ui.job.logged) { ui.job.logged = true; note(ui.job.kind === 'crm' ? 'Đồng bộ CRM xong' : 'Xuất call xong', ui.job.kind === 'crm' ? 'CRM' : 'Xuất call', `${data.ok}/${data.total} tác vụ thành công`); }
           await refreshStatus();
           if (ui.job.kind === 'crm' && data.ok > 0) await stampSync();
           return rerender({ keep: true });
         }
       } catch (err) {
+        ui.job.pollFails = (ui.job.pollFails ?? 0) + 1;
+        if (ui.job.pollFails < MAX_POLL_FAILS) { timer = setTimeout(tick, POLL_MS * 2); return; }   // chập chờn thoáng qua thì thử lại
         ui.job.lines.push(`Mất kết nối máy chủ cục bộ: ${err.message}`);
         ui.job.finished = true;
+        ui.alert = { scope: scopeOf(ui.job), tone: 'bad', title: 'Mất kết nối với máy chủ cục bộ', text: err.message, hint: 'Kiểm tra cửa sổ chạy server.py còn mở không. Lượt chạy có thể vẫn đang tiếp tục trên máy chủ: mở lại trang này để xem kết quả, hoặc chạy lại.' };
+        notifyDone(ui.alert);
         return rerender({ keep: true });
       }
       timer = setTimeout(tick, POLL_MS);
@@ -81,7 +117,8 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   }
 
   function resumeJob(jobId, kind = '') {
-    ui.job = { kind, id: jobId, lines: [], next: 0, done: 0, total: 0, ok: 0, finished: false, startedAt: Date.now() };
+    ui.alert = null;
+    ui.job = { kind, id: jobId, lines: [], next: 0, done: 0, total: 0, ok: 0, finished: false, startedAt: Date.now(), lastProgressAt: Date.now() };
     startPolling(jobId);
   }
 
@@ -204,6 +241,8 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   const ACTIONS = {
     section: (key) => { if (['links', 'crm', 'call', 'audit'].includes(key) && getMe()?.role !== 'admin') return; Object.assign(ui, { section: key, editing: null, error: '' }); if (key === 'audit' && !ui.audit.loaded) reloadAudit(); rerender(); },
     'audit-reload': () => reloadAudit(),
+    'alert-close': () => { ui.alert = null; rerender({ keep: true }); },
+    'focus-cookie': () => { rerender({ keep: true }); setTimeout(() => { const f = document.querySelector(`form[data-sform="${ui.section === 'call' ? 'call-cookie' : 'cookie'}"] input`); f?.scrollIntoView({ block: 'center' }); f?.focus(); }, 60); },
     cancel: () => { ui.editing = null; ui.error = ''; rerender(); },
     'account-edit': edit('account'),
     'account-delete': remove((e) => `Xóa tài khoản ${e}?`, (e) => async () => { ui.accounts = await removeAccount(getMe().role, e); note('Xóa tài khoản', e); }),
@@ -243,10 +282,11 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
       note('Xóa tác vụ CRM', gone);
     }),
     'call-cookie-clear': () => run(async () => { await callServer.clearCookie(); await refreshStatus(); note('Xóa cookie xuất call', 'Xuất call'); }),
-    'call-run': () => runCall(false),
+    'call-run': () => { askNotify(); return runCall(false); },
     'call-dry-run': () => runCall(true),
     'cookie-clear': () => run(async () => { await crmServer.clearCookie(); await refreshStatus(); note('Xóa cookie CRM', 'CRM'); }),
     'crm-run': () => run(async () => {
+      askNotify();   // xin quyền thông báo của trình duyệt (cần thao tác bấm) để báo khi chạy xong lúc đang ở tab khác
       await getWriteToken();   // xin quyền ghi ngay khi bấm, để cuối job ghi được thời gian cập nhật
       const { jobId } = await crmServer.run(ui.tasks.filter((t) => t.enabled));
       note('Chạy đồng bộ CRM', 'CRM', `${ui.tasks.filter((t) => t.enabled).length} tác vụ`);

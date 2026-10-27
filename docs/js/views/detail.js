@@ -3,6 +3,7 @@ import { pct, num, hm } from '../format.js';
 import { memberStatus, elapsedRatio } from '../metrics.js';
 import { meter, statusBadge, passBadge } from './components.js';
 import { timesheetView } from './timesheet.js';
+import { addonScoreCard } from './addonScore.js';
 
 const section = (title, b, extra = '') => html`
   <section class="card">
@@ -43,6 +44,7 @@ export function detailView(team, m, workdays, report) {
       ${section('Điều kiện cần', m.need)}
       ${section('Điểm tổng (70%)', m.main)}
       ${section('Add-on (30%)', m.addon)}
+      ${addonScoreCard(m)}
       ${m.talk ? html`
         <section class="card">
           <div class="card__head"><h3 class="card__title">Talk time</h3>${passBadge(m.talk.pass)}</div>

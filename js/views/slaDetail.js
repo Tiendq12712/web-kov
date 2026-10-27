@@ -61,7 +61,7 @@ export function slaDetailView(data, { month, manager, code, names }) {
     <div class="toolbar"><h2 class="section-title">Data lâu nhất</h2><p class="muted">15 data có số ngày xử lý (ngày lịch) dài nhất.</p></div>
     <div class="table-wrap"><table class="sla-table">
       <thead><tr><th scope="col">Retailer</th>${manager ? html`<th scope="col">Nhân sự</th>` : ''}<th scope="col">Tạo</th><th scope="col">Tương tác</th><th scope="col" class="right">Số ngày</th><th scope="col">Tình trạng</th><th scope="col">Nguồn</th></tr></thead>
-      <tbody>${a.longest.map((x) => html`<tr class="static"><td class="num">${x.retailer || '—'}</td>${manager ? html`<td>${names.get(/^(\d+)/.exec(x.handler)?.[1]) ?? x.handler.replace(/^\d+\s*-\s*/, '').split(' - ')[0]}</td>` : ''}<td class="num">${dt(x.createdTs)}</td><td class="num">${x.status === 'Đã làm' ? dt(x.modifiedTs) : 'Đến hôm nay'}</td><td class="right num strong">${String(x.elapsed)}</td>
+      <tbody>${a.longest.map((x) => html`<tr class="static"><td class="num">${x.retailer || '—'}</td>${manager ? html`<td>${names.get(/^(\d+)/.exec(x.handler)?.[1]) ?? x.handler.replace(/^\d+\s*-\s*/, '').split(' - ')[0]}${/^(\d+)/.exec(x.handler)?.[1] ? html` <small class="muted">${/^(\d+)/.exec(x.handler)[1]}</small>` : ''}</td>` : ''}<td class="num">${dt(x.createdTs)}</td><td class="num">${x.status === 'Đã làm' ? dt(x.modifiedTs) : 'Đến hôm nay'}</td><td class="right num strong">${String(x.elapsed)}</td>
         <td><span class="badge badge--${KIND[x.kind][0]}">${KIND[x.kind][1]}</span></td><td>${x.source}</td></tr>`)}</tbody>
     </table></div>`;
 }

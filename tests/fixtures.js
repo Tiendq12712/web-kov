@@ -2,7 +2,7 @@
 const col = (letters) => [...letters].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1;
 const rowOf = (cells, width = 30) => { const r = Array(width).fill(''); for (const [letters, v] of Object.entries(cells)) r[col(letters)] = v; return r; };
 
-export const IDS = { config: null, kpi: 'KPIFILE000000000000000000001', score: 'SCOREFILE0000000000000000001' };
+export const IDS = { config: null, kpi: 'KPIFILE000000000000000000001', score: 'SCOREFILE0000000000000000001', hr: 'HRFILE0000000000000000000001', addon: 'ADDONFILE000000000000000000001' };
 const TEAM1 = [['9001', 'Nguyễn Văn An'], ['9002', 'Trần Thị Bình'], ['9003', 'Lê Hoàng Cường'], ['9004', 'Phạm Thu Dung']];
 const TEAM2 = [['9005', 'Võ Minh Em'], ['9006', 'Đỗ Thanh Giang'], ['9007', 'Bùi Quốc Hùng'], ['9008', 'Hoàng Thị Lan']];
 export const PEOPLE = [...TEAM1, ...TEAM2];
@@ -54,15 +54,49 @@ function scoreTab() {
     r('9001 - Nguyễn Văn An - Customer Success', '10/17/2026', '', 'ĐẠT, xử lý nhanh gọn', '', 4)];
 }
 
+/** Sheet Addon: mỗi loại (Payment, HDDT, Kship) một tab, có cột "Điểm ghi nhận". 9001: Payment 5đ + 0đ, Kship 1đ → trừ 9đ. */
+function addonTabs() {
+  const who = (code, name) => `${code} - ${name} - Customer Success`;
+  const pay = [['STT', 'activityid', 'retailer_id', 'Khối SC hỗ trợ', 'Ngày tạo act', 'Ngày chỉnh sửa', 'Ngày đăng ký lần đầu', 'Trang thái đky?', 'Số ngày có digi invoice trong 30D', 'SC impact thành công payment?', 'last_name', 'Điểm ghi nhận'],
+    ['1', '1001', '501000001', 'CSKH mới T15 - DVKH', '08/10/2026', '15/10/2026', '06/10/2026', 'yes', '9', 'success', who('9001', 'Nguyễn Văn An'), '5'],
+    ['1', '1002', '501000002', 'CSKH mới T15 - DVKH', '08/10/2026', '15/10/2026', '06/10/2026', 'yes', '1', 'non-success', who('9001', 'Nguyễn Văn An'), '0'],
+    ['1', '1003', '501000003', 'CSKH mới T15 - DVKH', '08/10/2026', '14/10/2026', '', 'yes', '12', 'success', who('9002', 'Trần Thị Bình'), '5'],
+    ['1', '1004', '501000004', 'CSKH mới T15 - DVKH', '08/10/2026', '14/10/2026', '', 'yes', '3', 'non-success', who('8201', 'Người Ngoài Danh Sách'), '0']];
+  const hddt = [['STT', 'activityid', 'retailer_id', 'createdtime', 'modifiedtime', 'min_merchant_regist_date', 'min_txn_date', 'total_einvoice', 'impact_hddt', 'last_name', 'Điểm ghi nhận'],
+    ['1', '2001', '501000005', '25/09/2026', '30/09/2026', '29/09/2026', '09/10/2026', '4', 'yes', who('9003', 'Lê Hoàng Cường'), '5'],
+    ['1', '2002', '501000006', '06/10/2026', '09/10/2026', '', '', '', 'no', who('9003', 'Lê Hoàng Cường'), '0']];
+  const kship = [['STT', 'last_name', 'ticket_no', 'tk_createdtime', 'last_interaction_time', 'potentialid', 'retailer_id', 'kship_status', 'kship_nn_that_bai', 'kship_chitiet_that_bai', 'add_on', 'Điểm ghi nhận'],
+    ['1', who('9001', 'Nguyễn Văn An'), 'TT1', '19/10/2026', '19/10/2026', '1', '501000007', 'Bán hàng', 'KH đang tìm hiểu', 'cần quen thao tác', 'Giới thiệu Kship', '1'],
+    ['1', who('9002', 'Trần Thị Bình'), 'TT2', '20/10/2026', '20/10/2026', '2', '501000008', 'Thành công', '', '', 'Giới thiệu Kship', '5']];
+  return { 'Payment': pay, 'HDDT': hddt, 'Kship': kship };
+}
+
+/** Sheet nhân sự: tab "Danh sách" và tab "Phép năm 2026" (mỗi tháng một khối 3 cột: phép thêm, đã dùng, còn). */
+function hrTabs() {
+  const staff = [['Tên nhân sự', 'Mã NV', 'Đầu số', 'Khu vực', 'Giới tính', 'Level'], ...PEOPLE.map(([code, name], i) => [`${code} - ${name} - Customer Success`, `NV${100 + i}`, code, i < 4 ? 'Miền Nam' : 'Miền Bắc', i % 2 ? 'Nữ' : 'Nam', 2])];
+  const months = Array.from({ length: 10 }, (_, i) => i + 1);
+  const title = ['', '', '', '', ''], head = ['MNV', 'Họ và tên', 'Phòng ban', '2025', '2026'];
+  months.forEach((m) => { title.push(`${String(m).padStart(2, '0')}/2026`, '', ''); head.push('Phép thêm', 'Đã dùng', 'Còn'); });
+  const leave = [title, head, ...PEOPLE.map(([, name], i) => {
+    const row = [`NV${100 + i}`, name, 'SC', '2', '12'];
+    let bal = 2 + (i % 3);
+    months.forEach((m) => { const used = (m + i) % 4 === 0 ? 1 : 0; bal += 1 - used; row.push('1', used ? String(used) : '', (bal - (i === 3 ? m * 0.6 : 0)).toFixed(1).replace('.', ',')); });
+    return row;
+  })];
+  return { 'Danh sách': staff, 'Phép năm 2026': leave };
+}
+
 /** Bảng tab theo từng Sheet: { [sheetId]: { [tên tab]: giá trị } }. */
 export function buildFixtures(configId, memberEmail) {
   return {
     [configId]: {
       'Tài khoản': [['1', 'admin@kiotviet.com', 'Admin', 'Full quyền', 'Quản Trị Viên', 'Nam', ''], ['2', memberEmail, 'Thành viên', 'Chỉ xem', 'Nguyễn Văn An', 'Nam', '9001']],
-      'Danh sách link': [['KPI', IDS.kpi, 'KPI'], ['Chấm call', IDS.score, '']],
-      'Cập nhật': [], 'Lịch sử': [], 'Đã nghe lại': [], 'Nhật ký thao tác': [], 'Gia hạn SLA': [], 'Cấu hình đồng bộ': [], 'Cấu hình call': [],
+      'Danh sách link': [['KPI', IDS.kpi, 'KPI'], ['Chấm call', IDS.score, ''], ['Danh sách nhân sự SC', IDS.hr, ''], ['Addon', IDS.addon, '']],
+      'Cập nhật': [], 'Lịch sử': [], 'Đã nghe lại': [], 'Nhật ký thao tác': [], 'Gia hạn SLA': [], 'Cấu hình đồng bộ': [['https://kvcrm.kiotviet.vn/crm/list?filter=1', 'https://docs.google.com/spreadsheets/d/ABCDEFGHIJKLMNOPQRSTUVWXYZ/edit', 'Data T10', 'Bật', 'Tác vụ mẫu']], 'Cấu hình call': [],
     },
     [IDS.kpi]: { 'KPI T10': kpiTab(), 'Data T10': detailTab() },
     [IDS.score]: { 'Phản hồi biểu mẫu 1': scoreTab() },
+    [IDS.hr]: hrTabs(),
+    [IDS.addon]: addonTabs(),
   };
 }

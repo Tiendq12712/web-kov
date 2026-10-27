@@ -437,6 +437,7 @@ document.addEventListener('click', (e) => {
   if (hit('[data-coach-side]')) { state.coachPref.side = state.coachPref.side === 'right' ? 'left' : 'right'; saveCoachPref(); return renderCoach(); }
   if (hit('[data-copy-link]')) { copyLink(hit('[data-copy-link]')); return; }
   if (hit('[data-lib-cat]')) { state.library.cat = hit('[data-lib-cat]').dataset.libCat; return renderView(); }
+  if (hit('[data-hr-status]')) { state.hr.status = hit('[data-hr-status]').dataset.hrStatus; return renderView(); }
   if (hit('[data-trend-range]')) { state.trend.range = hit('[data-trend-range]').dataset.trendRange; return renderView(); }
   if (hit('[data-trend-metric]')) { state.trend.metric = hit('[data-trend-metric]').dataset.trendMetric; return renderView(); }
   if (hit('[data-record-history]')) return recordHistoryNow();

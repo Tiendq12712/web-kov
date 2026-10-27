@@ -3,6 +3,8 @@
 #   sh scripts/check.sh          -> kiểm tra mã nguồn (thư mục gốc)
 #   sh scripts/check.sh docs     -> kiểm tra bản phát hành trong docs/
 DIR="${1:-.}"
+# Kiểm tra phần máy chủ cục bộ (phân loại lỗi cookie hết hạn…); python3 có sẵn trên máy chạy tool.
+if command -v python3 >/dev/null 2>&1 && [ -f tests/test_job_errors.py ]; then python3 -I tests/test_job_errors.py || { echo "Kiểm tra tự động: KHÔNG ĐẠT (job_errors)"; exit 1; }; fi
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 if [ ! -x "$CHROME" ]; then echo "Không tìm thấy Chrome ($CHROME) nên bỏ qua kiểm tra tự động."; exit 0; fi
 [ "$DIR" = "." ] || { mkdir -p "$DIR/tests" && cp tests/*.html tests/*.js "$DIR/tests/"; }

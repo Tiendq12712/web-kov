@@ -37,7 +37,7 @@ export const state = {
   callctl: { data: null, loading: false, error: '', month: 'all', person: 'all', q: 'all', stars: 'all', has: 'all', err: 'all', sort: 'priority', text: '' },   // kết quả chấm call (Sheet Chấm call)
   control: { rule: 'all', person: 'all' },   // kiểm soát data theo quy trình (dùng chung dữ liệu chi tiết Data Txx)
   addons: { data: null, loading: false, error: '', month: 'all', type: 'all', person: 'all', status: 'all', q: '' },   // add-on nhân sự chọn và được ghi nhận (Sheet PBI, tab Chi tiết addon)   // phân tích tệp data (tab Data Txx)   // từng cuộc gọi (Sheet "Dữ liệu call")
-  hr: { data: null, loading: false, error: '', q: '', region: 'all' },   // nhân sự và phép năm
+  hr: { data: null, loading: false, error: '', q: '', region: 'all', status: 'all' },   // nhân sự và phép năm
   library: { data: null, loading: false, error: '', cat: 'all', q: '' },   // thư viện tài liệu (quy trình, chính sách, giải trình…)
   coach: null, coachBump: 0,   // nhân vật Coach KPI nổi ở góc màn hình
   coachPref: readCoachPref(),  // { side: 'left' | 'right', open }

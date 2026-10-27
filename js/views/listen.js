@@ -65,7 +65,7 @@ export function listenView(data, ui, { names }) {
     <div class="toolbar"><h2 class="section-title">Danh sách data nên nghe lại</h2><p class="muted">${num(shownAll.length)} data${shownAll.length > shown.length ? ` (hiển thị ${num(shown.length)} data ưu tiên cao nhất)` : ''}. Dùng Retailer ID và thời gian tương tác để tìm bản ghi âm trong CRM; số điện thoại trong ghi chú được che bớt.</p></div>
     <div class="table-wrap"><table class="connect-table">
       <thead><tr><th scope="col">Mức</th><th scope="col" class="sticky-col">Nhân sự</th><th scope="col">Retailer ID</th><th scope="col">Tạo / tương tác</th><th scope="col" class="right">Số cuộc gọi</th><th scope="col">Dấu hiệu</th><th scope="col">Sau khi nghe</th><th scope="col">Ghi chú nhân sự</th></tr></thead>
-      <tbody>${shown.map((i) => html`<tr class="static"><td><span class="badge badge--${LEVEL[i.level][0] || 'warn'}">${LEVEL[i.level][1]}</span></td><td class="sticky-col"><strong>${nm(i.code, i.name)}</strong></td>
+      <tbody>${shown.map((i) => html`<tr class="static"><td><span class="badge badge--${LEVEL[i.level][0] || 'warn'}">${LEVEL[i.level][1]}</span></td><td class="sticky-col"><span class="person"><strong>${nm(i.code, i.name)}</strong>${i.code ? html`<small>${i.code}</small>` : ''}</span></td>
         <td class="num">${i.r.retailer || '—'}</td><td class="num muted">${dmy(i.r.created)}<br><small>${when(i.r.modifiedTs)}</small></td><td class="right num">${i.r.calls ?? '—'}</td>
         <td>${i.signals.length ? i.signals.map((k) => html`<span class="badge badge--${SIGNALS[k].weight >= 3 ? 'bad' : 'warn'}" title="${SIGNALS[k].hint}">${SIGNALS[k].short}</span> `) : html`<span class="muted">Chỉ vì không impact</span>`}</td>
         <td class="heard-cell">${(() => {

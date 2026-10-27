@@ -1251,3 +1251,35 @@ td.impact--good { color: var(--good); font-weight: 700; } td.impact--warn { colo
 .charts.region-split > * { margin: 0; }
 @media (max-width: 900px) { .charts.region-split { grid-template-columns: minmax(0, 1fr); } }
 .team-split .hist__row { grid-template-columns: minmax(80px, 130px) minmax(40px, 1fr) auto; }
+
+/* Phép năm: ô dùng phép đậm dần, thanh dùng phép, thẻ tóm tắt cá nhân */
+.hr-used { background: color-mix(in srgb, var(--accent) calc(18% + var(--i, .5) * 55%), transparent) !important; color: var(--text); font-weight: 700; }
+.hr-use { min-width: 140px; } .hr-use .bar { margin: 4px 0 2px; } .hr-use small { display: block; text-align: right; }
+.hr-spark { min-width: 100px; } .hr-hist .hist__row { grid-template-columns: minmax(110px, 170px) 1fr 80px; }
+.hr-hero { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: 20px; align-items: center; margin-bottom: 14px; }
+.hr-hero__msg { font-size: 17px; font-weight: 600; margin: 8px 0; line-height: 1.5; }
+@media (max-width: 700px) { .hr-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
+
+/* Phép năm: phép tồn năm trước và hạn 31/3 */
+.hr-carry { min-width: 120px; } .hr-carry-note { display: block; margin-top: 2px; } .hr-carry-note .badge { font-size: 11px; }
+.hr-carry-col { background: color-mix(in srgb, var(--warn-fill) 12%, transparent); font-weight: 700; }
+.hr-policy { margin: 6px 0 12px; line-height: 1.55; }
+.hr-carry-alert { margin: 0 0 14px; line-height: 1.55; } .hr-carry-alert--bad { background: var(--bad-soft); color: var(--bad); }
+
+/* Phép năm: cụm mốc hết tháng 3 giữa T3 và T4 */
+.hr-matrix .hr-cut { background: color-mix(in srgb, var(--accent) 9%, transparent); border-left: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.hr-matrix .hr-cut--head { color: var(--accent); font-weight: 700; white-space: normal; min-width: 76px; line-height: 1.25; }
+.hr-matrix td.hr-cut:nth-of-type(7) { border-right: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+
+/* Thông báo lỗi/kết quả đồng bộ CRM và xuất call */
+.alert { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; padding: 12px 16px; margin: 0 0 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }
+.alert p { margin: 4px 0 0; line-height: 1.5; font-size: 14px; } .alert__hint { font-weight: 600; }
+.alert__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.alert--bad { background: var(--bad-soft); border-color: var(--bad-fill); color: var(--bad); } .alert--warn { background: var(--warn-soft); border-color: var(--warn-fill); color: var(--warn); } .alert--good { background: var(--good-soft); border-color: var(--good-fill); color: var(--good); }
+.alert--bad p, .alert--warn p, .alert--good p { color: var(--text); }
+#crm-elapsed.is-stalled { color: var(--warn); font-weight: 700; }
+
+/* Điểm Add-on thực đạt (Payment / Kship / HDDT) */
+td.addon-lost, .addon-lost { color: var(--bad); font-weight: 700; }
+.addon-lost-list { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; }
+.card__subtitle { margin: 14px 0 4px; font-size: 13px; }

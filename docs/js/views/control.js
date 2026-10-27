@@ -49,7 +49,7 @@ export function controlView(data, ui, { manager, code, names, month }) {
     </div>
     <div class="table-wrap"><table class="connect-table">
       <thead><tr><th scope="col">Ngày tạo</th>${manager ? html`<th scope="col" class="sticky-col">Nhân sự</th>` : ''}<th scope="col">Retailer</th><th scope="col">Lỗi</th><th scope="col">Mô tả</th></tr></thead>
-      <tbody>${shown.map((f) => html`<tr class="static"><td class="num">${dmy(f.r.created)}</td>${manager ? html`<td class="sticky-col"><strong>${names.get(/^(\d+)/.exec(f.r.handler)?.[1]) ?? f.r.handler.replace(/^\d+\s*-\s*/, '').split(' - ')[0]}</strong></td>` : ''}<td class="num">${f.r.retailer || '—'}</td>
+      <tbody>${shown.map((f) => html`<tr class="static"><td class="num">${dmy(f.r.created)}</td>${manager ? html`<td class="sticky-col"><span class="person"><strong>${names.get(/^(\d+)/.exec(f.r.handler)?.[1]) ?? f.r.handler.replace(/^\d+\s*-\s*/, '').split(' - ')[0]}</strong>${/^(\d+)/.exec(f.r.handler)?.[1] ? html`<small>${/^(\d+)/.exec(f.r.handler)[1]}</small>` : ''}</span></td>` : ''}<td class="num">${f.r.retailer || '—'}</td>
         <td>${f.found.map((x) => html`<span class="badge badge--${x.rule.soft ? 'warn' : 'bad'}" title="${x.rule.label}">${x.note}</span> `)}</td><td class="muted ctl-desc">${maskPhone(f.r.desc).slice(0, 140)}${f.r.desc.length > 140 ? '…' : ''}</td></tr>`)}</tbody>
     </table></div>`;
 }

@@ -27,6 +27,10 @@ const preamble = (fixtures, email) => `
     }
     m = /spreadsheets\\/([^/?:]+)\\?fields/.exec(u);
     if (m) return FX[m[1]] ? json({ sheets: Object.keys(FX[m[1]]).map((title) => ({ properties: { title } })) }) : json({}, 404);
+    const api = window.__api;
+    if (api && u.includes('/api/crm/status')) return json({ ready: true, error: null, cookieSet: true, callCookieSet: false, cookieAt: api.cookieAt, callCookieAt: null, running: false, jobId: null });
+    if (api && u.includes('/api/crm/run') && init.method === 'POST') return json({ jobId: 'j1' });
+    if (api && /\\/api\\/crm\\/jobs\\/j1/.test(u)) return json({ id: 'j1', logs: api.job.logs.slice(Number(/since=(\\d+)/.exec(u)?.[1] ?? 0)), next: api.job.logs.length, done: api.job.done, total: api.job.total, ok: api.job.ok, finished: api.job.finished, error: api.job.error ?? null, failed: api.job.failed ?? [], stopped: Boolean(api.job.stopped) });
     if (u.includes('/api/')) return json({ error: 'Máy chủ cục bộ không chạy (kiểm tra tự động)' }, 404);
     return json({}, 404);
   };
@@ -35,14 +39,14 @@ const preamble = (fixtures, email) => `
 async function waitFor(fn, ms = 8000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (fn()) return true; } catch { /* chờ tiếp */ } await sleep(80); } return false; }
 
 /** Mở ứng dụng với một tài khoản; trả về { win, doc, open(tab), stop() }. */
-export async function bootApp({ root, email, configId }) {
+export async function bootApp({ root, email, configId, api = null }) {
   // Phiên giả đặt từ trang kiểm tra (cùng nguồn gốc nên cùng localStorage) trước khi dựng iframe.
   const d = new Date(), todayIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   Object.keys(localStorage).filter((k) => k.startsWith('kpi.')).forEach((k) => localStorage.removeItem(k));
   localStorage.setItem('kpi.session', JSON.stringify({ token: 'fake', email, date: todayIso, write: true, expiresAt: Date.now() + 3_600_000 }));
   localStorage.setItem('kpi.write', '1');
   const html = await (await fetch(`${root}index.html`, { cache: 'no-store' })).text();
-  const patched = html.replace('<head>', `<head><base href="${root}"><script>${preamble(buildFixtures(configId, email), email)}<\/script>`);
+  const patched = html.replace('<head>', `<head><base href="${root}"><script>${api ? `window.__api = ${JSON.stringify(api)};` : ''}${preamble(buildFixtures(configId, email), email)}<\/script>`);
   const frame = document.createElement('iframe');
   frame.style.cssText = 'width:1200px;height:800px;position:fixed;left:-3000px;top:0';
   frame.srcdoc = patched;
