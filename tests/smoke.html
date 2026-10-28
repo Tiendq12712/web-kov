@@ -409,6 +409,30 @@ await test('Ứng dụng (Nhân sự): vào trang "Hôm nay của tôi", xem T�
   } finally { app.stop(); }
 });
 
+await test('Customer Info: so sánh theo tuần và theo nhân sự', async () => {
+  const cw = await import(`${root}js/cinfoWeekly.js`), pv = await import(`${root}js/views/cinfo.js`), { parsePbi } = await import(`${root}js/pbi.js`);
+  const mk = (modified, code, used, advised, match) => ({ modified, code, name: `NS${code}`, used, advised, match, created: modified, type: 'T15', status: 'Completed', featScore: 50, setupScore: 70 });
+  const acts = [];
+  // tuần 05-11/10: 40 act (4 không dùng, 8 tư vấn, 2 khớp); tuần 12-18/10: 40 act (2 không dùng, 10 tư vấn, 5 khớp); tuần 19-25/10: 10 act (ít)
+  for (let i = 0; i < 40; i++) acts.push(mk('2026-10-06', i % 2 ? 'A' : 'B', i >= 4, i < 8, i < 2));
+  for (let i = 0; i < 40; i++) acts.push(mk('2026-10-13', i % 2 ? 'A' : 'B', i >= 2, i < 10, i < 5));
+  for (let i = 0; i < 10; i++) acts.push(mk('2026-10-20', 'A', true, i < 2, i < 1));
+  acts.push(mk('2026-10-25', 'A', true, false, false));
+  const w = cw.weeklyStats(acts);
+  eq(w.map((x) => x.start), ['2026-10-05', '2026-10-12', '2026-10-19'], 'chia tuần từ thứ 2');
+  eq([w[0].total, Math.round(w[0].useRate * 1000), Math.round(w[0].adviceRate * 100), Math.round(w[0].matchRate * 100)], [40, 900, 20, 25], 'tuần 1: 90% dùng C-Info, 20% tư vấn, 25% khớp');
+  eq([w[1].matched, w[1].advised], [5, 10], 'tuần 2 khớp 5/10'); eq([w[0].partial, w[1].partial, w[2].partial, w[2].small], [true, false, false, true], 'tuần đầu bị cắt là chưa đủ; tuần có dữ liệu tới chủ nhật là đủ; tuần ít act là small');
+  eq(cw.compareWeeks(w).map((x) => x.start), ['2026-10-12', '2026-10-19'], 'chỉ có 1 tuần đủ dữ liệu thì lấy hai tuần cuối');
+  const acts2 = [...acts, ...Array.from({ length: 40 }, (_, i) => mk('2026-10-07', 'A', true, false, false)), ...Array.from({ length: 40 }, (_, i) => mk('2026-10-27', 'A', true, false, false))];
+  const w2 = cw.weeklyStats(acts2); const p2 = cw.compareWeeks(w2);
+  eq(p2 != null, true, 'có hai tuần để so sánh'); const pc = cw.peopleCompare(acts2, p2); eq(pc.length >= 1, true, 'có bảng theo nhân sự');
+  const rows = [Object.keys({}).length ? [] : ['activityid', 'last_name', 'used_stt', 'is_match_feature', 'status', 'createdtime', 'modifiedtime', 'Công việc hỗ trợ', 'feature_score_t', 'setup_score_t'],
+    ['1', '8101 - An - Customer Success', 'Có', '1', 'Completed', '01/10/2026', '06/10/2026', 'Tư vấn tính năng', '60,5', '80']];
+  const parsed = parsePbi(rows); eq([parsed.acts[0].featScore, parsed.acts[0].setupScore], [60.5, 80], 'đọc điểm tính năng và setup (dấu phẩy thập phân)');
+  const out = String(pv.cinfoView({ ...parsePbi(rows), acts, people: [], types: [], statuses: [], createdRange: ['', ''], modifiedRange: ['', ''] }, { ...pv.DEFAULT_FILTERS }, { manager: true, code: null }));
+  eq(out.includes('So sánh theo tuần') && out.includes('chưa đủ tuần'), true, 'giao diện có bảng so sánh theo tuần và nhãn tuần chưa đủ'); eq((out.match(/<svg viewBox="0 0 [^>]*aria-label="Biểu đồ đường"/g) ?? []).length, 3, 'có 3 biểu đồ theo tuần'); eq(out.includes('10/05*') || out.includes('05/10*'), true, 'nhãn tuần chưa đủ có dấu *');
+});
+
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {
   const as = await import(`${root}js/addonScore.js`), ad = await import(`${root}js/addonDetail.js`), fx = await import(`${root}tests/fixtures.js`);
   const tabs = fx.buildFixtures('cfg', 'x@kiotviet.com')[fx.IDS.addon];

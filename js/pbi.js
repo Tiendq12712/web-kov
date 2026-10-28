@@ -23,6 +23,9 @@ function features(v) {
   return t.split('|##|').map((x) => x.trim()).filter(Boolean);
 }
 
+/** Điểm dạng số (có thể dùng dấu phẩy thập phân); trống thì null. */
+const score = (v) => { const t = text(v).replace(',', '.'); return t !== '' && Number.isFinite(Number(t)) ? Number(t) : null; };
+
 export function parsePbi(rows) {
   if (rows.length < 2) throw new Error('Tab dữ liệu Power BI chưa có dòng nào');
   const head = rows[0].map(text);
@@ -30,7 +33,7 @@ export function parsePbi(rows) {
   const idx = {
     id: col('activityid'), retailer: col('retailer_id'), type: col('Loại công việc'), who: col('last_name'), used: col('used_stt'),
     match: col('is_match_feature'), status: col('status'), created: col('createdtime'), modified: col('modifiedtime'),
-    support: col('Công việc hỗ trợ'), matched: col('matched_feature'), sc: col('Tính năng SC tư vấn'), rcm: col('Tính năng rcm tư vấn'),
+    support: col('Công việc hỗ trợ'), matched: col('matched_feature'), sc: col('Tính năng SC tư vấn'), rcm: col('Tính năng rcm tư vấn'), featScore: col('feature_score_t'), setupScore: col('setup_score_t'),
   };
   if (idx.who < 0 || idx.used < 0) throw new Error('Tab dữ liệu Power BI thiếu cột last_name hoặc used_stt');
   const get = (r, k) => (idx[k] >= 0 ? r[idx[k]] : '');
@@ -46,6 +49,7 @@ export function parsePbi(rows) {
       // Tư vấn tính năng: cột "Công việc hỗ trợ" có công việc "Tư vấn tính năng" (có thể kèm công việc khác, ngăn bằng "|##|").
       support: text(get(r, 'support')), advised: /tư vấn tính năng/i.test(text(get(r, 'support'))), scFeatures: sc,
       matchedFeatures: features(get(r, 'matched')), rcmFeatures: features(get(r, 'rcm')),
+      featScore: score(get(r, 'featScore')), setupScore: score(get(r, 'setupScore')),
     };
   });
   if (!acts.length) throw new Error('Không có activity nào trong tab dữ liệu Power BI');

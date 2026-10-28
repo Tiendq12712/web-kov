@@ -1283,3 +1283,10 @@ td.impact--good { color: var(--good); font-weight: 700; } td.impact--warn { colo
 td.addon-lost, .addon-lost { color: var(--bad); font-weight: 700; }
 .addon-lost-list { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; }
 .card__subtitle { margin: 14px 0 4px; font-size: 13px; }
+
+/* So sánh theo tuần (Customer Info) */
+.delta { display: block; font-size: 11px; font-weight: 700; color: var(--muted); }
+.delta--good { color: var(--good); } .delta--bad { color: var(--bad); }
+tr.is-partial td { opacity: .72; }
+
+.cinfo-charts { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 12px; }

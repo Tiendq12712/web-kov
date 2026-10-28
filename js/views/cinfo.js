@@ -1,5 +1,7 @@
 import { html } from '../dom.js';
 import { num, pct } from '../format.js';
+import { lineChart, chartCard } from './charts.js';
+import { weeklyStats, compareWeeks, peopleCompare, MIN_WEEK_ACTS } from '../cinfoWeekly.js';
 
 /** Mục tiêu tỉ lệ SC dùng Customer Info; ≥ 95% xanh, từ mục tiêu tới 95% vàng, dưới mục tiêu đỏ. */
 export const TARGET = 0.9;
@@ -23,6 +25,62 @@ const totalsOf = (acts) => ({
   total: acts.length, notUsed: acts.filter((a) => !a.used).length,
   advised: acts.filter((a) => a.advised).length, matched: acts.filter((a) => a.advised && a.match).length,
 });
+
+const dm = (isoDay) => `${isoDay.slice(8, 10)}/${isoDay.slice(5, 7)}`;
+/** Chênh lệch so với kỳ trước: điểm phần trăm (hoặc điểm số), xanh khi cải thiện, đỏ khi xấu đi; `down` = chỉ số càng thấp càng tốt. */
+const delta = (cur, prev, { down = false, points = false } = {}) => {
+  if (cur == null || prev == null) return '';
+  const d = points ? cur - prev : (cur - prev) * 100;
+  if (Math.abs(d) < (points ? 0.05 : 0.05)) return html`<small class="delta">＝</small>`;
+  const good = down ? d < 0 : d > 0;
+  return html`<small class="delta delta--${good ? 'good' : 'bad'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(1).replace('.', ',')}${points ? '' : ' đ%'}</small>`;
+};
+const pc = (r) => (r == null ? '—' : pct(r, 1).replace('.', ','));
+const sc = (v) => (v == null ? '—' : v.toFixed(1).replace('.', ','));
+
+/** So sánh theo tuần (T2–CN, theo ngày chỉnh sửa) và, với quản lý, so sánh hai tuần gần nhất theo từng nhân sự. */
+function weeklySection(acts, manager) {
+  const weeks = weeklyStats(acts);
+  if (weeks.length < 2) return '';
+  const pair = manager ? compareWeeks(weeks) : null;
+  const people = pair ? peopleCompare(acts, pair) : [];
+  // Biểu đồ: bỏ tuần quá ít act (nhiễu); tuần chưa đủ ngày đánh dấu * ở nhãn.
+  const pts = weeks.filter((w) => !w.small);
+  const labels = pts.map((w) => `${dm(w.start)}${w.partial ? '*' : ''}`);
+  const percent = (v) => `${Math.round(v)}%`, p1c = (v) => `${v.toFixed(1).replace('.', ',')}%`;
+  const val = (key, mult = 100) => pts.map((w) => (w[key] == null ? 0 : w[key] * mult));
+  const charts = pts.length >= 2 ? html`
+    <div class="grid cinfo-charts">
+      ${chartCard('Tư vấn & khớp tính năng theo tuần', lineChart({ labels, format: percent, valueFormat: p1c, values: true, series: [{ name: '% act tư vấn tính năng', cls: 's1', values: val('adviceRate') }, { name: '% khớp / tư vấn', cls: 's3', values: val('matchRate') }] }), 'Càng cao càng tốt. Tuần có dấu * chưa đủ 7 ngày dữ liệu.')}
+      ${chartCard('Act không dùng C-Info theo tuần', lineChart({ labels, format: percent, valueFormat: p1c, values: true, series: [{ name: '% act không dùng C-Info', cls: 's2', values: pts.map((w) => (w.useRate == null ? 0 : (1 - w.useRate) * 100)) }] }), 'Càng thấp càng tốt (mục tiêu dùng C-Info 90% trở lên).')}
+      ${chartCard('Điểm trung bình theo tuần', lineChart({ labels, format: (v) => `${Math.round(v)}`, valueFormat: (v) => v.toFixed(1).replace('.', ','), values: true, series: [{ name: 'Điểm tính năng', cls: 's1', values: pts.map((w) => w.feat ?? 0) }, { name: 'Điểm setup', cls: 's4', values: pts.map((w) => w.setup ?? 0) }] }), 'Thang 100; tuần càng về sau điểm càng tăng là tốt.')}
+    </div>` : '';
+  const cell = (cur, prev, w, opts) => html`<td class="num">${pc(cur)}${w.small || (prev && prev.small) ? '' : delta(cur, prev, opts)}</td>`;
+  return html`
+    <div class="toolbar"><h2 class="section-title">So sánh theo tuần</h2>
+      <p class="muted">Tính theo ngày chỉnh sửa act, mỗi tuần từ thứ 2 đến chủ nhật. Mũi tên là chênh lệch so với tuần trước (đ% = điểm phần trăm), xanh là tốt lên. Tuần dưới ${MIN_WEEK_ACTS} act hoặc chưa đủ ngày chỉ để tham khảo, không so chênh lệch.</p></div>
+    ${charts}
+    <div class="table-wrap"><table class="cinfo-table sortable">
+      <thead><tr><th class="sticky-col">Tuần</th><th>Số act</th><th>% act dùng C-Info</th><th>% act tư vấn tính năng</th><th>% khớp / tư vấn</th><th>Điểm TB tính năng</th><th>Điểm TB setup</th></tr></thead>
+      <tbody>${weeks.map((w) => { const pv = w.prev; return html`<tr class="static ${w.partial || w.small ? 'is-partial' : ''}">
+        <td class="sticky-col"><strong>${dm(w.start)} – ${dm(w.end)}</strong>${w.partial ? html`<small class="cinfo-rate">chưa đủ tuần</small>` : w.small ? html`<small class="cinfo-rate">ít dữ liệu</small>` : ''}</td>
+        <td class="num">${num(w.total)}</td>${cell(w.useRate, pv?.useRate, w)}${cell(w.adviceRate, pv?.adviceRate, w)}
+        <td class="num">${pc(w.matchRate)}${w.small || pv?.small || w.advised < 10 || (pv && pv.advised < 10) ? '' : delta(w.matchRate, pv?.matchRate)}<small class="cinfo-rate">${w.matched}/${w.advised} act</small></td>
+        <td class="num">${sc(w.feat)}${w.small || pv?.small ? '' : delta(w.feat, pv?.feat, { points: true })}</td><td class="num">${sc(w.setup)}${w.small || pv?.small ? '' : delta(w.setup, pv?.setup, { points: true })}</td></tr>`; })}</tbody>
+    </table></div>
+    ${pair && people.length ? html`
+      <div class="toolbar"><h2 class="section-title">Theo nhân sự: ${dm(pair[0].start)}–${dm(pair[0].end)} so với ${dm(pair[1].start)}–${dm(pair[1].end)}</h2>
+        <p class="muted">Hai tuần đủ dữ liệu gần nhất. Mỗi chỉ số: tuần trước → tuần sau. Người có dưới 10 act ở một tuần thì không so chênh lệch.</p></div>
+      <div class="table-wrap"><table class="cinfo-table sortable">
+        <thead><tr><th class="sticky-col">Nhân sự</th><th>Số act</th><th>% dùng C-Info</th><th>% tư vấn tính năng</th><th>% khớp / tư vấn</th></tr></thead>
+        <tbody>${people.map((p) => { const ok = p.a.total >= 10 && p.b.total >= 10; return html`<tr class="static">
+          <td class="sticky-col"><span class="person"><strong>${p.name}</strong><small>${p.code}</small></span></td>
+          <td class="num">${p.a.total} → ${p.b.total}</td>
+          <td class="num">${pc(p.a.useRate)} → ${pc(p.b.useRate)}${ok ? delta(p.b.useRate, p.a.useRate) : ''}</td>
+          <td class="num">${pc(p.a.adviceRate)} → ${pc(p.b.adviceRate)}${ok ? delta(p.b.adviceRate, p.a.adviceRate) : ''}</td>
+          <td class="num">${pc(p.a.matchRate)} → ${pc(p.b.matchRate)}${ok && p.a.advised >= 3 && p.b.advised >= 3 ? delta(p.b.matchRate, p.a.matchRate) : ''}<small class="cinfo-rate">${p.a.matched}/${p.a.advised} → ${p.b.matched}/${p.b.advised}</small></td></tr>`; })}</tbody>
+      </table></div>` : ''}`;
+}
 
 /** Đồng hồ nửa vòng: tỉ lệ dùng Customer Info, vạch đen là mục tiêu. */
 function gauge(rate) {
@@ -102,5 +160,6 @@ export function cinfoView(data, f, { manager, code }) {
           <td class="num cinfo-pct cinfo-pct--${tone(rate)}">${pct(rate, 2).replace('.', ',')}</td><td class="num">${withRate(t.advised, ratio(t.advised, t.total))}</td><td class="num">${withRate(t.matched, ratio(t.matched, t.advised))}</td></tr></tfoot>
       </table></div>
       <p class="muted">Act = activity. "Không dùng C-Info" là act có <code>used_stt</code> = Không. "Tư vấn tính năng" là act có công việc hỗ trợ <em>Tư vấn tính năng</em>; "theo RCM" là act tư vấn tính năng mà tính năng SC tư vấn khớp với tính năng RCM đề xuất (<code>is_match_feature</code> = 1). Tỉ lệ nhỏ bên dưới: "không dùng" và "tư vấn tính năng" tính trên tổng act; "theo RCM" tính trên số act tư vấn tính năng.</p>`
-      : html`<p class="muted">Không có activity nào khớp bộ lọc.</p>`}`;
+      : html`<p class="muted">Không có activity nào khớp bộ lọc.</p>`}
+    ${weeklySection(acts, manager)}`;
 }
