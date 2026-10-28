@@ -25,6 +25,7 @@ let pbiLink = null;      // link Power BI (dòng "PBI" trong tab Danh sách link
 let hrLink = null;       // link "Danh sách nhân sự SC" (tab Danh sách + tab Phép năm)
 let scoreLink = null;    // link "Chấm call" (Google Form chấm chất lượng cuộc gọi)
 let callLink = null;     // link "Dữ liệu call" (từng cuộc gọi do mục Xuất Call ghi ra)
+let visitsLink = null;   // link "Lịch sử truy cập" (Sheet phản hồi của Google Form ghi lượt vào)
 let addonLink = null;    // link "Addon" (điểm thực đạt Payment, Kship, HDDT)
 let libraryLink = null;  // link "Thư viện" (dòng Thư viện trong tab Danh sách link)
 
@@ -34,11 +35,13 @@ const isHr = (l) => /nhan su/.test(l.info.normalize('NFD').replace(/[\u0300-\u03
 const isCalls = (l) => /^du lieu call/.test(l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase());
 const isScore = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'cham call';
 const isAddonScore = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'addon';
+const isVisits = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'lich su truy cap';
 const isLibrary = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'thu vien';
 export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
   pbiLink = links.find(isPbi) ?? null;
   libraryLink = links.find(isLibrary) ?? null;
   addonLink = links.find(isAddonScore) ?? null;
+  visitsLink = links.find(isVisits) ?? null;
   hrLink = links.find(isHr) ?? null;
   callLink = links.find(isCalls) ?? null;
   scoreLink = links.find(isScore) ?? null;
@@ -77,6 +80,10 @@ export const loadMonth = (ym) => memo(ym, () => {
       return data;
     });
 });
+
+/** Lịch sử truy cập: Sheet phản hồi của Google Form (dòng "Lịch sử truy cập" trong tab Danh sách link). */
+export const hasVisits = () => Boolean(visitsLink);
+export const visitsSheet = () => visitsLink;
 
 /** Điểm thực đạt của Payment, Kship, HDDT: mỗi tab của Sheet Addon là một loại; không đọc được thì giữ nguyên số của Sheet KPI. */
 export const hasAddonScores = () => Boolean(addonLink);
@@ -206,11 +213,12 @@ export const loadDetail = () => memo('detail', async () => {
 export const clearCache = () => { cache.clear(); store.clear(); persistClear(); };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
-export const snapshotData = () => ({ months, pbi: pbiLink, addon: addonLink, library: libraryLink, hr: hrLink, calls: callLink, scores: scoreLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'scores' && !key.startsWith('detail')) });
-export function restoreData({ months: saved, pbi, addon, library, hr, calls, scores, entries }) {
+export const snapshotData = () => ({ months, pbi: pbiLink, addon: addonLink, visits: visitsLink, library: libraryLink, hr: hrLink, calls: callLink, scores: scoreLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'scores' && !key.startsWith('detail')) });
+export function restoreData({ months: saved, pbi, addon, visits, library, hr, calls, scores, entries }) {
   months = saved;
   pbiLink = pbi ?? null;
   addonLink = addon ?? null;
+  visitsLink = visits ?? null;
   libraryLink = library ?? null;
   hrLink = hr ?? null;
   callLink = calls ?? null;

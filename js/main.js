@@ -20,6 +20,7 @@ import { qualityWarnings, acceptQuality } from './quality.js';
 import { callScoreView } from './views/callScores.js';
 import { listenView } from './views/listen.js';
 import { logAction } from './audit.js';
+import { logVisit } from './visits.js';
 import { jobTypeView } from './views/jobType.js';
 import { teamView, rowsView } from './views/team.js';
 import { detailView } from './views/detail.js';
@@ -784,7 +785,7 @@ async function start() {
   setBoot('Đang xác thực tài khoản…', 1);
   try { await startApp(); } finally { setBoot(); }
   greet();
-  if (state.me && state.data) { chat.watch(); persistSnapshot(); preloadPbi(); preloadDetail(); }   // thăm dò tin mới + lưu bản dữ liệu hôm nay
+  if (state.me && state.data) { logVisit({ email: state.me.email, name: state.me.name, role: state.me.role }); chat.watch(); persistSnapshot(); preloadPbi(); preloadDetail(); }   // thăm dò tin mới + lưu bản dữ liệu hôm nay
 }
 
 /** Thẻ chào mừng theo tiến độ của chính người đăng nhập; chỉ hiện một lần cho mỗi lần đăng nhập. */

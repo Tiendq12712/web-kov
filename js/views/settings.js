@@ -1,11 +1,13 @@
 import { stampNow } from '../audit.js';
 import { html } from '../dom.js';
 import { badge } from './components.js';
+import { lineChart, chartCard } from './charts.js';
+import { visitStats } from '../visits.js';
 import { ROLES, GENDERS, canManage } from '../directory.js';
 import { monthLabel } from '../format.js';
 import { DATE_MODES, modeOf, resolveRange } from '../crm.js';
 
-const SECTIONS = [['accounts', 'Tài khoản'], ['links', 'Cấu hình'], ['crm', 'Đồng bộ CRM'], ['call', 'Xuất Call'], ['audit', 'Nhật ký']];
+const SECTIONS = [['accounts', 'Tài khoản'], ['links', 'Cấu hình'], ['crm', 'Đồng bộ CRM'], ['call', 'Xuất Call'], ['audit', 'Nhật ký'], ['visits', 'Truy cập']];
 const SERVER_COMMAND = '<thư-mục-tool>/venv/bin/python3 server.py 8080';
 const short = (text, n = 40) => (text.length > n ? `${text.slice(0, n)}…` : text);
 const ROLE_TONE = { admin: 'good', manager: 'warn', member: 'neutral' };
@@ -275,7 +277,7 @@ const callSection = (ui) => html`${alertBox(ui, 'call')}${serverCard(ui.status, 
 })}`;
 
 /** Chỉ Admin được vào Cấu hình, Đồng bộ CRM và Xuất Call; Quản trị chỉ thấy Tài khoản. */
-export const ADMIN_ONLY = ['links', 'crm', 'call', 'audit'];
+export const ADMIN_ONLY = ['links', 'crm', 'call', 'audit', 'visits'];
 
 /* ---------- Nhật ký thao tác (Admin) ---------- */
 const ACTION_TONE = (a) => (/^Xóa|^Tắt/.test(a) ? 'bad' : /^Thêm|^Bật|^Chạy|^Đồng bộ|^Xuất/.test(a) ? 'good' : /cookie/i.test(a) ? 'warn' : 'neutral');
@@ -307,7 +309,37 @@ const auditSection = (ui) => {
     </table></div>`;
 };
 
-const BODY = { accounts: accountsSection, links: linksSection, crm: crmSection, call: callSection, audit: auditSection };
+/* ---------- Lượt truy cập (Admin) ---------- */
+const visitsSection = (ui) => {
+  const v = ui.visits, dm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+  if (!v.enabled) return html`
+    <div class="toolbar"><h2 class="section-title">Lượt truy cập</h2></div>
+    <p class="notice">Chưa có link Sheet phản hồi. Thêm dòng <strong>Lịch sử truy cập</strong> (ID Sheet phản hồi của Google Form) vào tab "Danh sách link" của Sheet cấu hình.</p>`;
+  const stats = visitStats(v.rows, ui.accounts, stampNow().slice(0, 10));
+  const fmtLast = (s) => `${s.slice(8, 10)}/${s.slice(5, 7)} ${s.slice(11)}`;
+  return html`
+    <div class="toolbar"><h2 class="section-title">Lượt truy cập</h2>
+      <p class="muted">Mỗi lần mở web ghi một lượt (mở lại trong 30 phút tính cùng một lượt). Chỉ Admin xem được; dữ liệu nằm ở Sheet phản hồi của Google Form.</p></div>
+    ${notice({ error: v.error })}
+    ${v.writing ? '' : html`<p class="notice">Web chưa ghi lượt vào: cần điền ID Form và mã các ô (<code>entry.…</code>) vào <code>visits</code> trong <code>js/config.js</code>.</p>`}
+    <div class="grid">
+      <div class="card"><h3 class="card__title">Hôm nay</h3><p class="big num">${stats.todayPeople}</p><p class="muted">người · ${stats.todayVisits} lượt</p></div>
+      <div class="card"><h3 class="card__title">7 ngày</h3><p class="big num">${stats.week.people}</p><p class="muted">người · ${stats.week.visits} lượt</p></div>
+      <div class="card"><h3 class="card__title">30 ngày</h3><p class="big num">${stats.month.people}</p><p class="muted">người · ${stats.month.visits} lượt</p></div>
+      <div class="card"><h3 class="card__title">Chưa vào 7 ngày</h3><p class="big num">${stats.inactive.length}</p><p class="muted">trên ${ui.accounts.length} tài khoản</p></div>
+    </div>
+    ${stats.total ? chartCard('Lượt truy cập 30 ngày gần nhất', lineChart({ labels: stats.days.map((d) => dm(d.day)), format: (x) => String(Math.round(x)), values: false, series: [{ name: 'Lượt', cls: 's1', values: stats.days.map((d) => d.visits) }, { name: 'Người', cls: 's3', values: stats.days.map((d) => d.people) }] })) : html`<p class="muted">${v.loading ? 'Đang tải…' : 'Chưa có lượt truy cập nào.'}</p>`}
+    <div class="filters"><button class="btn btn--ghost" type="button" data-act="visits-reload" ${v.loading ? 'disabled' : ''}>${v.loading ? 'Đang tải…' : 'Tải lại'}</button></div>
+    <div class="toolbar"><h2 class="section-title">Theo tài khoản</h2></div>
+    <div class="table-wrap"><table class="connect-table">
+      <thead><tr><th scope="col">Tài khoản</th><th scope="col">Lần vào gần nhất</th><th scope="col" class="right">7 ngày</th><th scope="col" class="right">30 ngày</th><th scope="col" class="right">Tổng</th><th scope="col">Thiết bị</th></tr></thead>
+      <tbody>${stats.people.map((p) => html`<tr class="static"><td><span class="person"><strong>${p.name || p.email}</strong><small>${p.email}</small></span></td><td class="num">${fmtLast(p.last)}</td><td class="right num">${p.d7}</td><td class="right num">${p.d30}</td><td class="right num">${p.total}</td><td>${p.device || '—'}</td></tr>`)}</tbody>
+    </table></div>
+    ${stats.inactive.length ? html`<div class="toolbar"><h2 class="section-title">Chưa vào trong 7 ngày</h2></div>
+      <p class="muted">${stats.inactive.map((a) => a.name || a.email).join(' · ')}</p>` : ''}`;
+};
+
+const BODY = { accounts: accountsSection, links: linksSection, crm: crmSection, call: callSection, audit: auditSection, visits: visitsSection };
 
 export const settingsView = (ui) => html`
   <div class="toolbar">

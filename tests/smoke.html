@@ -289,6 +289,15 @@ await test('Nhật ký thao tác: giao diện Thiết lập hiện bảng và l�
   ui.audit.action = 'Xóa tài khoản'; domx.mount(box, settingsView(ui)); eq(box.querySelectorAll('tbody tr').length, 1, 'lọc theo hành động');
   ui.me.role = 'manager'; domx.mount(box, settingsView(ui)); eq(box.textContent.includes('Nhật ký thao tác'), false, 'Quản trị không thấy nhật ký');
 });
+await test('Thiết lập → Truy cập: hướng dẫn khi chưa bật, thống kê khi đã có dữ liệu', async () => {
+  const { settingsView } = await import(`${root}js/views/settings.js`), domx = await import(`${root}js/dom.js`);
+  const base = { section: 'visits', me: { role: 'admin', email: 'a@kiotviet.com' }, accounts: [{ email: 'a@x.com', name: 'An', role: 'member' }], links: [], tasks: [], months: [], access: {}, job: null, editing: null, error: '', busy: false, call: {}, audit: { rows: [], q: '', action: 'all', who: 'all' } };
+  const box = document.createElement('div');
+  domx.mount(box, settingsView({ ...base, visits: { enabled: false, rows: [], loaded: false, loading: false, error: '' } })); eq(box.textContent.includes('Chưa có link Sheet phản hồi'), true, 'chưa có link thì hướng dẫn');
+  const today = new Date(), pad = (n) => String(n).padStart(2, '0'), at = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())} 09:00`;
+  domx.mount(box, settingsView({ ...base, visits: { enabled: true, writing: false, rows: [{ email: 'a@x.com', name: 'An', role: 'member', device: 'Máy tính', at }], loaded: true, loading: false, error: '' } }));
+  eq(box.textContent.includes('Theo tài khoản') && box.textContent.includes('a@x.com') && box.querySelector('svg') != null, true, 'có thẻ, biểu đồ và bảng theo tài khoản'); eq(box.textContent.includes('Web chưa ghi lượt vào'), true, 'báo khi chưa cấu hình Form để ghi');
+});
 const td = await import(`${root}js/today.js`), tdv = await import(`${root}js/views/today.js`);
 await test('Hôm nay của tôi: data cần xử lý, chấm call, kiểm soát, xu hướng và giao diện', async () => {
   const day = (d) => Date.UTC(2026, 9, d, 8);
@@ -459,6 +468,25 @@ await test('Đánh giá không khớp: gộp nhật ký (dòng mới nhất, r�
   eq(pv.filterActs({ ...data, statuses: ['Done'] }, pv.DEFAULT_FILTERS).length, 3, 'báo cáo không có trạng thái Completed thì không lọc mất hết');
   const member = String(pv.cinfoView(data, { ...pv.DEFAULT_FILTERS }, { manager: false, code: '9', evals: m }));
   eq(member.includes('data-mm-check'), false, 'nhân sự không thấy ô đánh giá của quản lý');
+});
+
+await test('Lượt truy cập: ghi qua Form (cách nhau 30 phút), đọc phản hồi và thống kê', async () => {
+  const vs = await import(`${root}js/visits.js`), { CONFIG } = await import(`${root}js/config.js`);
+  eq(vs.visitsEnabled(), false, 'chưa cấu hình Form thì không ghi'); eq(vs.logVisit({ email: 'a@x.com', name: 'An', role: 'member' }), false, 'không gửi gì khi chưa cấu hình');
+  const saved = JSON.stringify(CONFIG.visits), realFetch = window.fetch, sent = [];
+  CONFIG.visits = { form: 'FORMID', fields: { email: 'entry.1', name: 'entry.2', role: 'entry.3', device: 'entry.4', at: 'entry.5' }, sheet: 'S', tab: '' };
+  window.fetch = (url, opt) => { sent.push([url, String(opt?.body)]); return Promise.resolve({}); };
+  try {
+    try { localStorage.removeItem('kpi.visit.last.zz@x.com'); } catch {}
+    const t0 = Date.now();
+    eq([vs.logVisit({ email: 'zz@x.com', name: 'Zed', role: 'member' }, t0), vs.logVisit({ email: 'zz@x.com' }, t0 + 5 * 60_000), vs.logVisit({ email: 'zz@x.com', name: 'Zed', role: 'member' }, t0 + 31 * 60_000)], [true, false, true], 'mở lại trong 30 phút tính cùng một lượt');
+    eq(sent.length, 2, 'chỉ gửi 2 lần'); eq(sent[0][0].includes('/forms/d/e/FORMID/formResponse') && sent[0][1].includes('entry.1=zz%40x.com') && sent[0][1].includes('entry.2=Zed'), true, 'gửi đúng địa chỉ Form và mã ô');
+  } finally { window.fetch = realFetch; CONFIG.visits = JSON.parse(saved); }
+  const rows = [['Dấu thời gian', 'Email', 'Tên', 'Vai trò', 'Thiết bị', 'Thời điểm'], ['x', 'A@x.com', 'An', 'member', 'Máy tính', '2026-10-28 09:00:00'], ['x', 'a@x.com', 'An', 'member', 'Điện thoại', '2026-10-27 08:00:00'], ['x', 'b@x.com', 'Bình', 'admin', 'Máy tính', '2026-10-20 08:00:00'], ['x', '', '', '', '', '2026-10-28 10:00:00']];
+  const parsed = vs.parseVisits(rows); eq(parsed.length, 3, 'bỏ dòng thiếu email; email chuẩn hóa chữ thường'); eq(parsed[0].at, '2026-10-28 09:00', 'mới nhất trước');
+  const st = vs.visitStats(parsed, [{ email: 'a@x.com', name: 'Nguyễn An' }, { email: 'b@x.com', name: 'Bình' }, { email: 'c@x.com', name: 'Cúc' }], '2026-10-28');
+  eq([st.todayPeople, st.week.people, st.month.people, st.week.visits], [1, 1, 2, 2], 'hôm nay 1 người; 7 ngày 1 người (2 lượt); 30 ngày 2 người');
+  eq(st.inactive.map((a) => a.email), ['b@x.com', 'c@x.com'], 'tài khoản chưa vào trong 7 ngày'); eq(st.people.find((p) => p.email === 'a@x.com').name, 'Nguyễn An', 'ưu tiên tên trong danh sách tài khoản'); eq(st.days.at(-1).visits, 1, 'số lượt theo ngày');
 });
 
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {

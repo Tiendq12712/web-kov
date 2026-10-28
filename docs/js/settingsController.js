@@ -1,4 +1,6 @@
 import { logAction, loadAudit } from './audit.js';
+import { loadVisits, visitsEnabled } from './visits.js';
+import { hasVisits, visitsSheet } from './data.js';
 import { CONFIG } from './config.js';
 import { html } from './dom.js';
 import { sheetId } from './sheet.js';
@@ -25,6 +27,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     section: 'accounts', accounts: [], links: [], tasks: [], status: null, serverError: '',
     access: { loading: false, error: '', result: null },
     audit: { rows: [], loaded: false, loading: false, error: '', action: 'all', who: 'all', q: '' },
+    visits: { rows: [], loaded: false, loading: false, error: '', enabled: false, writing: visitsEnabled(), who: 'all' },
     alert: null, job: null, editing: null, error: '', busy: false, loaded: false, loading: false, me: null, months: [],
     call: { gsheet_url: '', tab_name: '', agents: '', cuser: '', date_mode: 'month_to_yesterday', date_from: '', date_to: '' },
   };
@@ -157,6 +160,12 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     catch (err) { if (err.code === 'auth') return onAuthExpired(err.message); ui.audit.error = err.message; }
     ui.audit.loading = false; rerender({ keep: true });
   }
+  async function reloadVisits() {
+    Object.assign(ui.visits, { loading: true, error: '' }); rerender({ keep: true });
+    try { ui.visits.rows = await loadVisits(visitsSheet()); ui.visits.loaded = true; }
+    catch (err) { if (err.code === 'auth') return onAuthExpired(err.message); ui.visits.error = err.message; }
+    ui.visits.loading = false; rerender({ keep: true });
+  }
   const fail = (message) => { ui.error = message; rerender(); };
   /** Ghi nhật ký thao tác (không chờ, không làm hỏng thao tác chính). */
   const note = (action, object = '', detail = '') => { logAction(getMe()?.email, action, object, detail).catch(() => {}); };
@@ -239,8 +248,9 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   const remove = (message, action) => (key) => { if (confirm(message(key))) run(action(key)); };
 
   const ACTIONS = {
-    section: (key) => { if (['links', 'crm', 'call', 'audit'].includes(key) && getMe()?.role !== 'admin') return; Object.assign(ui, { section: key, editing: null, error: '' }); if (key === 'audit' && !ui.audit.loaded) reloadAudit(); rerender(); },
+    section: (key) => { if (['links', 'crm', 'call', 'audit', 'visits'].includes(key) && getMe()?.role !== 'admin') return; Object.assign(ui, { section: key, editing: null, error: '' }); if (key === 'audit' && !ui.audit.loaded) reloadAudit(); if (key === 'visits') { ui.visits.enabled = hasVisits(); ui.visits.writing = visitsEnabled(); if (ui.visits.enabled && !ui.visits.loaded) reloadVisits(); } rerender(); },
     'audit-reload': () => reloadAudit(),
+    'visits-reload': () => reloadVisits(),
     'alert-close': () => { ui.alert = null; rerender({ keep: true }); },
     'focus-cookie': () => { rerender({ keep: true }); setTimeout(() => { const f = document.querySelector(`form[data-sform="${ui.section === 'call' ? 'call-cookie' : 'cookie'}"] input`); f?.scrollIntoView({ block: 'center' }); f?.focus(); }, 60); },
     cancel: () => { ui.editing = null; ui.error = ''; rerender(); },
