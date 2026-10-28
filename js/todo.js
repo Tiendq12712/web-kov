@@ -1,3 +1,4 @@
+import { countedActs } from './pbi.js';
 import { computeSla } from './sla.js';
 import { memberStatus, elapsedRatio } from './metrics.js';
 import { pct } from './format.js';
@@ -42,7 +43,7 @@ export function buildTodo({ me, found, data, report, pbi, unread, control, alert
     if (lowTalk.length) push({ tone: 'warn', count: lowTalk.length, text: 'nhân sự talktime thấp hơn tiến độ tháng', hint: 'Talktime thực tế dưới mức cần có theo ngày đã qua', tab: 'report' });
     if (pbi) {
       const by = new Map();
-      for (const a of pbi.acts) { const c = by.get(a.code) ?? { t: 0, n: 0 }; c.t += 1; c.n += a.used ? 0 : 1; by.set(a.code, c); }
+      for (const a of countedActs(pbi.acts)) { const c = by.get(a.code) ?? { t: 0, n: 0 }; c.t += 1; c.n += a.used ? 0 : 1; by.set(a.code, c); }
       const low = [...by.values()].filter((c) => c.t && 1 - c.n / c.t < TARGET_CINFO).length;
       if (low) push({ tone: 'warn', count: low, text: 'nhân sự dùng Customer Info dưới mục tiêu', hint: `Mục tiêu ${pct(TARGET_CINFO)}`, tab: 'cinfo' });
     }
@@ -56,7 +57,7 @@ export function buildTodo({ me, found, data, report, pbi, unread, control, alert
     const noPay = unpaidDays(report, found.member.code, asOf);
     if (noPay) push({ tone: 'info', count: noPay, text: 'ngày làm việc đã qua chưa có công', hint: 'Ô công trống (không tính Chủ nhật) — kiểm tra bảng công, báo quản lý nếu thiếu', timesheet: `${found.team.id}:${found.member.code}` });
     if (pbi) {
-      const own = pbi.acts.filter((a) => a.code === found.member.code);
+      const own = countedActs(pbi.acts).filter((a) => a.code === found.member.code);
       const not = own.filter((a) => !a.used).length;
       if (not) push({ tone: 'warn', count: not, text: 'act chưa dùng Customer Info', hint: `Tỉ lệ dùng hiện ${pct(1 - not / own.length, 1).replace('.', ',')}, mục tiêu ${pct(TARGET_CINFO)}`, tab: 'cinfo' });
     }

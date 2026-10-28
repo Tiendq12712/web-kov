@@ -4,6 +4,7 @@ import { num, pct } from '../format.js';
 import { lineChart, chartCard } from './charts.js';
 import { analyzeMismatch, CAUSES } from '../cinfoMismatch.js';
 import { EVALS, evalOf } from '../mismatchEval.js';
+import { COUNTED_STATUS } from '../pbi.js';
 import { weeklyStats, compareWeeks, peopleCompare, MIN_WEEK_ACTS } from '../cinfoWeekly.js';
 
 /** Mục tiêu tỉ lệ SC dùng Customer Info; ≥ 95% xanh, từ mục tiêu tới 95% vàng, dưới mục tiêu đỏ. */
@@ -12,14 +13,14 @@ const GOOD = 0.95;
 const ratio = (a, b) => (b ? a / b : 0);
 const tone = (r) => (r >= GOOD ? 'good' : r >= TARGET ? 'warn' : 'bad');
 
-export const DEFAULT_FILTERS = { evalF: 'all', cFrom: '', cTo: '', mFrom: '', mTo: '', type: 'all', status: 'all', used: 'all', advice: 'all', match: 'all', sc: 'all' };
+export const DEFAULT_FILTERS = { evalF: 'all', cFrom: '', cTo: '', mFrom: '', mTo: '', type: 'all', status: COUNTED_STATUS, used: 'all', advice: 'all', match: 'all', sc: 'all' };
 
 /** Lọc activity theo bộ lọc; nhân sự thường chỉ thấy activity của mình (`only` = đầu số). */
 export function filterActs(data, f, only = null) {
   return data.acts.filter((a) => (!only || a.code === only)
     && (!f.cFrom || a.created >= f.cFrom) && (!f.cTo || a.created <= f.cTo)
     && (!f.mFrom || a.modified >= f.mFrom) && (!f.mTo || a.modified <= f.mTo)
-    && (f.type === 'all' || a.type === f.type) && (f.status === 'all' || a.status === f.status)
+    && (f.type === 'all' || a.type === f.type) && (f.status === 'all' || !data.statuses.includes(f.status) || a.status === f.status)
     && (f.used === 'all' || a.used === (f.used === 'yes')) && (f.advice === 'all' || a.advised === (f.advice === 'yes'))
     && (f.match === 'all' || a.match === (f.match === '1')) && (f.sc === 'all' || a.code === f.sc));
 }
@@ -91,19 +92,25 @@ const featCell = (items) => (items.length ? html`<details class="feat-list"><sum
 const causeBadge = (id) => { const c = CAUSES.find(([k]) => k === id); return html`<span class="badge badge--${id === 'diff' ? 'warn' : 'bad'}" title="${c[2]}">${c[1]}</span>`; };
 
 /** Ô đánh giá của quản lý: chọn kết luận và ghi chú ngắn. */
-const evalCell = (a, rec) => { const data = (extra) => html`data-id="${a.id}" data-retailer="${a.retailer}" data-code="${a.code}" data-name="${a.name}" ${extra}`; return html`<td class="mm-eval">
-  <select class="select heard-select ${rec ? `heard-select--${evalOf(rec.result)?.tone ?? ''}` : ''}" data-mm-select ${data('')} aria-label="Đánh giá retailer ${a.retailer}"><option value="">Chưa đánh giá</option>${EVALS.map((e) => html`<option value="${e.id}" ${rec?.result === e.id ? 'selected' : ''}>${e.label}</option>`)}</select>
-  <input class="search mm-note" type="text" data-mm-note ${data('')} placeholder="Ghi chú…" value="${rec?.note ?? ''}" aria-label="Ghi chú cho retailer ${a.retailer}">
-  ${rec ? html`<small class="muted">${rec.by?.split('@')[0] ?? ''} · ${rec.at ?? ''}</small>` : ''}</td>`; };
+const evalCell = (a, rec, open) => {
+  const ids = rec?.results ?? [], tone = evalOf(ids[0])?.tone ?? '';
+  const label = ids.length ? ids.map((x) => evalOf(x).label.replace(/ \(.*\)$/, '')).join(' · ') : 'Chưa đánh giá';
+  const attrs = (extra = '') => html`data-id="${a.id}" data-retailer="${a.retailer}" data-code="${a.code}" data-name="${a.name}" ${extra}`;
+  return html`<td class="mm-eval">
+  <details class="mm-multi ${ids.length ? `mm-multi--${tone}` : ''}" data-mm-multi ${attrs(open === a.id ? 'open' : '')}><summary title="Bấm để chọn một hoặc nhiều đánh giá">${label}</summary>
+    <div class="mm-multi__list">${EVALS.map((e) => html`<label><input type="checkbox" data-mm-check value="${e.id}" ${ids.includes(e.id) ? 'checked' : ''}> ${e.label}</label>`)}</div></details>
+  <input class="search mm-note" type="text" data-mm-note ${attrs()} placeholder="Ghi chú…" value="${rec?.note ?? ''}" aria-label="Ghi chú cho retailer ${a.retailer}">
+  ${rec ? html`<small class="muted">${rec.by?.split('@')[0] ?? ''} · ${rec.at ?? ''}</small>` : ''}</td>`;
+};
 
 /** "Vì sao không khớp": act có tư vấn tính năng nhưng không khớp tính năng hệ thống gợi ý. */
-function mismatchSection(acts, allActs, manager, { f, evals, notice }) {
+function mismatchSection(acts, allActs, manager, { f, evals, notice, open }) {
   const m = analyzeMismatch(acts, allActs);
   if (!m.advised) return '';
   const evalFilter = manager ? (f.evalF ?? 'all') : 'all';
-  const rows = m.bad.filter((a) => evalFilter === 'all' || (evalFilter === 'none' ? !evals.has(a.id) : evals.get(a.id)?.result === evalFilter));
+  const rows = m.bad.filter((a) => evalFilter === 'all' || (evalFilter === 'none' ? !evals.has(a.id) : evals.get(a.id)?.results.includes(evalFilter)));
   const shown = [...rows].sort((a, b) => (b.modified ?? '').localeCompare(a.modified ?? '')).slice(0, 300);
-  const evalCount = (id) => m.bad.filter((a) => evals.get(a.id)?.result === id).length;
+  const evalCount = (id) => m.bad.filter((a) => evals.get(a.id)?.results.includes(id)).length;
   const done = m.bad.filter((a) => evals.has(a.id)).length;
   return html`
     <div class="toolbar"><h2 class="section-title">Vì sao không khớp tính năng</h2>
@@ -122,7 +129,7 @@ function mismatchSection(acts, allActs, manager, { f, evals, notice }) {
         <thead><tr><th class="sticky-col">Nhân sự</th><th>Act tư vấn</th><th>% khớp</th><th>SC không ghi</th><th>Ngoài danh mục</th><th>Khác gợi ý</th><th>Hệ thống không gợi ý</th><th>TB số tính năng SC ghi</th></tr></thead>
         <tbody>${m.people.map((p) => html`<tr class="static"><td class="sticky-col"><span class="person"><strong>${p.name}</strong><small>${p.code}</small></span></td>
           <td class="num">${num(p.advised)}</td><td class="num">${pc(p.rate)}</td><td class="num">${p.causes['no-sc'] || '·'}</td><td class="num">${p.causes.outside || '·'}</td><td class="num">${p.causes.diff || '·'}</td><td class="num">${p.causes['no-rcm'] || '·'}</td><td class="num">${p.avgSc.toFixed(1).replace('.', ',')}</td></tr>`)}</tbody></table></div>` : ''}
-    <div class="toolbar"><h2 class="section-title">Chi tiết retailer không khớp</h2><p class="muted">${num(rows.length)} act${rows.length > shown.length ? ` (hiển thị ${num(shown.length)} act mới nhất)` : ''}. Chọn nhân sự ở ô bên dưới (dùng chung với ô "Tên SC" phía trên). Bấm "n tính năng" để xem danh sách.</p></div>
+    <div class="toolbar"><h2 class="section-title">Chi tiết retailer không khớp</h2><p class="muted">${num(rows.length)} act${rows.length > shown.length ? ` (hiển thị ${num(shown.length)} act mới nhất)` : ''}. Chọn nhân sự ở ô bên dưới (dùng chung với ô "Tên SC" phía trên). Bấm "n tính năng" để xem danh sách; mỗi act chọn được nhiều đánh giá.</p></div>
     ${manager ? html`
       ${notice ? html`<p class="notice" role="status">${notice}</p>` : ''}
       <div class="filters" aria-label="Lọc retailer không khớp">
@@ -132,7 +139,7 @@ function mismatchSection(acts, allActs, manager, { f, evals, notice }) {
       </div>` : ''}
     <div class="table-wrap"><table class="cinfo-table">
       <thead><tr><th>Chỉnh sửa</th>${manager ? html`<th class="sticky-col">Nhân sự</th>` : ''}<th>Retailer</th><th>Nguyên nhân</th><th>SC tư vấn</th><th>Hệ thống gợi ý</th>${manager ? html`<th>Đánh giá của quản lý</th>` : ''}</tr></thead>
-      <tbody>${shown.map((a) => html`<tr class="static"><td class="num">${dmy(a.modified)}</td>${manager ? html`<td class="sticky-col"><span class="person"><strong>${a.name}</strong><small>${a.code}</small></span></td>` : ''}<td class="num">${a.retailer}</td><td>${causeBadge(a.cause)}</td><td>${featCell(a.scFeatures)}</td><td>${featCell(a.rcmFeatures)}</td>${manager ? evalCell(a, evals.get(a.id)) : ''}</tr>`)}</tbody>
+      <tbody>${shown.map((a) => html`<tr class="static"><td class="num">${dmy(a.modified)}</td>${manager ? html`<td class="sticky-col"><span class="person"><strong>${a.name}</strong><small>${a.code}</small></span></td>` : ''}<td class="num">${a.retailer}</td><td>${causeBadge(a.cause)}</td><td>${featCell(a.scFeatures)}</td><td>${featCell(a.rcmFeatures)}</td>${manager ? evalCell(a, evals.get(a.id), open) : ''}</tr>`)}</tbody>
     </table></div>`;
 }
 
@@ -170,7 +177,7 @@ const dates = (label, fromKey, toKey, f, [min, max]) => html`
  * Báo cáo "Kết quả SC sử dụng Customer Info" (giống báo cáo Power BI): bộ lọc, 4 chỉ số, đồng hồ và bảng theo nhân sự.
  * Admin/Quản trị xem tất cả SC; nhân sự chỉ thấy phần của mình (nhận ra bằng đầu số).
  */
-export function cinfoView(data, f, { manager, code, evals = new Map(), evalNotice = '' }) {
+export function cinfoView(data, f, { manager, code, evals = new Map(), evalNotice = '', evalOpen = null }) {
   if (!manager && !code) return html`<p class="notice">Chưa nhận ra bạn trong báo cáo (thiếu <strong>Đầu số</strong> trong tab Tài khoản). Hãy liên hệ quản lý để được bổ sung.</p>`;
   const only = manager ? null : String(code);
   const acts = filterActs(data, f, only);
@@ -216,5 +223,5 @@ export function cinfoView(data, f, { manager, code, evals = new Map(), evalNotic
       <p class="muted">Act = activity. "Không dùng C-Info" là act có <code>used_stt</code> = Không. "Tư vấn tính năng" là act có công việc hỗ trợ <em>Tư vấn tính năng</em>; "theo RCM" là act tư vấn tính năng mà tính năng SC tư vấn khớp với tính năng RCM đề xuất (<code>is_match_feature</code> = 1). Tỉ lệ nhỏ bên dưới: "không dùng" và "tư vấn tính năng" tính trên tổng act; "theo RCM" tính trên số act tư vấn tính năng.</p>`
       : html`<p class="muted">Không có activity nào khớp bộ lọc.</p>`}
     ${weeklySection(acts, manager)}
-    ${mismatchSection(acts, data.acts, manager, { f, evals, notice: evalNotice })}`;
+    ${mismatchSection(acts, data.acts, manager, { f, evals, notice: evalNotice, open: evalOpen })}`;
 }

@@ -1295,3 +1295,11 @@ tr.is-partial td { opacity: .72; }
 details.feat-list summary { cursor: pointer; color: var(--accent, #4f8cff); font-size: 12px; white-space: nowrap; }
 details.feat-list ul { margin: 4px 0 0; padding-left: 16px; font-size: 12px; min-width: 190px; }
 td.mm-eval { min-width: 210px; } td.mm-eval .select, td.mm-eval .mm-note { width: 100%; margin-bottom: 4px; }
+
+/* Chọn nhiều đánh giá (Customer Info → vì sao không khớp) */
+details.mm-multi { position: relative; margin-bottom: 4px; }
+details.mm-multi summary { cursor: pointer; list-style: none; padding: 6px 8px; border: 1px solid var(--border, #3a4560); border-radius: 8px; font-size: 13px; background: var(--card, transparent); }
+details.mm-multi summary::-webkit-details-marker { display: none; }
+details.mm-multi--good summary { border-color: var(--good-fill); color: var(--good); } details.mm-multi--warn summary { border-color: var(--warn-fill); color: var(--warn); } details.mm-multi--bad summary { border-color: var(--bad-fill); color: var(--bad); }
+.mm-multi__list { display: grid; gap: 4px; padding: 8px; margin-top: 4px; border: 1px solid var(--border, #3a4560); border-radius: 8px; font-size: 13px; background: var(--card, #121a2b); }
+.mm-multi__list label { display: flex; gap: 6px; align-items: flex-start; cursor: pointer; }

@@ -62,3 +62,7 @@ export function parsePbi(rows) {
     createdRange: [dates('created')[0] ?? '', dates('created').at(-1) ?? ''], modifiedRange: [dates('modified')[0] ?? '', dates('modified').at(-1) ?? ''],
   };
 }
+
+/** Trạng thái act được dùng để thống kê Customer Info (act đã hoàn tất); báo cáo không có trạng thái này thì dùng mọi act. */
+export const COUNTED_STATUS = 'Completed';
+export const countedActs = (acts) => (acts.some((a) => a.status === COUNTED_STATUS) ? acts.filter((a) => a.status === COUNTED_STATUS) : acts);

@@ -447,14 +447,18 @@ await test('Customer Info: vì sao không khớp tính năng', async () => {
 await test('Đánh giá không khớp: gộp nhật ký (dòng mới nhất, rỗng = bỏ đánh giá) và giao diện gọn', async () => {
   const me = await import(`${root}js/mismatchEval.js`), pv = await import(`${root}js/views/cinfo.js`);
   const m = me.mergeEvals([['1', 'R1', '9', 'An', 'forgot', '', 'a@x', 't1'], ['4', 'R4', '9', 'An', 'forgot', '', 'a@x', 't1'], ['1', 'R1', '9', 'An', 'objective', 'KH đã dùng', 'a@x', 't2'], ['2', 'R2', '9', 'An', 'skip', '', 'a@x', 't1'], ['2', 'R2', '9', 'An', '', '', 'a@x', 't3'], ['3', 'R3', '9', 'An', 'sai', '', 'a@x', 't1']]);
+  const multi = me.mergeEvals([['9', 'R9', '9', 'An', 'skip,customer,customer,sai', '', 'a@x', 't1']]).get('9'); eq(multi.results, ['skip', 'customer'], 'một act lưu được nhiều đánh giá (bỏ trùng và giá trị sai)');
   eq(m.get('4').result, 'skip', 'đánh giá cũ "quên tư vấn" được gộp vào "SC không tư vấn theo gợi ý"'); eq([m.size, m.get('1').result, m.get('1').note], [2, 'objective', 'KH đã dùng'], 'dòng mới nhất thắng; đánh giá rỗng hoặc sai định dạng thì bỏ');
   const act = (id, match) => ({ id, retailer: `R${id}`, code: '9', name: 'An', advised: true, match, scFeatures: ['A', 'B'], rcmFeatures: ['C'], modified: '2026-10-06', created: '2026-10-06', used: true, type: 'T', status: 'Completed' });
   const data = { acts: [act('1', false), act('2', false), act('3', true)], people: [], types: [], statuses: [], createdRange: ['', ''], modifiedRange: ['', ''] };
   const out = String(pv.cinfoView(data, { ...pv.DEFAULT_FILTERS }, { manager: true, code: null, evals: m }));
-  eq(out.includes('2 tính năng') && out.includes('<details'), true, 'cột tính năng chỉ hiện số lượng, bấm mới xem'); eq(out.includes('data-mm-select') && out.includes('data-mm-note'), true, 'quản lý có ô đánh giá và ghi chú');
+  eq(out.includes('2 tính năng') && out.includes('<details'), true, 'cột tính năng chỉ hiện số lượng, bấm mới xem'); eq(out.includes('data-mm-check') && out.includes('data-mm-note'), true, 'quản lý có ô chọn nhiều đánh giá và ghi chú'); eq(out.includes('KH chủ động đưa ra vấn đề') && out.includes('SC có tư vấn nhưng không chọn tính năng'), true, 'có đánh giá KH chủ động đưa ra vấn đề và SC không chọn tính năng');
   eq(out.includes('Đã đánh giá 1/2'), true, 'đếm số act đã đánh giá'); eq(out.includes('data-cinfo="sc"'), true, 'có ô lọc nhân sự trong phần không khớp');
+  const mixed = { ...data, statuses: ['Completed', 'In Progress'], acts: [...data.acts, { ...act('9', false), status: 'In Progress' }] };
+  eq(pv.filterActs(mixed, pv.DEFAULT_FILTERS).length, 3, 'mặc định chỉ thống kê act Completed (bỏ In Progress)'); eq(pv.filterActs(mixed, { ...pv.DEFAULT_FILTERS, status: 'all' }).length, 4, 'chọn Tất cả thì tính cả In Progress');
+  eq(pv.filterActs({ ...data, statuses: ['Done'] }, pv.DEFAULT_FILTERS).length, 3, 'báo cáo không có trạng thái Completed thì không lọc mất hết');
   const member = String(pv.cinfoView(data, { ...pv.DEFAULT_FILTERS }, { manager: false, code: '9', evals: m }));
-  eq(member.includes('data-mm-select'), false, 'nhân sự không thấy ô đánh giá của quản lý');
+  eq(member.includes('data-mm-check'), false, 'nhân sự không thấy ô đánh giá của quản lý');
 });
 
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {

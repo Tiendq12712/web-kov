@@ -1,3 +1,4 @@
+import { countedActs } from './pbi.js';
 import { CONFIG } from './config.js';
 import { readTable, writeTable } from './sheetTable.js';
 import { computeSla } from './sla.js';
@@ -32,7 +33,7 @@ export function buildSnapshot({ data, month, date, pbi }) {
   const sla = computeSla(data.work, date, month, { live: false });
   const slaBy = new Map((sla?.rows ?? []).map((r) => [r.code, r]));
   const cinfo = new Map();
-  for (const a of pbi?.acts ?? []) {
+  for (const a of countedActs(pbi?.acts ?? [])) {
     const c = cinfo.get(a.code) ?? { total: 0, not: 0 };
     c.total += 1; c.not += a.used ? 0 : 1;
     cinfo.set(a.code, c);
