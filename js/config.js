@@ -15,7 +15,7 @@ export const CONFIG = {
   addonReport: false,   // báo cáo Add-on (tab "Chi tiết addon" của Sheet PBI): tạm ẩn vì dữ liệu PBI chưa chuẩn; đổi thành true để hiện lại
   // Ghi lượt truy cập qua Google Form của chủ web. form = phần ID giữa /d/e/ và /viewform trong link Form;
   // fields = mã ô (entry.xxxxxxxx) của từng câu hỏi. Để trống = không ghi lượt truy cập. Sheet phản hồi đọc từ dòng "Lịch sử truy cập" trong tab Danh sách link.
-  visits: { form: '', fields: { email: '', name: '', role: '', device: '', at: '' } },
+  visits: { form: '1FAIpQLSeWfxw7qKnYLJPLtY79C5v3I50sGiQj9cJnpMDkowqMNYyMVA', fields: { email: 'entry.719797848', name: 'entry.2141170959', role: 'entry.1112981075', device: 'entry.864412324', at: 'entry.174835214' } },
   // Diện mạo nhân vật robot (nhân vật riêng): armor = màu giáp, accent = màu khiên/ánh sáng.
   mascot: { armor: '#2f63e0', accent: '#38bdf8' },
   // Sheet lưu tin nhắn chia sẻ (mặc định cùng Sheet cấu hình; nên dùng Sheet riêng để nhân sự không sửa được tab Tài khoản).

@@ -472,8 +472,9 @@ await test('Đánh giá không khớp: gộp nhật ký (dòng mới nhất, r�
 
 await test('Lượt truy cập: ghi qua Form (cách nhau 30 phút), đọc phản hồi và thống kê', async () => {
   const vs = await import(`${root}js/visits.js`), { CONFIG } = await import(`${root}js/config.js`);
-  eq(vs.visitsEnabled(), false, 'chưa cấu hình Form thì không ghi'); eq(vs.logVisit({ email: 'a@x.com', name: 'An', role: 'member' }), false, 'không gửi gì khi chưa cấu hình');
   const saved = JSON.stringify(CONFIG.visits), realFetch = window.fetch, sent = [];
+  CONFIG.visits = { form: '', fields: {} };
+  eq(vs.visitsEnabled(), false, 'chưa cấu hình Form thì không ghi'); eq(vs.logVisit({ email: 'a@x.com', name: 'An', role: 'member' }), false, 'không gửi gì khi chưa cấu hình');
   CONFIG.visits = { form: 'FORMID', fields: { email: 'entry.1', name: 'entry.2', role: 'entry.3', device: 'entry.4', at: 'entry.5' }, sheet: 'S', tab: '' };
   window.fetch = (url, opt) => { sent.push([url, String(opt?.body)]); return Promise.resolve({}); };
   try {
