@@ -24,7 +24,7 @@ export const state = {
   sort: { key: 'kpi', dir: 'desc' },
   report: { data: null, loading: false, error: '', region: 'all', weekMetric: 'calls', dayMetric: 'calls', query: '', sort: { key: 'talk', dir: 'desc' } },
   work: { team: 'all', matrix: 'backlogAll', query: '', sort: { key: 'pctDone', dir: 'desc' } },
-  cinfo: { data: null, loading: false, error: '', f: { ...DEFAULT_FILTERS } },   // báo cáo Customer Info (PBI) + bộ lọc
+  cinfo: { data: null, loading: false, error: '', f: { ...DEFAULT_FILTERS }, evals: new Map(), evalsLoaded: false, evalsLoading: false, evalNotice: '' },   // báo cáo Customer Info (PBI) + bộ lọc
   trend: { data: null, loading: false, error: '', metric: 'kpi', who: 'all', range: 'all' },   // xu hướng theo ngày (lịch sử đồng bộ)
   compare: { a: null, b: null, key: '', data: null, loading: false, error: '' },   // so sánh hai tháng (quản lý)
   connect: { region: 'all', shortSec: 30, longSec: 180, view: 'month' },   // phân tích chất lượng call kết nối (dùng chung dữ liệu năng suất)

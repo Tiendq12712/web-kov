@@ -38,6 +38,7 @@ import { createSettings } from './settingsController.js';
 import { createChat } from './chatController.js';
 import { slaView } from './views/sla.js';
 import { cinfoView, DEFAULT_FILTERS } from './views/cinfo.js';
+import { ensureEvals, setEval, clearEval } from './app/mismatchEval.js';
 import { trendView } from './views/trend.js';
 import { loadHistory, recordHistory, buildSnapshot } from './history.js';
 import { buildTodo } from './todo.js';
@@ -265,7 +266,8 @@ function currentPage() {
   if (state.tab === 'library' && hasLibrary()) return { view: lazyTab(state.library, 'library', loadLibrary, (d) => libraryView(d, state.library)), title: 'Thư viện' };
   if (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) return { view: renderCompare(), title: 'So sánh tháng' };
   if (state.tab === 'trend' && state.me.role !== 'member') return { view: lazyTab(state.trend, 'trend', loadHistory, (h) => trendView(h, state.trend, { manager: state.me.role !== 'member', code: myCode() })), title: 'Xu hướng' };
-  if (state.tab === 'cinfo') return { view: lazyTab(state.cinfo, 'cinfo', loadPbi, (d) => cinfoView(d, state.cinfo.f, { manager: state.me.role !== 'member', code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code })), title: 'Customer Info' };
+  if (state.tab === 'cinfo' && state.me.role !== 'member') ensureEvals();
+  if (state.tab === 'cinfo') return { view: lazyTab(state.cinfo, 'cinfo', loadPbi, (d) => cinfoView(d, state.cinfo.f, { evals: state.cinfo.evals, evalNotice: state.cinfo.evalNotice, manager: state.me.role !== 'member', code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code })), title: 'Customer Info' };
   if (state.tab === 'sla') {
     const manager = state.me.role !== 'member';
     const detail = hasDetail() ? lazyTab(state.segmentM, 'sla', (m) => loadDetailFor([m]), (d) => withQuality('sla', d, slaDetailView(d, { month: state.month, manager, code: myCode(), names: kpiNames() }))) : '';
@@ -531,6 +533,8 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'compare-a' || e.target.id === 'compare-b') { state.compare[e.target.id === 'compare-a' ? 'a' : 'b'] = e.target.value; return renderView(); }
   if (e.target.id === 'trend-who') { sharePerson(e.target.value); return renderView(); }
   if (e.target.id === 'month') return setMonth(e.target.value);
+  if (e.target.matches?.('[data-mm-select]')) return e.target.value ? setEval(e.target, { result: e.target.value }) : clearEval(e.target);
+  if (e.target.matches?.('[data-mm-note]')) return setEval(e.target, { note: e.target.value.trim() });
   const cinfoField = e.target.dataset?.cinfo;
   if (cinfoField) { state.cinfo.f[cinfoField] = e.target.value || (e.target.type === 'date' ? '' : 'all'); return renderView(); }
   const id = e.target.id;

@@ -430,7 +430,31 @@ await test('Customer Info: so sánh theo tuần và theo nhân sự', async () =
     ['1', '8101 - An - Customer Success', 'Có', '1', 'Completed', '01/10/2026', '06/10/2026', 'Tư vấn tính năng', '60,5', '80']];
   const parsed = parsePbi(rows); eq([parsed.acts[0].featScore, parsed.acts[0].setupScore], [60.5, 80], 'đọc điểm tính năng và setup (dấu phẩy thập phân)');
   const out = String(pv.cinfoView({ ...parsePbi(rows), acts, people: [], types: [], statuses: [], createdRange: ['', ''], modifiedRange: ['', ''] }, { ...pv.DEFAULT_FILTERS }, { manager: true, code: null }));
-  eq(out.includes('So sánh theo tuần') && out.includes('chưa đủ tuần'), true, 'giao diện có bảng so sánh theo tuần và nhãn tuần chưa đủ'); eq((out.match(/<svg viewBox="0 0 [^>]*aria-label="Biểu đồ đường"/g) ?? []).length, 3, 'có 3 biểu đồ theo tuần'); eq(out.includes('10/05*') || out.includes('05/10*'), true, 'nhãn tuần chưa đủ có dấu *');
+  eq(out.includes('So sánh theo tuần') && out.includes('chưa đủ tuần'), true, 'giao diện có bảng so sánh theo tuần và nhãn tuần chưa đủ'); eq(out.includes('Vì sao không khớp tính năng'), true, 'giao diện có bảng vì sao không khớp'); eq((out.match(/<svg viewBox="0 0 [^>]*aria-label="Biểu đồ đường"/g) ?? []).length, 3, 'có 3 biểu đồ theo tuần'); eq(out.includes('10/05*') || out.includes('05/10*'), true, 'nhãn tuần chưa đủ có dấu *');
+});
+
+await test('Customer Info: vì sao không khớp tính năng', async () => {
+  const mm = await import(`${root}js/cinfoMismatch.js`);
+  const mk = (retailer, sc, rcm, match, advised = true) => ({ retailer, code: '1', name: 'An', advised, match, scFeatures: sc, rcmFeatures: rcm, modified: '2026-10-06' });
+  const all = [mk('1', ['A'], ['A', 'B'], true), mk('2', [], ['A'], false), mk('3', ['X'], [], false), mk('4', ['Z'], ['A'], false), mk('5', ['A'], ['B'], false), mk('6', ['Q'], ['A'], false, false)];
+  const r = mm.analyzeMismatch(all, all);
+  eq([r.advised, r.matched, r.bad.length], [5, 1, 4], 'chỉ xét act có tư vấn tính năng; không tính act không tư vấn');
+  eq(r.byCause, { 'no-sc': 1, 'no-rcm': 1, outside: 1, diff: 1 }, 'phân đúng 4 nguyên nhân: không ghi, hệ thống không gợi ý, ngoài danh mục, khác gợi ý');
+  eq(r.scOnly.find((x) => x.feature === 'Z').outside, true, 'tính năng SC ghi chưa từng nằm trong danh mục gợi ý được đánh dấu ngoài danh mục');
+  eq(r.people[0].rate, 0.2, 'tỉ lệ khớp theo nhân sự (1/5)');
+});
+
+await test('Đánh giá không khớp: gộp nhật ký (dòng mới nhất, rỗng = bỏ đánh giá) và giao diện gọn', async () => {
+  const me = await import(`${root}js/mismatchEval.js`), pv = await import(`${root}js/views/cinfo.js`);
+  const m = me.mergeEvals([['1', 'R1', '9', 'An', 'forgot', '', 'a@x', 't1'], ['4', 'R4', '9', 'An', 'forgot', '', 'a@x', 't1'], ['1', 'R1', '9', 'An', 'objective', 'KH đã dùng', 'a@x', 't2'], ['2', 'R2', '9', 'An', 'skip', '', 'a@x', 't1'], ['2', 'R2', '9', 'An', '', '', 'a@x', 't3'], ['3', 'R3', '9', 'An', 'sai', '', 'a@x', 't1']]);
+  eq(m.get('4').result, 'skip', 'đánh giá cũ "quên tư vấn" được gộp vào "SC không tư vấn theo gợi ý"'); eq([m.size, m.get('1').result, m.get('1').note], [2, 'objective', 'KH đã dùng'], 'dòng mới nhất thắng; đánh giá rỗng hoặc sai định dạng thì bỏ');
+  const act = (id, match) => ({ id, retailer: `R${id}`, code: '9', name: 'An', advised: true, match, scFeatures: ['A', 'B'], rcmFeatures: ['C'], modified: '2026-10-06', created: '2026-10-06', used: true, type: 'T', status: 'Completed' });
+  const data = { acts: [act('1', false), act('2', false), act('3', true)], people: [], types: [], statuses: [], createdRange: ['', ''], modifiedRange: ['', ''] };
+  const out = String(pv.cinfoView(data, { ...pv.DEFAULT_FILTERS }, { manager: true, code: null, evals: m }));
+  eq(out.includes('2 tính năng') && out.includes('<details'), true, 'cột tính năng chỉ hiện số lượng, bấm mới xem'); eq(out.includes('data-mm-select') && out.includes('data-mm-note'), true, 'quản lý có ô đánh giá và ghi chú');
+  eq(out.includes('Đã đánh giá 1/2'), true, 'đếm số act đã đánh giá'); eq(out.includes('data-cinfo="sc"'), true, 'có ô lọc nhân sự trong phần không khớp');
+  const member = String(pv.cinfoView(data, { ...pv.DEFAULT_FILTERS }, { manager: false, code: '9', evals: m }));
+  eq(member.includes('data-mm-select'), false, 'nhân sự không thấy ô đánh giá của quản lý');
 });
 
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {

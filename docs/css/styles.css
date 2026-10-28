@@ -1290,3 +1290,8 @@ td.addon-lost, .addon-lost { color: var(--bad); font-weight: 700; }
 tr.is-partial td { opacity: .72; }
 
 .cinfo-charts { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 12px; }
+
+/* Danh sách tính năng gọn và ô đánh giá (Customer Info → vì sao không khớp) */
+details.feat-list summary { cursor: pointer; color: var(--accent, #4f8cff); font-size: 12px; white-space: nowrap; }
+details.feat-list ul { margin: 4px 0 0; padding-left: 16px; font-size: 12px; min-width: 190px; }
+td.mm-eval { min-width: 210px; } td.mm-eval .select, td.mm-eval .mm-note { width: 100%; margin-bottom: 4px; }
