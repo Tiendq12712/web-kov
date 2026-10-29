@@ -461,7 +461,7 @@ html, body { max-width: 100%; overflow-x: clip; }
 
 /* ---------- Logo KiotViet ---------- */
 .brand { display: flex; align-items: center; gap: 10px; }
-.brand__logo { width: 32px; height: 32px; flex: none; object-fit: contain; }
+.brand__logo { width: 32px; height: 32px; flex: none; object-fit: contain; border-radius: 50%; }
 .boot__bars { width: 48px; height: 48px; object-fit: contain; }
 
 /* ---------- Điện thoại: thu gọn thanh khi cuộn, kéo để tải lại ---------- */
@@ -1303,3 +1303,5 @@ details.mm-multi summary::-webkit-details-marker { display: none; }
 details.mm-multi--good summary { border-color: var(--good-fill); color: var(--good); } details.mm-multi--warn summary { border-color: var(--warn-fill); color: var(--warn); } details.mm-multi--bad summary { border-color: var(--bad-fill); color: var(--bad); }
 .mm-multi__list { display: grid; gap: 4px; padding: 8px; margin-top: 4px; border: 1px solid var(--border, #3a4560); border-radius: 8px; font-size: 13px; background: var(--card, #121a2b); }
 .mm-multi__list label { display: flex; gap: 6px; align-items: flex-start; cursor: pointer; }
+
+.boot__bars { border-radius: 50%; }
