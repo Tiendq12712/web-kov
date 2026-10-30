@@ -1305,3 +1305,13 @@ details.mm-multi--good summary { border-color: var(--good-fill); color: var(--go
 .mm-multi__list label { display: flex; gap: 6px; align-items: flex-start; cursor: pointer; }
 
 .boot__bars { border-radius: 50%; }
+
+/* Chi tiết nhân sự: thẻ điểm Add-on thực đạt trải rộng, bảng loại bên trái và danh sách act chưa đủ điểm bên phải */
+.card--wide { grid-column: 1 / -1; }
+.addon-score-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 20px; align-items: start; }
+.addon-score-grid .addon-lost-list { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); padding-left: 0; list-style: none; }
+.addon-score-grid .card__subtitle { margin-top: 0; }
+@media (max-width: 760px) { .addon-score-grid { grid-template-columns: 1fr; } }
+
+/* Thẻ thông số cuối chi tiết nhân sự: 2 cặp nhãn/giá trị mỗi hàng khi đủ rộng, đỡ tốn chiều cao */
+@media (min-width: 640px) { .drawer__body > dl.kv.card { grid-template-columns: 1fr auto 1fr auto; column-gap: 28px; } }

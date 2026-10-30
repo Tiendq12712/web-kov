@@ -10,7 +10,7 @@ import { todoControl, todoAlerts, preloadDetail, currentSla } from './app/backgr
 import { renderToday } from './app/today.js';
 import { readHash, readLast, writeHash } from './app/route.js';
 import { state, saveCoachPref, latestAsOf, myCode, team, kpiNames, kpiPeople } from './app/state.js';
-import { getSession, getRemembered, signIn, signOut, loadGis } from './auth.js';
+import { getSession, getRemembered, signIn, signOut, loadGis, requireConsentNext } from './auth.js';
 import { saveSnapshot, loadSnapshot, clearSnapshot } from './snapshot.js';
 import { loadAccounts, findAccount, canOpenSettings } from './directory.js';
 import { html, mount } from './dom.js';
@@ -420,6 +420,7 @@ document.addEventListener('click', (e) => {
   if (hit('[data-close]') || e.target === els.detail) return els.detail.close();
   if (hit('[data-tab]')) { e.preventDefault(); els.detail.close(); return setTab(hit('[data-tab]').dataset.tab); }
   if (hit('[data-timesheet]')) return openMember(hit('[data-timesheet]').dataset.timesheet, { timesheet: true });
+  if (hit('[data-ad-clear]')) { sharePerson('all'); state.addonD.type = 'all'; return renderView(); }
   if (hit('[data-addon-person]')) { sharePerson(hit('[data-addon-person]').dataset.addonPerson); return renderView(); }
   if (hit('[data-member]')) return openMember(hit('[data-member]').dataset.member);
   if (hit('[data-heat]')) {
@@ -519,8 +520,8 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'cs-month') { shareMonth(e.target.value); return renderView(); }
   if (e.target.id === 'cs-person') { sharePerson(e.target.value); return renderView(); }
   if (e.target.id === 'ctl-rule') { state.control.rule = e.target.value; return renderView(); }
-  if (e.target.id === 'ad-person') { sharePerson(e.target.value); return renderView(); }
-  if (e.target.id === 'ad-type') { state.addonD.type = e.target.value; return renderView(); }
+  if (e.target.id === 'ad-person' || e.target.id === 'ad-person2') { sharePerson(e.target.value); return renderView(); }
+  if (e.target.id === 'ad-type' || e.target.id === 'ad-type2') { state.addonD.type = e.target.value; return renderView(); }
   if (e.target.id === 'ctl-person') { sharePerson(e.target.value); return renderView(); }
   if (e.target.id === 'addon-month') { state.addons.month = e.target.value; state.addons.person = 'all'; state.addons.type = 'all'; return renderView(); }
   if (e.target.id === 'addon-type') { state.addons.type = e.target.value; return renderView(); }
@@ -815,7 +816,12 @@ async function startApp() {
     state.tab = hash.tab || last.tab || (state.me.role === 'member' ? 'me' : 'overview');   // nhân sự vào trang riêng của mình (nếu không hợp lệ thì tự về Tổng quan)
     await setMonth(months.some((m) => m.month === month) ? month : months[0].month, { boot: true });
   } catch (err) {
-    if (err.code === 'auth') showLogin(err.message); else showError(err.message);
+    if (err.code === 'auth') showLogin(err.message);
+    else if (err.code === 'forbidden' && !startApp.retried) {
+      // Vừa đăng nhập mà bị từ chối đọc Sheet (thường do bỏ tích quyền xem Google Sheets ở màn hình Google): quay về màn hình đăng nhập và lần sau hiện lại màn hình cấp quyền.
+      startApp.retried = true; requireConsentNext(); signOut(); clearCache();
+      showLogin('Google chưa cho web đọc báo cáo bằng tài khoản này. Bấm đăng nhập lại, rồi ở màn hình Google nhớ tích chọn quyền xem Google Sheets.');
+    } else showError(err.message);   // startApp.retried: chỉ tự quay về đăng nhập một lần, tránh lặp vô hạn nếu tài khoản thật sự không có quyền
   }
 }
 

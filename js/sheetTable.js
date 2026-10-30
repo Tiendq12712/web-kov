@@ -15,7 +15,7 @@ async function call(url, token, options = {}) {
   catch (err) { throw err.name === 'AbortError' ? new Error('Google Sheets phản hồi quá lâu. Kiểm tra mạng rồi thử lại.') : err; }
   finally { clearTimeout(timer); }
   if (res.status === 401) throw Object.assign(new Error('Phiên đăng nhập đã hết hạn'), { code: 'auth' });
-  if (res.status === 403) throw new Error('Bạn không có quyền với Google Sheet này (cần quyền chỉnh sửa để thay đổi)');
+  if (res.status === 403) throw Object.assign(new Error('Bạn không có quyền với Google Sheet này (cần quyền chỉnh sửa để thay đổi)'), { code: 'forbidden' });
   return res;
 }
 

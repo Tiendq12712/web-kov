@@ -3,6 +3,12 @@ import { CONFIG } from './config.js';
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const SCOPE = 'openid email https://www.googleapis.com/auth/spreadsheets.readonly';
 const WRITE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const READ_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+/** Google cho người dùng bỏ tích từng quyền ở màn hình cấp quyền: token trả về có thể thiếu quyền xem Google Sheets. */
+export const hasSheetsScope = (res) => { if (!res?.scope) return true; const granted = String(res.scope).split(/\s+/); return granted.includes(READ_SCOPE) || granted.includes(WRITE_SCOPE); };   // không có thông tin quyền thì không chặn
+let forceConsent = false;
+/** Gọi khi vừa đăng nhập mà vẫn bị từ chối đọc Sheet: lần đăng nhập kế tiếp hiện lại màn hình cấp quyền. */
+export const requireConsentNext = () => { forceConsent = true; };   // lần đăng nhập trước thiếu quyền Sheets: lần sau luôn hiện lại màn hình cấp quyền
 const STORAGE_KEY = 'kpi.session';
 const DAY_KEY = 'kpi.day';   // nhớ đăng nhập trong ngày: { email, date } (không chứa token)
 const EXPIRY_MARGIN_MS = 60_000;
@@ -82,10 +88,19 @@ export async function signIn({ resume = false, silent = false } = {}) {
   const remembered = resume ? getRemembered() : null;
   const write = wantsWrite();
   const scope = write ? `${SCOPE} ${WRITE_SCOPE}` : SCOPE;
-  const request = remembered
-    ? { prompt: silent ? 'none' : '', login_hint: remembered.email, scope }
-    : { prompt: 'select_account', scope };   // cho phép chọn tài khoản khác
-  const { access_token: token, expires_in: seconds } = await requestToken(request);
+  const request = forceConsent
+    ? { prompt: 'consent', login_hint: remembered?.email, scope }
+    : remembered
+      ? { prompt: silent ? 'none' : '', login_hint: remembered.email, scope }
+      : { prompt: 'select_account', scope };   // cho phép chọn tài khoản khác
+  const granted = await requestToken(request);
+  const { access_token: token, expires_in: seconds } = granted;
+  if (!hasSheetsScope(granted)) {
+    google.accounts.oauth2.revoke(token);
+    forceConsent = true;
+    throw new Error('Bạn chưa cấp quyền "Xem Google Trang tính" ở màn hình Google. Bấm đăng nhập lại và nhớ tích chọn ô quyền xem Google Sheets (nếu không, web không đọc được báo cáo).');
+  }
+  forceConsent = false;
   const profile = await fetchProfile(token);
   if (!isAllowed(profile)) {
     google.accounts.oauth2.revoke(token);

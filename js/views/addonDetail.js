@@ -28,14 +28,17 @@ export function addonDetailView(data, ui, { manager, code, names, month, members
   const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   const acts = a.acts.filter((x) => type === 'all' || x.kind === type || x.type === type).sort((x, y) => (y.lost - x.lost) || (y.date ?? '').localeCompare(x.date ?? ''));
   const shown = acts.slice(0, 400);
+  // Hai ô lọc xuất hiện ở đầu tab và ngay trên bảng chi tiết; dùng chung một trạng thái nên đổi ô nào cũng được.
+  const filters = (suffix) => html`<div class="filters" role="search" aria-label="Lọc add-on">
+      ${manager ? html`<label class="filter"><span>Nhân sự</span><select id="ad-person${suffix}" class="select">${opt('all', 'Cả team', person)}${team.people.map((p) => opt(p.code, `${nm(p.code, p.name)} (${p.code})`, person))}</select></label>` : ''}
+      <label class="filter"><span>Loại add-on</span><select id="ad-type${suffix}" class="select">${opt('all', 'Tất cả loại', type)}${team.kinds.map((k) => opt(k, k, type))}</select></label>
+      ${person !== 'all' || type !== 'all' ? html`<button class="link-btn filters__clear" type="button" data-ad-clear>Xóa lọc</button>` : ''}
+    </div>`;
   const who = person === 'all' ? 'cả team' : nm(person, members.find((m) => m.code === person)?.name ?? person);
   return html`
     <div class="toolbar"><h2 class="section-title">Chi tiết Add-on${manager ? '' : ' của bạn'}</h2>
       <p class="muted">Tất cả add-on nhân sự chọn trong tháng. Mỗi add-on đủ ${FULL}đ, một act chọn nhiều add-on thì điểm cộng dồn (3 add-on = 15đ). Payment, Kship và HDDT/CKS lấy điểm thực đạt từ Sheet Addon; 7 loại còn lại mặc định ${FULL}đ/add-on.</p></div>
-    <div class="filters" role="search" aria-label="Lọc add-on">
-      ${manager ? html`<label class="filter"><span>Nhân sự</span><select id="ad-person" class="select">${opt('all', 'Cả team', person)}${team.people.map((p) => opt(p.code, `${nm(p.code, p.name)} (${p.code})`, person))}</select></label>` : ''}
-      <label class="filter"><span>Loại add-on</span><select id="ad-type" class="select">${opt('all', 'Tất cả loại', type)}${team.kinds.map((k) => opt(k, k, type))}</select></label>
-    </div>
+    ${filters('')}
     <div class="grid">
       ${stat('Add-on đã chọn', num(a.total.acts), `${who} · ${a.byType.filter((t) => t.acts).length} loại`)}
       ${a.hasScores ? stat('Điểm thực đạt', `${num(a.total.earned)} / ${num(a.total.full)}`, 'Mỗi add-on đủ 5đ, không giới hạn theo act', a.total.full && a.total.earned / a.total.full < 0.5 ? 'bad' : 'good') : ''}
@@ -57,6 +60,7 @@ export function addonDetailView(data, ui, { manager, code, names, month, members
         <td class="right num">${num(p.sheetDone)}</td><td class="right num">${lostCell(p.lost)}${p.missing ? html` <small class="muted" title="Act thiếu retailer trong báo cáo PBI">(${p.missing}⚠)</small>` : ''}</td><td class="right num">${num(p.done)} / ${num(p.target)}</td><td class="right num strong">${p.rate == null ? '—' : pct(p.rate, 0)}</td></tr>`)}</tbody>
     </table></div>` : ''}
     <div class="toolbar"><h2 class="section-title">Chi tiết từng add-on · ${who}</h2><p class="muted">${num(acts.length)} add-on${acts.length > shown.length ? ` (hiển thị ${num(shown.length)})` : ''}; add-on mất điểm xếp trước.</p></div>
+    ${filters('2')}
     <div class="table-wrap"><table class="connect-table">
       <thead><tr><th scope="col">Ngày</th>${person === 'all' ? html`<th scope="col" class="sticky-col">Nhân sự</th>` : ''}<th scope="col">Loại add-on</th><th scope="col">Retailer</th><th scope="col" class="right">Điểm</th><th scope="col">Trạng thái / lý do</th></tr></thead>
       <tbody>${shown.length ? shown.map((x) => html`<tr class="static"><td class="num">${dmy(x.date)}</td>${person === 'all' ? html`<td class="sticky-col"><span class="person"><strong>${nm(x.code, x.name)}</strong><small>${x.code}</small></span></td>` : ''}<td>${x.kind}</td><td class="num">${x.retailer || '—'}</td>

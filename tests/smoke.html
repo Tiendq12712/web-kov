@@ -490,6 +490,23 @@ await test('Lượt truy cập: ghi qua Form (cách nhau 30 phút), đọc phả
   eq(st.inactive.map((a) => a.email), ['b@x.com', 'c@x.com'], 'tài khoản chưa vào trong 7 ngày'); eq(st.people.find((p) => p.email === 'a@x.com').name, 'Nguyễn An', 'ưu tiên tên trong danh sách tài khoản'); eq(st.days.at(-1).visits, 1, 'số lượt theo ngày');
 });
 
+await test('Đăng nhập lần đầu bị Google từ chối đọc Sheet: quay về đăng nhập kèm hướng dẫn, không kẹt ở khung lỗi', async () => {
+  const app = await bootApp({ root, email: 'member@kiotviet.com', configId: CFG.configSheet, forbid: true });
+  try {
+    await sleep(1500);
+    const text = app.doc.body.textContent;
+    eq(text.includes('Google chưa cho web đọc báo cáo'), true, 'hiện hướng dẫn tích chọn quyền xem Google Sheets'); eq(text.includes('Đăng nhập bằng Google') || app.doc.getElementById('login') != null, true, 'có nút đăng nhập lại');
+    eq(text.includes('Bạn không có quyền với Google Sheet này'), false, 'không còn khung lỗi cụt');
+  } finally { app.stop(); }
+});
+
+await test('Đăng nhập: nhận ra token thiếu quyền xem Google Sheets (người dùng bỏ tích ở màn hình cấp quyền)', async () => {
+  const { hasSheetsScope } = await import(`${root}js/auth.js`);
+  eq(hasSheetsScope({ scope: 'openid email https://www.googleapis.com/auth/spreadsheets.readonly' }), true, 'đủ quyền xem');
+  eq(hasSheetsScope({ scope: 'openid https://www.googleapis.com/auth/spreadsheets' }), true, 'quyền ghi cũng đủ');
+  eq(hasSheetsScope({ scope: 'openid email profile' }), false, 'thiếu quyền Sheets'); eq(hasSheetsScope({}), true, 'không có thông tin quyền thì không chặn (tránh chặn nhầm)');
+});
+
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {
   const as = await import(`${root}js/addonScore.js`), ad = await import(`${root}js/addonDetail.js`), fx = await import(`${root}tests/fixtures.js`);
   const tabs = fx.buildFixtures('cfg', 'x@kiotviet.com')[fx.IDS.addon];
@@ -503,6 +520,9 @@ await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng ac
   eq(by['Kích hoạt payment thành công'].acts, 3, 'Payment: 3 act từ Sheet Addon (không đếm trùng với data chi tiết)'); eq([by['Giới thiệu Kship'].earned, by['Giới thiệu Kship'].lost], [6, 4], 'Kship: 1đ + 5đ, trừ 4');
   eq(by['Mua phần cứng'].acts, 2, 'đếm số act'); eq([by['Mua phần cứng'].earned, by['Mua phần cứng'].lost], [10, 0], 'loại khác mặc định đủ 5đ mỗi act');
   eq(r.people.find((p) => p.code === '9001').lost, 9, 'tổng điểm trừ của 9001'); eq(r.total.full, (r.total.acts) * 5, 'tổng điểm đủ = 5đ × số act'); eq(r.total.lost, 9 + 5, 'tổng trừ của cả team (9001: 9, 9003: HDDT 5)');
+  const av = await import(`${root}js/views/addonDetail.js`);
+  const html0 = String(av.addonDetailView({ rows }, { person: 'all', type: 'all' }, { manager: true, code: null, names: new Map(), month: '2026-10', members }));
+  eq(html0.includes('id="ad-person"') && html0.includes('id="ad-person2"') && html0.includes('id="ad-type2"'), true, 'ô lọc nhân sự và loại add-on có ở đầu tab và trên bảng chi tiết');
   eq(ad.analyzeAddonDetail(rows, members, { month: '2026-10', code: '9002' }).acts.length, 3, 'xem một nhân sự chỉ thấy act của người đó (2 Payment/Kship + 1 phần cứng)'.length ? 3 : 0);
 });
 

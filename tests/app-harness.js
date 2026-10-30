@@ -19,6 +19,7 @@ const preamble = (fixtures, email) => `
   window.fetch = async (url, init = {}) => {
     const u = String(url); window.__calls.push(u);
     if (u.includes('oauth2/v3/userinfo')) return json({ email: ${JSON.stringify(email)}, email_verified: true, hd: 'kiotviet.com', name: 'Test' });
+    if (window.__forbid && /spreadsheets\\//.test(u)) return json({ error: { message: 'forbidden' } }, 403);
     let m = /spreadsheets\\/([^/?]+)\\/values\\/([^?]+)/.exec(u);
     if (m) {
       const tab = decodeURIComponent(m[2]).split('!')[0].replace(/^'|'$/g, '').replace(/''/g, "'"), sheet = FX[m[1]];
@@ -39,14 +40,14 @@ const preamble = (fixtures, email) => `
 async function waitFor(fn, ms = 8000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (fn()) return true; } catch { /* chờ tiếp */ } await sleep(80); } return false; }
 
 /** Mở ứng dụng với một tài khoản; trả về { win, doc, open(tab), stop() }. */
-export async function bootApp({ root, email, configId, api = null }) {
+export async function bootApp({ root, email, configId, api = null, forbid = false }) {
   // Phiên giả đặt từ trang kiểm tra (cùng nguồn gốc nên cùng localStorage) trước khi dựng iframe.
   const d = new Date(), todayIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   Object.keys(localStorage).filter((k) => k.startsWith('kpi.')).forEach((k) => localStorage.removeItem(k));
   localStorage.setItem('kpi.session', JSON.stringify({ token: 'fake', email, date: todayIso, write: true, expiresAt: Date.now() + 3_600_000 }));
   localStorage.setItem('kpi.write', '1');
   const html = await (await fetch(`${root}index.html`, { cache: 'no-store' })).text();
-  const patched = html.replace('<head>', `<head><base href="${root}"><script>${api ? `window.__api = ${JSON.stringify(api)};` : ''}${preamble(buildFixtures(configId, email), email)}<\/script>`);
+  const patched = html.replace('<head>', `<head><base href="${root}"><script>${forbid ? 'window.__forbid = true;' : ''}${api ? `window.__api = ${JSON.stringify(api)};` : ''}${preamble(buildFixtures(configId, email), email)}<\/script>`);
   const frame = document.createElement('iframe');
   frame.style.cssText = 'width:1200px;height:800px;position:fixed;left:-3000px;top:0';
   frame.srcdoc = patched;
