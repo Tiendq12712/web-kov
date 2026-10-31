@@ -500,6 +500,14 @@ await test('Đăng nhập lần đầu bị Google từ chối đọc Sheet: qua
   } finally { app.stop(); }
 });
 
+await test('Tool CRM: máy chủ cục bộ tắt thì báo rõ thay vì "Failed to fetch"', async () => {
+  const { crmServer } = await import(`${root}js/crm.js`), realFetch = window.fetch;
+  window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
+  try { let msg = ''; try { await crmServer.setCookie('KVCRM_PHPSESSID=x'); } catch (e) { msg = e.message; }
+    eq(msg.includes('Không kết nối được máy chủ cục bộ') && !msg.includes('Failed to fetch'), true, 'thông báo tiếng Việt, có hướng dẫn'); } finally { window.fetch = realFetch; }
+  const sw = await (await fetch(`${root}sw.js`)).text(); eq(sw.includes("url.pathname.startsWith('/api/')"), true, 'service worker không cache API của máy chủ cục bộ');
+});
+
 await test('Đăng nhập: nhận ra token thiếu quyền xem Google Sheets (người dùng bỏ tích ở màn hình cấp quyền)', async () => {
   const { hasSheetsScope } = await import(`${root}js/auth.js`);
   eq(hasSheetsScope({ scope: 'openid email https://www.googleapis.com/auth/spreadsheets.readonly' }), true, 'đủ quyền xem');

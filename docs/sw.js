@@ -1,6 +1,6 @@
 /* Service worker: chỉ cache "vỏ" ứng dụng (HTML/CSS/JS/icon cùng origin).
    Dữ liệu KPI và đăng nhập Google (khác origin) KHÔNG bao giờ được cache. */
-const CACHE = 'kpi-shell-v263';
+const CACHE = 'kpi-shell-v264';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/main.js', 'js/config.js', 'js/auth.js', 'js/sheet.js', 'js/persist.js', 'js/quality.js', 'js/periodReport.js', 'js/callScores.js', 'js/listen.js', 'js/tasks.js', 'js/views/tasks.js', 'js/app/state.js', 'js/app/route.js', 'js/app/nav.js', 'js/app/hooks.js', 'js/app/filters.js', 'js/app/heard.js', 'js/app/reportExport.js', 'js/app/background.js', 'js/app/today.js', 'js/today.js', 'js/views/today.js', 'js/audit.js', 'js/addonScore.js', 'js/visits.js', 'js/cinfoWeekly.js', 'js/cinfoMismatch.js', 'js/mismatchEval.js', 'js/app/mismatchEval.js', 'js/addonDetail.js', 'js/views/addonDetail.js', 'js/views/addonScore.js', 'js/heard.js', 'js/jobType.js', 'js/views/jobType.js', 'js/views/listen.js', 'js/views/callScores.js', 'js/reportPdf.js', 'js/data.js',
@@ -29,6 +29,7 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;   // API của máy chủ cục bộ (trạng thái, công việc) luôn lấy mới, không lấy từ bộ nhớ đệm: nếu không, máy chủ đã tắt mà web vẫn báo "Sẵn sàng"
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);

@@ -8,7 +8,7 @@ import { monthLabel } from '../format.js';
 import { DATE_MODES, modeOf, resolveRange } from '../crm.js';
 
 const SECTIONS = [['accounts', 'Tài khoản'], ['links', 'Cấu hình'], ['crm', 'Đồng bộ CRM'], ['call', 'Xuất Call'], ['audit', 'Nhật ký'], ['visits', 'Truy cập']];
-const SERVER_COMMAND = '<thư-mục-tool>/venv/bin/python3 server.py 8080';
+const SERVER_COMMAND = '~/Downloads/Tool_KiotViet_CRM_MacOS/venv/bin/python3 server.py 8080';
 const short = (text, n = 40) => (text.length > n ? `${text.slice(0, n)}…` : text);
 const ROLE_TONE = { admin: 'good', manager: 'warn', member: 'neutral' };
 

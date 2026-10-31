@@ -69,11 +69,16 @@ export const splitAgents = (text) => text.split(/[\n;]+/).map((a) => a.trim()).f
 /* ---------- Máy chủ cục bộ chạy tool CRM ---------- */
 /** Gọi máy chủ cục bộ; `scope` là nhóm API (crm hoặc call). */
 async function request(scope, method, path, body) {
-  const res = await fetch(`/api/${scope}${path}`, {
-    method,
-    headers: { 'X-KV-Client': 'web-kov', ...(body ? { 'Content-Type': 'application/json' } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`/api/${scope}${path}`, {
+      method,
+      headers: { 'X-KV-Client': 'web-kov', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error('Không kết nối được máy chủ cục bộ của tool CRM (có thể đã tắt hoặc bạn mở web ngoài http://localhost:8080). Chạy lại máy chủ rồi thử lại.');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `Máy chủ cục bộ trả lỗi ${res.status}`);
   return data;
