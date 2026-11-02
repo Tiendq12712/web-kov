@@ -19,11 +19,13 @@ const GLYPH = {
   retail: '<circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2.5l2 11h10l2-8H7"/>',
   fnb: '<path d="M7 3v6a2 2 0 0 0 4 0V3M9 3v18"/><path d="M17 3c-2 1.5-3 4-3 7h3v11"/>',
   booking: '<rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4M9 14.5l2 2 4-4"/>',
+  salon: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7.5L20 18M8 16.5L20 6"/>',
+  hotel: '<path d="M3 19V6M3 15h18v4M21 15v-3a3 3 0 0 0-3-3h-7v6"/><circle cx="7" cy="11" r="1.7"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
 };
 const GROUPS = [['quy trinh', 'book', '#3b82f6'], ['chinh sach', 'shield', '#f59e0b'], ['giai trinh', 'clipboard', '#8b5cf6'], ['gian hang', 'store', '#14b8a6']];
 /** Mỗi sản phẩm một biểu tượng + màu riêng (tránh xanh dương, dành cho vai trò Zalo). */
-const PRODUCT = { retail: ['retail', '#10b981'], fnb: ['fnb', '#f97316'], booking: ['booking', '#a855f7'], other: ['link', '#64748b'] };
+const PRODUCT = { retail: ['retail', '#10b981'], fnb: ['fnb', '#f97316'], booking: ['booking', '#a855f7'], salon: ['salon', '#ec4899'], hotel: ['hotel', '#ef4444'], other: ['link', '#64748b'] };
 const KIND_COLOR = { doc: '#3b82f6', sheet: '#10b981', slide: '#f59e0b', form: '#8b5cf6', file: '#ef4444', video: '#ef4444', link: '#64748b' };
 const icon = (glyph, color, size = 36) => raw(`<span class="lib-icon" style="--c:${color};width:${size}px;height:${size}px"><svg viewBox="0 0 24 24" width="${Math.round(size * 0.58)}" height="${Math.round(size * 0.58)}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPH[glyph]}</svg></span>`);
 /** Biểu tượng sao chép (hai tờ giấy chồng nhau) và dấu tích báo đã chép. */

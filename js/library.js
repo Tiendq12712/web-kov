@@ -18,12 +18,14 @@ export function kindOf(url) {
 
 const plainText = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
-/** Sản phẩm của gian hàng (cột Product): Retail / FnB / Booking, mỗi loại một biểu tượng và màu riêng. */
+/** Sản phẩm của gian hàng (cột Product): Retail / FnB / Booking / Salon / Hotel, mỗi loại một biểu tượng và màu riêng. */
 export function productOf(value) {
   const t = plainText(value).replace(/[^a-z]/g, '');
   if (!t) return null;
   if (t.includes('fnb')) return { id: 'fnb', label: 'FnB' };
   if (t.includes('booking')) return { id: 'booking', label: 'Booking' };
+  if (t.includes('salon')) return { id: 'salon', label: 'Salon' };
+  if (t.includes('hotel')) return { id: 'hotel', label: 'Hotel' };
   if (t.includes('retail')) return { id: 'retail', label: 'Retail' };
   return { id: 'other', label: String(value).trim() };
 }
