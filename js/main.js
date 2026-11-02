@@ -921,9 +921,12 @@ async function startFromSnapshot(snap) {
     const last = readLast(snap.me.email);
     state.tab = last.tab || 'overview';
     const want = snap.month;   // bản lưu chỉ có dữ liệu của tháng này
-    await Promise.all([setMonth(months.some((m) => m.month === want) ? want : months[0].month, { boot: true }), sleep(700)]);
+    if (!months.some((m) => m.month === want)) { staleSession = false; clearSnapshot(); return showLogin(); }   // tháng đã bị ẩn/gỡ: bản lưu không dùng được, đăng nhập lại để tải tháng hiện có
+    await Promise.all([setMonth(want, { boot: true }), sleep(700)]);
     if (!state.data) { staleSession = false; return showLogin(); }
     syncLogout();
+  } catch {
+    staleSession = false; state.data = null; clearSnapshot(); return showLogin();   // bất kỳ lỗi nào khi dựng từ bản lưu: về màn hình đăng nhập thay vì để trang trắng
   } finally { setBoot(); }
   greet();
   armRefresh();
@@ -941,7 +944,7 @@ async function open() {
   }
   showLogin();
 }
-open();
+open().catch(() => showLogin());
 
 if ('serviceWorker' in navigator) {
   // Có bản mới được kích hoạt thì báo cho người dùng cập nhật (không tự tải lại).
