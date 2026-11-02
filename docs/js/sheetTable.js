@@ -1,5 +1,5 @@
 import { getToken, getWriteToken } from './auth.js';
-import { sheetId } from './sheet.js';
+import { sheetId, RETRY_429, sleep } from './sheet.js';
 
 /** Bảng nhỏ lưu trong một tab Google Sheet: dòng 1 là tiêu đề, dữ liệu từ dòng 2. */
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -9,9 +9,15 @@ const lastColumn = (columns) => String.fromCharCode(64 + columns.length);
 const rangeOf = (tab, a1) => encodeURIComponent(`${tab}!${a1}`);
 
 async function call(url, token, options = {}) {
-  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 60_000);   // quá 60 giây thì báo lỗi thay vì chờ mãi
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 90_000);   // quá 60 giây thì báo lỗi thay vì chờ mãi
   let res;
-  try { res = await fetch(url, { ...options, signal: ctrl.signal, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }); }
+  try {
+    for (let attempt = 0; ; attempt += 1) {   // gặp 429 (vượt hạn mức theo phút) thì chờ rồi thử lại
+      res = await fetch(url, { ...options, signal: ctrl.signal, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+      if (res.status !== 429 || attempt >= RETRY_429.length) break;
+      await sleep(RETRY_429[attempt]);
+    }
+  }
   catch (err) { throw err.name === 'AbortError' ? new Error('Google Sheets phản hồi quá lâu. Kiểm tra mạng rồi thử lại.') : err; }
   finally { clearTimeout(timer); }
   if (res.status === 401) throw Object.assign(new Error('Phiên đăng nhập đã hết hạn'), { code: 'auth' });
@@ -24,6 +30,7 @@ export async function readTable({ url, tab, columns, token = getToken(), maxRows
   const area = `A2:${lastColumn(columns)}${maxRows}`;
   const res = await call(`${API}/${sheetId(url)}/values/${rangeOf(tab, area)}?valueRenderOption=FORMATTED_VALUE`, token);
   if (res.status === 400) return [];
+  if (res.status === 429) throw new Error('Google Sheets đang giới hạn số lần đọc (quá nhiều yêu cầu trong 1 phút). Đợi khoảng 1 phút rồi tải lại trang.');
   if (!res.ok) throw new Error(`Không đọc được tab "${tab}" (${res.status})`);
   const { values = [] } = await res.json();
   return values

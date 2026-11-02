@@ -382,6 +382,22 @@ await test('Ứng dụng (Admin): khởi động và mở mọi tab không lỗi
     }
   } finally { app.stop(); }
 });
+await test('Google Sheets báo 429 (vượt hạn mức đọc): tự chờ rồi thử lại, hết lượt thì báo lỗi dễ hiểu', async () => {
+  const sh = await import(`${root}js/sheet.js`), st = await import(`${root}js/sheetTable.js`);
+  const saved = [...sh.RETRY_429], realFetch = window.fetch;
+  sh.RETRY_429.splice(0, sh.RETRY_429.length, 1, 1);
+  try {
+    let calls = 0;
+    window.fetch = async () => (++calls < 2 ? new Response('', { status: 429 }) : new Response(JSON.stringify({ values: [['a', 'b']] }), { status: 200 }));
+    const rows = await st.readTable({ url: 'abc123', tab: 'T', columns: ['x', 'y'], token: 't' });
+    eq(rows, [['a', 'b']], 'lần 2 đọc được'); eq(calls, 2, 'thử lại đúng 1 lần');
+    window.fetch = async () => new Response('', { status: 429 });
+    let msg = ''; try { await st.readTable({ url: 'abc123', tab: 'T', columns: ['x'], token: 't' }); } catch (e) { msg = e.message; }
+    eq(msg.includes('giới hạn số lần đọc'), true, `báo lỗi dễ hiểu: ${msg}`);
+    calls = 0; window.fetch = async () => (++calls < 2 ? new Response('', { status: 429 }) : new Response(JSON.stringify({ values: [['z']] }), { status: 200 }));
+    eq(await sh.fetchRows('abc123', 't', { tab: 'T' }), [['z']], 'fetchRows cũng thử lại');
+  } finally { window.fetch = realFetch; sh.RETRY_429.splice(0, sh.RETRY_429.length, ...saved); }
+});
 await test('Điểm Add-on thực đạt: Payment/Kship/HDDT trừ phần không đạt khỏi Add-on và KPI', async () => {
   const as = await import(`${root}js/addonScore.js`), fx = await import(`${root}tests/fixtures.js`);
   const tabs = fx.buildFixtures('cfg', 'x@kiotviet.com')[fx.IDS.addon];

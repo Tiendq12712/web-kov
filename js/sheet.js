@@ -92,12 +92,21 @@ export function parseKpi(rows, month) {
 /* ---------- Gọi Google Sheets API ---------- */
 export const sheetId = (urlOrId) => /\/d\/([\w-]+)/.exec(urlOrId)?.[1] ?? urlOrId;
 
-/** fetch có thời gian chờ: quá hạn thì báo lỗi thay vì chờ mãi. */
+/** Thời gian chờ (ms) trước mỗi lần thử lại khi Google báo vượt hạn mức đọc (429); hạn mức tính theo phút nên chờ khá lâu. */
+export const RETRY_429 = [3000, 8000, 15000];
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** fetch có thời gian chờ: quá hạn thì báo lỗi thay vì chờ mãi; gặp 429 thì chờ rồi thử lại. */
 async function fetchWithin(url, init, ms) {
-  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), ms);
-  try { return await fetch(url, { ...init, signal: ctrl.signal }); }
-  catch (err) { throw err.name === 'AbortError' ? new Error('Google Sheets phản hồi quá lâu. Kiểm tra mạng rồi thử lại.') : err; }
-  finally { clearTimeout(timer); }
+  for (let attempt = 0; ; attempt += 1) {
+    const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), ms);
+    let res;
+    try { res = await fetch(url, { ...init, signal: ctrl.signal }); }
+    catch (err) { throw err.name === 'AbortError' ? new Error('Google Sheets phản hồi quá lâu. Kiểm tra mạng rồi thử lại.') : err; }
+    finally { clearTimeout(timer); }
+    if (res.status !== 429 || attempt >= RETRY_429.length) return res;
+    await sleep(RETRY_429[attempt]);
+  }
 }
 
 /** Đọc một tab. `render`: UNFORMATTED_VALUE (số thô) hoặc FORMATTED_VALUE (chuỗi như đang hiển thị). */
@@ -109,6 +118,7 @@ export async function fetchRows(urlOrId, token, { tab, range: area = 'A1:AZ1000'
     throw Object.assign(new Error('Tài khoản của bạn chưa được cấp quyền xem Google Sheet này'), { code: 'forbidden' });
   }
   if (res.status === 400) throw new Error(`Không tìm thấy tab "${tab}" trong Google Sheet`);
+  if (res.status === 429) throw new Error('Google Sheets đang giới hạn số lần đọc (quá nhiều yêu cầu trong 1 phút). Đợi khoảng 1 phút rồi tải lại trang.');
   if (!res.ok) throw new Error(`Google Sheets trả lỗi ${res.status}`);
   return (await res.json()).values ?? [];
 }
