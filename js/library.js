@@ -16,21 +16,43 @@ export function kindOf(url) {
   return { id: 'link', label: 'Liên kết', icon: '🔗' };
 }
 
+const plainText = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
+
+/** Sản phẩm của gian hàng (cột Product): Retail / FnB / Booking, mỗi loại một biểu tượng và màu riêng. */
+export function productOf(value) {
+  const t = plainText(value).replace(/[^a-z]/g, '');
+  if (!t) return null;
+  if (t.includes('fnb')) return { id: 'fnb', label: 'FnB' };
+  if (t.includes('booking')) return { id: 'booking', label: 'Booking' };
+  if (t.includes('retail')) return { id: 'retail', label: 'Retail' };
+  return { id: 'other', label: String(value).trim() };
+}
+
+/** Vai trò của gian hàng (cột Vai trò): Zalo được làm nổi bật và xếp lên đầu. */
+export const roleOf = (value) => { const label = text(value); return label ? { label, zalo: /zalo/i.test(label) } : null; };
+
+const hostOf = (url) => { try { return new URL(url).host; } catch { return url; } };
+
 /** Một tab -> { name, items: [{ title, url, kind, extra: [[tiêu đề cột, giá trị]] }] }. Dòng không có link hợp lệ bị bỏ. */
 export function parseTab(name, rows) {
   if (!rows.length) return { name, items: [] };
   const head = rows[0].map(text);
   const linkCol = head.findIndex((h) => /^link/i.test(h));
   const titleCol = head.findIndex((h) => /tiêu đề|tên|title/i.test(h));
-  const t = titleCol >= 0 ? titleCol : 0;
+  const col = (re) => head.findIndex((h) => re.test(plainText(h)));
+  const productCol = col(/^product|san pham/), roleCol = col(/^vai tro|^role/), accountCol = col(/tai khoan|account/);
+  const store = productCol >= 0;   // tab gian hàng: có cột Product
+  const t = !store && titleCol >= 0 ? titleCol : 0;
   const items = rows.slice(1).map((r) => {
     const cells = r.map(text);
     const url = (linkCol >= 0 ? cells[linkCol] : cells.find(isUrl)) ?? '';
     return {
-      title: cells[t] || url, url, kind: kindOf(url),
+      title: store ? hostOf(url) : cells[t] || url, url, kind: kindOf(url),
+      ...(store ? { product: productOf(cells[productCol]), role: roleCol >= 0 ? roleOf(cells[roleCol]) : null, account: accountCol >= 0 ? cells[accountCol] : '' } : {}),
       extra: head.map((h, i) => [h, cells[i] ?? '']).filter(([h, v], i) => h && v && i !== t && i !== (linkCol >= 0 ? linkCol : cells.findIndex(isUrl))),
     };
   }).filter((i) => isUrl(i.url));
+  if (store) items.sort((a, b) => Number(b.role?.zalo ?? false) - Number(a.role?.zalo ?? false));   // Array.sort ổn định: giữ thứ tự cũ trong từng nhóm
   return { name, items };
 }
 

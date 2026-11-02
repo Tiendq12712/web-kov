@@ -15,9 +15,15 @@ const GLYPH = {
   form: '<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/>',
   file: '<path d="M8.5 12.5l5.8-5.8a3.2 3.2 0 0 1 4.5 4.5l-7.4 7.4a5 5 0 0 1-7-7l7.1-7.1"/>',
   video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/>',
+  store: '<path d="M4 9l1.5-5h13L20 9"/><path d="M4 9a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0A2.7 2.7 0 0 0 20 9"/><path d="M5.5 12v8h13v-8M10 20v-4h4v4"/>',
+  retail: '<circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2.5l2 11h10l2-8H7"/>',
+  fnb: '<path d="M7 3v6a2 2 0 0 0 4 0V3M9 3v18"/><path d="M17 3c-2 1.5-3 4-3 7h3v11"/>',
+  booking: '<rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4M9 14.5l2 2 4-4"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
 };
-const GROUPS = [['quy trinh', 'book', '#3b82f6'], ['chinh sach', 'shield', '#f59e0b'], ['giai trinh', 'clipboard', '#8b5cf6']];
+const GROUPS = [['quy trinh', 'book', '#3b82f6'], ['chinh sach', 'shield', '#f59e0b'], ['giai trinh', 'clipboard', '#8b5cf6'], ['gian hang', 'store', '#14b8a6']];
+/** Mỗi sản phẩm một biểu tượng + màu riêng (tránh xanh dương, dành cho vai trò Zalo). */
+const PRODUCT = { retail: ['retail', '#10b981'], fnb: ['fnb', '#f97316'], booking: ['booking', '#a855f7'], other: ['link', '#64748b'] };
 const KIND_COLOR = { doc: '#3b82f6', sheet: '#10b981', slide: '#f59e0b', form: '#8b5cf6', file: '#ef4444', video: '#ef4444', link: '#64748b' };
 const icon = (glyph, color, size = 36) => raw(`<span class="lib-icon" style="--c:${color};width:${size}px;height:${size}px"><svg viewBox="0 0 24 24" width="${Math.round(size * 0.58)}" height="${Math.round(size * 0.58)}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPH[glyph]}</svg></span>`);
 /** Biểu tượng sao chép (hai tờ giấy chồng nhau) và dấu tích báo đã chép. */
@@ -33,7 +39,22 @@ export function libraryItems(lib, { cat = 'all', q = '' }) {
     .filter((g) => g.items.length);
 }
 
-const itemRow = (i) => html`
+const storeRow = (i) => {
+  const [glyph, color] = PRODUCT[i.product?.id ?? 'other'];
+  return html`
+  <li class="lib-item lib-item--store ${i.role?.zalo ? 'is-zalo' : ''}" data-product="${i.product?.id ?? 'other'}">
+    <span class="lib-item__icon" title="${i.product?.label ?? ''}" aria-hidden="true">${icon(glyph, color, 40)}</span>
+    <span class="lib-item__text"><strong>${i.title}</strong>
+      <span class="store-tags">${i.product ? html`<span class="tag tag--product" style="--c:${color}">${i.product.label}</span>` : ''}${i.role ? html`<span class="tag ${i.role.zalo ? 'tag--zalo' : 'tag--role'}">${i.role.zalo ? '★ ' : ''}${i.role.label}</span>` : ''}</span>
+      ${i.account ? html`<small class="store-account">${i.account}</small>` : ''}</span>
+    <span class="lib-item__actions">
+      <button class="btn btn--ghost lib-item__copy" type="button" data-copy-link="${i.url}" title="Sao chép link" aria-label="Sao chép link ${i.title}">${raw(COPY_ICON)}</button>
+      <a class="btn btn--ghost lib-item__go" href="${i.url}" target="_blank" rel="noopener noreferrer">Mở</a>
+    </span>
+  </li>`;
+};
+
+const itemRow = (i) => i.product !== undefined ? storeRow(i) : html`
   <li class="lib-item">
     <span class="lib-item__icon" title="${i.kind.label}" aria-hidden="true">${icon(i.kind.id, KIND_COLOR[i.kind.id] ?? '#64748b')}</span>
     <span class="lib-item__text"><strong>${i.title}</strong>

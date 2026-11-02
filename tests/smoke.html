@@ -389,6 +389,19 @@ await test('Tab KPI chưa có dòng "Update …" (tháng mới): vẫn tải đ�
   eq(sh.fallbackAsOf('2026-12', new Date(2026, 10, 1)), '2026-12-01', 'tháng chưa tới → ngày 1');
   eq(mt.elapsedRatio(sh.fallbackAsOf('2026-11', new Date(2026, 10, 1))) > 0, true, 'tính được tiến độ thời gian');
 });
+await test('Thư viện → Gian hàng: nhận Product/Vai trò, Zalo lên đầu, mỗi sản phẩm một biểu tượng riêng', async () => {
+  const lib = await import(`${root}js/library.js`), view = await import(`${root}js/views/library.js`);
+  const tab = lib.parseTab('Gian hàng', [['Link truy cập', 'Product', 'Tài khoản đăng nhập', 'Vai trò'],
+    ['https://fnb.kiotviet.vn/fnbtea/man/', 'FnB', 'Tài khoản: 1', 'Test'], ['https://demo.kiotviet.vn/man/', 'Retail', 'Tài khoản: SĐT', 'Zalo'], ['https://bk.kiotviet.vn/', 'Booking', '', 'Zalo']]);
+  eq(tab.items.map((i) => i.product.id), ['retail', 'booking', 'fnb'], 'Zalo xếp lên đầu, giữ thứ tự cũ trong từng nhóm');
+  eq(tab.items[0].title, 'demo.kiotviet.vn', 'tiêu đề là tên miền'); eq(tab.items[0].role.zalo, true, 'nhận ra vai trò Zalo');
+  const lb = lib.buildLibrary([tab, lib.parseTab('Tài liệu', [['Tiêu đề', 'Link'], ['A', 'https://docs.google.com/document/d/1']])]);
+  const host = document.createElement('div'); host.innerHTML = view.libraryListView(lb, { cat: 'all', q: '' }).toString();
+  eq(host.querySelectorAll('.lib-item.is-zalo').length, 2, 'dòng Zalo được làm nổi bật');
+  eq(host.querySelectorAll('.tag--zalo').length, 2, 'nhãn Zalo');
+  eq(new Set([...host.querySelectorAll('.lib-item--store')].map((li) => li.querySelector('svg').innerHTML)).size, 3, 'Retail/FnB/Booking mỗi loại một biểu tượng');
+  eq(host.querySelectorAll('.lib-item:not(.lib-item--store)').length, 1, 'tab khác vẫn hiện như cũ');
+});
 await test('Google Sheets báo 429 (vượt hạn mức đọc): tự chờ rồi thử lại, hết lượt thì báo lỗi dễ hiểu', async () => {
   const sh = await import(`${root}js/sheet.js`), st = await import(`${root}js/sheetTable.js`);
   const saved = [...sh.RETRY_429], realFetch = window.fetch;
