@@ -382,6 +382,13 @@ await test('Ứng dụng (Admin): khởi động và mở mọi tab không lỗi
     }
   } finally { app.stop(); }
 });
+await test('Tab KPI chưa có dòng "Update …" (tháng mới): vẫn tải được, ngày cập nhật lấy theo hôm nay', async () => {
+  const sh = await import(`${root}js/sheet.js`), mt = await import(`${root}js/metrics.js`);
+  eq(sh.fallbackAsOf('2026-11', new Date(2026, 10, 1)), '2026-11-01', 'đang trong tháng → hôm nay');
+  eq(sh.fallbackAsOf('2026-10', new Date(2026, 10, 1)), '2026-10-31', 'tháng đã qua → ngày cuối tháng');
+  eq(sh.fallbackAsOf('2026-12', new Date(2026, 10, 1)), '2026-12-01', 'tháng chưa tới → ngày 1');
+  eq(mt.elapsedRatio(sh.fallbackAsOf('2026-11', new Date(2026, 10, 1))) > 0, true, 'tính được tiến độ thời gian');
+});
 await test('Google Sheets báo 429 (vượt hạn mức đọc): tự chờ rồi thử lại, hết lượt thì báo lỗi dễ hiểu', async () => {
   const sh = await import(`${root}js/sheet.js`), st = await import(`${root}js/sheetTable.js`);
   const saved = [...sh.RETRY_429], realFetch = window.fetch;

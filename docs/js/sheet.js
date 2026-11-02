@@ -54,6 +54,14 @@ const parseUpdated = (text, year) => {
   return m && { time: m[1], date: `${year}-${m[3].padStart(2, '0')}-${m[2].padStart(2, '0')}` };
 };
 
+/** Tab chưa có dòng "Update …" (ví dụ tháng mới vừa mở): hôm nay nếu đang trong tháng, tháng đã qua thì ngày cuối tháng, tháng chưa tới thì ngày 1. */
+export function fallbackAsOf(month, now = new Date()) {
+  const [y, m] = month.split('-').map(Number);
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  if (today.startsWith(month)) return today;
+  return today > month ? `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}` : `${month}-01`;
+}
+
 /** Dòng sau "TEAM ONLINE" (nếu có); tab chỉ chứa Team Online thì đọc từ đầu. */
 const findOnlineStart = (rows) =>
   rows.findIndex((r) => r.some((c) => typeof c === 'string' && c.trim() === ONLINE_MARKER)) + 1;
@@ -78,7 +86,7 @@ export function parseKpi(rows, month) {
     if (typeof a === 'string' && a.startsWith('Update')) {
       updated = parseUpdated(a, year);
     } else if (typeof a === 'number' && /^\d+\s*-/.test(b ?? '') && (current || queue.length)) {
-      current ??= { ...queue.shift(), updatedTime: updated?.time, asOf: updated?.date, members: [] };
+      current ??= { ...queue.shift(), updatedTime: updated?.time ?? '—', asOf: updated?.date ?? fallbackAsOf(month), members: [] };
       current.members.push(readMember(cell, row, ONLINE));
     } else if (current && isTotalRow(a, b, cell('D', row))) {
       teams.push(current);
