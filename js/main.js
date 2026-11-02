@@ -798,6 +798,9 @@ function greet() {
   requestAnimationFrame(() => startTour({ email: state.me.email, onClose: welcome }));
 }
 
+/** Lỗi bất ngờ (không do mạng/quyền): kèm file:dòng đầu tiên trong mã web để dễ tìm nguyên nhân. */
+const where = (err) => { const m = /\/(js\/[^\s):]+:\d+)/.exec(String(err?.stack ?? '')); return m ? ` (${m[1]})` : ''; };
+
 async function startApp() {
   try {
     if (!(await authorize())) return;
@@ -821,7 +824,7 @@ async function startApp() {
       // Vừa đăng nhập mà bị từ chối đọc Sheet (thường do bỏ tích quyền xem Google Sheets ở màn hình Google): quay về màn hình đăng nhập và lần sau hiện lại màn hình cấp quyền.
       startApp.retried = true; requireConsentNext(); signOut(); clearCache();
       showLogin('Google chưa cho web đọc báo cáo bằng tài khoản này. Bấm đăng nhập lại, rồi ở màn hình Google nhớ tích chọn quyền xem Google Sheets.');
-    } else showError(err.message);   // startApp.retried: chỉ tự quay về đăng nhập một lần, tránh lặp vô hạn nếu tài khoản thật sự không có quyền
+    } else { console.error(err); showError(`${err.message}${where(err)}`); }   // startApp.retried: chỉ tự quay về đăng nhập một lần, tránh lặp vô hạn nếu tài khoản thật sự không có quyền
   }
 }
 
