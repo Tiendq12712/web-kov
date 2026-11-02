@@ -49,7 +49,7 @@ export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
 }).then(async (list) => {
   // Ngày được gia hạn SLA nằm ở tab "Gia hạn SLA" (Ngày | Số ngày cộng thêm | Ghi chú); không đọc được thì dùng mặc định.
   try { setSlaExtra(await readTable({ url: CONFIG.configSheet, tab: CONFIG.tabs.slaExtra, columns: ['Ngày tạo data', 'Số ngày cộng thêm', 'Ghi chú'] })); } catch { /* giữ mặc định */ }
-  return (months = list);
+  return (months = list.filter((m) => !CONFIG.hiddenMonths?.includes(m.month)));
 }));
 export const reloadMonths = () => { monthsPromise = null; cache.clear(); store.clear(); persistClear(); };
 

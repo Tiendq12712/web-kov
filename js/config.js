@@ -12,6 +12,7 @@ export const CONFIG = {
   alerts: {},
   // Mục tiêu % Impact của nhân sự (cột % Impact ở Tổng quan): xanh khi đạt mục tiêu, cam khi đạt từ 80% mục tiêu, đỏ khi thấp hơn.
   impactTarget: 0.4,
+  hiddenMonths: ['2026-11'],   // tháng tạm ẩn khỏi danh sách (dữ liệu chưa sẵn sàng); xóa khỏi mảng để hiện lại
   addonReport: false,   // báo cáo Add-on (tab "Chi tiết addon" của Sheet PBI): tạm ẩn vì dữ liệu PBI chưa chuẩn; đổi thành true để hiện lại
   // Ghi lượt truy cập qua Google Form của chủ web. form = phần ID giữa /d/e/ và /viewform trong link Form;
   // fields = mã ô (entry.xxxxxxxx) của từng câu hỏi. Để trống = không ghi lượt truy cập. Sheet phản hồi đọc từ dòng "Lịch sử truy cập" trong tab Danh sách link.
