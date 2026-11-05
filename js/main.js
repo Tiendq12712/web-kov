@@ -718,6 +718,7 @@ const showError = (message) => {
 function showLogin(message = '') {
   setBoot();
   resetUserData(); state.me = null; disarmRefresh();   // về màn hình đăng nhập: bỏ dữ liệu của phiên trước và mọi thao tác tải còn dang dở
+  loadGis().catch(() => {});   // nạp sẵn thư viện đăng nhập Google: bấm nút là mở cửa sổ ngay, không chờ tải (trình duyệt chặn cửa sổ mở chậm sau lúc bấm)
   const remembered = getRemembered();   // đã đăng nhập hôm nay nhưng token hết hạn: chỉ cần bấm Tiếp tục
   els.logout.hidden = true;
   setAccount(null);
