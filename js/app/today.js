@@ -16,8 +16,9 @@ export function ensureTodayData() {
   const load = (slice, loader, apply, ok = () => true) => {
     if (slice.data || slice.loading || slice.error) return;
     slice.loading = true;
-    loader().then((d) => { if (ok()) apply(d); }).catch((err) => { if (err.code === 'auth') hooks.authLost(err.message); else slice.error = err.message; })
-      .finally(() => { slice.loading = false; if (state.tab === 'me') hooks.renderView(); });
+    let lost = false;   // hết phiên: không vẽ lại (sẽ gọi Google tiếp bằng token hỏng)
+    loader().then((d) => { if (ok()) apply(d); }).catch((err) => { if (err.code === 'auth') { lost = true; hooks.authLost(err.message); } else slice.error = err.message; })
+      .finally(() => { slice.loading = false; if (!lost && state.tab === 'me') hooks.renderView(); });
   };
   if (hasDetail()) load(state.segmentM, () => loadDetailFor([month]), (d) => { state.segmentM.data = d; }, () => month === state.month);
   if (hasScores()) load(state.callctl, loadScores, (d) => { state.callctl.data = d; });

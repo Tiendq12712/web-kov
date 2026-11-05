@@ -7,9 +7,8 @@ function show(cell) {
   hide();
   current = cell;
   tip = Object.assign(document.createElement('div'), { className: 'tip', role: 'tooltip' });
-  const who = cell.dataset.who ? `<small>${cell.dataset.who}</small>` : '';
-  tip.innerHTML = `${who}<span></span>`;
-  tip.lastChild.textContent = cell.dataset.note;
+  const note = Object.assign(document.createElement('span'), { textContent: cell.dataset.note });
+  tip.append(...(cell.dataset.who ? [Object.assign(document.createElement('small'), { textContent: cell.dataset.who })] : []), note);   // textContent: tên lấy từ Sheet không được chạy như HTML
   document.body.append(tip);
   const r = cell.getBoundingClientRect(), t = tip.getBoundingClientRect();
   const left = Math.max(8, Math.min(r.left + r.width / 2 - t.width / 2, innerWidth - t.width - 8));

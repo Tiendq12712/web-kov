@@ -8,7 +8,7 @@ const MEMBER = /^(\d+)\s*-\s*(.+?)\s*-\s*(.+)$/;
 /** Ngày dạng dd/mm/yyyy (chuỗi) hoặc số serial của Google Sheets -> 'YYYY-MM-DD' ('' nếu trống/không đọc được). */
 export function toIsoDate(v) {
   if (typeof v === 'number') {
-    const d = new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86_400_000);
+    const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 86_400_000);
     return d.toISOString().slice(0, 10);
   }
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(text(v));

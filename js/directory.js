@@ -124,8 +124,15 @@ async function yearFromTitle(link, tab) {
   }
 }
 
-const tabsOf = async (links, kind) => (await Promise.all(links.filter((l) => l.kind === kind)
-  .map(async (l) => (await fetchTabs(l.id, getToken())).map((tab) => ({ id: l.id, tab }))))).flat();
+/** Tab của các link cùng loại. Một link lỗi (chưa chia sẻ, đã xóa) bị bỏ qua nếu còn link khác đọc được; hết phiên hoặc tất cả cùng lỗi thì báo lỗi. */
+const tabsOf = async (links, kind) => {
+  const results = await Promise.allSettled(links.filter((l) => l.kind === kind)
+    .map(async (l) => (await fetchTabs(l.id, getToken())).map((tab) => ({ id: l.id, tab }))));
+  const bad = results.find((r) => r.status === 'rejected');
+  const ok = results.filter((r) => r.status === 'fulfilled');
+  if (bad && (bad.reason?.code === 'auth' || !ok.length)) throw bad.reason;
+  return ok.flatMap((r) => r.value);
+};
 
 /**
  * Mỗi tháng: { month, kpi: {id, tab}, productivity: {id, tab} | null }, mới nhất trước.

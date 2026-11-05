@@ -1,6 +1,6 @@
 /* Service worker: chỉ cache "vỏ" ứng dụng (HTML/CSS/JS/icon cùng origin).
    Dữ liệu KPI và đăng nhập Google (khác origin) KHÔNG bao giờ được cache. */
-const CACHE = 'kpi-shell-v271';
+const CACHE = 'kpi-shell-v273';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/styles.css',
   'js/main.js', 'js/config.js', 'js/auth.js', 'js/sheet.js', 'js/persist.js', 'js/quality.js', 'js/periodReport.js', 'js/callScores.js', 'js/listen.js', 'js/tasks.js', 'js/views/tasks.js', 'js/app/state.js', 'js/app/route.js', 'js/app/nav.js', 'js/app/hooks.js', 'js/app/filters.js', 'js/app/heard.js', 'js/app/reportExport.js', 'js/app/background.js', 'js/app/today.js', 'js/today.js', 'js/views/today.js', 'js/audit.js', 'js/addonScore.js', 'js/visits.js', 'js/cinfoWeekly.js', 'js/cinfoMismatch.js', 'js/mismatchEval.js', 'js/app/mismatchEval.js', 'js/addonDetail.js', 'js/views/addonDetail.js', 'js/views/addonScore.js', 'js/heard.js', 'js/jobType.js', 'js/views/jobType.js', 'js/views/listen.js', 'js/views/callScores.js', 'js/reportPdf.js', 'js/data.js',
@@ -24,7 +24,8 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Stale-while-revalidate: mở nhanh từ cache, đồng thời cập nhật bản mới cho lần sau.
+// Ưu tiên bản mới từ mạng (chờ tối đa 4 giây), lỗi/chậm thì dùng bản đã lưu: mọi file của một lần phát hành luôn cùng phiên bản,
+// không bị trộn file cũ với file mới (nguyên nhân trang trắng sau khi cập nhật). Offline vẫn mở được từ bộ nhớ.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -33,13 +34,17 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(request, { ignoreSearch: true });
-    const refresh = fetch(request, { cache: 'no-cache' }).then((res) => {
+    const fresh = fetch(request, { cache: 'no-cache' }).then((res) => {
       if (res.ok) cache.put(request, res.clone());
       return res;
     });
-    if (cached) { refresh.catch(() => {}); return cached; }
-    try { return await refresh; }
-    catch { return request.mode === 'navigate' ? cache.match('index.html') : Response.error(); }
+    fresh.catch(() => {});   // thua cuộc đua thời gian thì vẫn tiếp tục lưu bản mới cho lần sau
+    try {
+      return await Promise.race([fresh, new Promise((_, reject) => setTimeout(reject, 4000))]);
+    } catch {
+      const cached = await cache.match(request, { ignoreSearch: true });
+      if (cached) return cached;
+      try { return await fresh; } catch { return request.mode === 'navigate' ? cache.match('index.html') : Response.error(); }
+    }
   })());
 });

@@ -19,7 +19,7 @@ import time
 import uuid
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 # Python cài từ python.org trên macOS chưa có chứng chỉ gốc -> dùng bộ của certifi (đã cài cùng tool).
 try:
@@ -271,16 +271,16 @@ class Handler(SimpleHTTPRequestHandler):
 
     def read_json(self):
         length = int(self.headers.get('Content-Length') or 0)
-        if length > MAX_BODY:
+        if length < 0 or length > MAX_BODY:
             raise ValueError('Dữ liệu gửi lên quá lớn')
         return json.loads(self.rfile.read(length) or b'{}')
 
     # -- định tuyến
     def send_head(self):
         """Chỉ phát file web: không phát file ẩn (.git, .claude…) hay mã Python."""
-        path = urlparse(self.path).path
+        path = unquote(urlparse(self.path).path)   # giải mã trước khi kiểm tra: "/%2egit/config" vẫn là .git
         hidden = any(part.startswith('.') for part in path.split('/') if part)
-        if not self.host_ok() or hidden or path.endswith(('.py', '.pyc')):
+        if not self.host_ok() or hidden or path.lower().endswith(('.py', '.pyc')):
             self.send_error(404)
             return None
         return super().send_head()

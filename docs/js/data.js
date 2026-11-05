@@ -50,7 +50,7 @@ export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
   // Ngày được gia hạn SLA nằm ở tab "Gia hạn SLA" (Ngày | Số ngày cộng thêm | Ghi chú); không đọc được thì dùng mặc định.
   try { setSlaExtra(await readTable({ url: CONFIG.configSheet, tab: CONFIG.tabs.slaExtra, columns: ['Ngày tạo data', 'Số ngày cộng thêm', 'Ghi chú'] })); } catch { /* giữ mặc định */ }
   return (months = list.filter((m) => !CONFIG.hiddenMonths?.includes(m.month)));
-}));
+}).catch((err) => { monthsPromise = null; throw err; }));   // lỗi thì cho phép thử lại, không giữ lời hứa đã hỏng
 export const reloadMonths = () => { monthsPromise = null; cache.clear(); store.clear(); persistClear(); };
 
 const entryOf = (ym) => {
@@ -210,12 +210,12 @@ export const loadDetail = () => memo('detail', async () => {
   return { rows: sets.flat(), months: list.map((m) => m.month).sort() };
 });
 
-export const clearCache = () => { cache.clear(); store.clear(); persistClear(); };
+export const clearCache = () => { cache.clear(); store.clear(); persistClear(); monthsPromise = null; };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
 export const snapshotData = () => ({ months, pbi: pbiLink, addon: addonLink, visits: visitsLink, library: libraryLink, hr: hrLink, calls: callLink, scores: scoreLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'scores' && !key.startsWith('detail')) });
 export function restoreData({ months: saved, pbi, addon, visits, library, hr, calls, scores, entries }) {
-  months = saved;
+  months = saved.filter((m) => !CONFIG.hiddenMonths?.includes(m.month));   // tháng đã ẩn không được mở lại qua bản lưu
   pbiLink = pbi ?? null;
   addonLink = addon ?? null;
   visitsLink = visits ?? null;
@@ -223,6 +223,6 @@ export function restoreData({ months: saved, pbi, addon, visits, library, hr, ca
   hrLink = hr ?? null;
   callLink = calls ?? null;
   scoreLink = scores ?? null;
-  monthsPromise = Promise.resolve(saved);
+  monthsPromise = Promise.resolve(months);
   entries.forEach(([key, value]) => { cache.set(key, Promise.resolve(value)); store.set(key, value); });
 }

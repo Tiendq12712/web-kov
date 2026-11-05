@@ -9,7 +9,7 @@ import { prepareReport } from './app/reportExport.js';
 import { todoControl, todoAlerts, preloadDetail, currentSla } from './app/background.js';
 import { renderToday } from './app/today.js';
 import { readHash, readLast, writeHash } from './app/route.js';
-import { state, saveCoachPref, latestAsOf, myCode, team, kpiNames, kpiPeople } from './app/state.js';
+import { state, resetUserData, saveCoachPref, latestAsOf, myCode, team, kpiNames, kpiPeople } from './app/state.js';
 import { getSession, getRemembered, signIn, signOut, loadGis, requireConsentNext } from './auth.js';
 import { saveSnapshot, loadSnapshot, clearSnapshot } from './snapshot.js';
 import { loadAccounts, findAccount, canOpenSettings } from './directory.js';
@@ -149,10 +149,11 @@ function lazyTab(slice, tab, loader, render) {
   if (!slice.loading) {
     slice.loading = true;
     const month = state.month;
+    let lost = false;   // hết phiên: dừng ở đây, vẽ lại sẽ gọi Google tiếp bằng token hỏng (401 lặp lại → 429); làm mới phiên xong mới tải lại
     loader(month)
       .then((data) => { if (month === state.month) slice.data = data; })
-      .catch((err) => { if (err.code === 'auth') authLost(err.message); else slice.error = err.message; })
-      .finally(() => { slice.loading = false; if (state.tab === tab && state.month === month) renderView(); });
+      .catch((err) => { if (err.code === 'auth') { lost = true; authLost(err.message); } else slice.error = err.message; })
+      .finally(() => { slice.loading = false; if (!lost && state.tab === tab && state.month === month) renderView(); });
   }
   return html`<div class="loading" role="status"><p class="muted">Đang tải dữ liệu… lần đầu có thể mất vài giây, các lần sau sẽ nhanh hơn.</p><div class="loading__bar"><i></i></div></div>`;
 }
@@ -304,6 +305,7 @@ function renderCoach() {
 }
 
 function renderView() {
+  if (!state.me) return;   // đang ở màn hình đăng nhập: tải xong muộn không được vẽ đè lên
   if (!state.data) {   // chưa có báo cáo nào: chỉ còn trang Thiết lập (dành cho Admin / Quản trị)
     els.tabs.replaceChildren();
     els.bottomNav.replaceChildren();
@@ -381,8 +383,9 @@ async function copyLink(btn) {
 
 function openMember(ref, { timesheet = false } = {}) {
   const [teamId, code] = ref.split(':');
-  const t = state.data.teams.find((x) => x.id === teamId);
-  const member = t.members.find((m) => m.code === code);
+  const t = state.data?.teams.find((x) => x.id === teamId);
+  const member = t?.members.find((m) => m.code === code);
+  if (!member) return;   // dữ liệu vừa được làm mới trong lúc bấm
   const workdays = state.report.data ? workdaysByCode(state.report.data).get(member.code) : undefined;
   mount(els.detail, detailView(t, member, workdays, state.report.data));
   els.detail.showModal();
@@ -647,10 +650,11 @@ function renderCompare() {
   if (c.key !== key) Object.assign(c, { key, data: null, error: '', loading: false });
   if (c.a !== c.b && !c.data && !c.loading && !c.error) {
     c.loading = true;
+    let lost = false;
     loadCompare(c.a, c.b)
       .then((d) => { if (c.key === key) c.data = d; })
-      .catch((err) => { if (err.code === 'auth') authLost(err.message); else c.error = err.message; })
-      .finally(() => { c.loading = false; if (state.tab === 'compare' && c.key === key) renderView(); });
+      .catch((err) => { if (err.code === 'auth') { lost = true; authLost(err.message); } else c.error = err.message; })
+      .finally(() => { c.loading = false; if (!lost && state.tab === 'compare' && c.key === key) renderView(); });
   }
   if (c.error) return html`<p class="notice" role="alert">${c.error}</p>`;
   return compareView({ months: monthList, a: c.a, b: c.b, data: c.data });
@@ -713,6 +717,7 @@ const showError = (message) => {
 
 function showLogin(message = '') {
   setBoot();
+  resetUserData(); state.me = null; disarmRefresh();   // về màn hình đăng nhập: bỏ dữ liệu của phiên trước và mọi thao tác tải còn dang dở
   const remembered = getRemembered();   // đã đăng nhập hôm nay nhưng token hết hạn: chỉ cần bấm Tiếp tục
   els.logout.hidden = true;
   setAccount(null);
@@ -747,7 +752,7 @@ document.addEventListener('click', (e) => {
   if (e.target.id === 'login') handleLogin(e.target, { resume: e.target.hasAttribute('data-resume') });
   if (e.target.id === 'login-other') { clearSnapshot(); signOut(); showLogin(); }
 });
-els.logout.addEventListener('click', () => { hideWelcome(els.welcome); chat.reset(); clearSnapshot(); disarmRefresh(); signOut(); clearCache(); settings.reset(); state.me = null; state.data = null; showLogin(); });
+els.logout.addEventListener('click', () => { hideWelcome(els.welcome); chat.reset(); clearSnapshot(); disarmRefresh(); signOut(); clearCache(); settings.reset(); startApp.retried = false; showLogin(); });
 
 /* ---------- Khởi động ---------- */
 /** Email phải có trong tab "Tài khoản" của Sheet cấu hình; quyền lấy từ cột "Phân quyền". */
@@ -818,6 +823,7 @@ async function startApp() {
     const month = hash.month || last.month;
     state.tab = hash.tab || last.tab || (state.me.role === 'member' ? 'me' : 'overview');   // nhân sự vào trang riêng của mình (nếu không hợp lệ thì tự về Tổng quan)
     await setMonth(months.some((m) => m.month === month) ? month : months[0].month, { boot: true });
+    startApp.retried = false;   // vào được rồi: lần sau nếu mất quyền lại được tự thử đăng nhập lại một lần
   } catch (err) {
     if (err.code === 'auth') showLogin(err.message);
     else if (err.code === 'forbidden' && !startApp.retried) {

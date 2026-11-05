@@ -54,9 +54,20 @@ def _ssl_context():
     return _context
 
 
+class _SameHostRedirect(urllib.request.HTTPRedirectHandler):
+    """Không theo chuyển hướng sang máy chủ khác: tránh gửi cookie phiên ra ngoài call-report.kiotviet.com."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urllib.parse.urlparse(newurl).netloc != urllib.parse.urlparse(HOST).netloc:
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def _get(url, cookie):
+    if urllib.parse.urlparse(url).netloc != urllib.parse.urlparse(HOST).netloc:
+        raise ValueError('Liên kết không thuộc call-report.kiotviet.com')
     req = urllib.request.Request(url, headers={'Cookie': cookie, 'User-Agent': USER_AGENT, 'Referer': HOST})
-    with urllib.request.urlopen(req, timeout=TIMEOUT, context=_ssl_context()) as resp:
+    opener = urllib.request.build_opener(_SameHostRedirect, urllib.request.HTTPSHandler(context=_ssl_context()))
+    with opener.open(req, timeout=TIMEOUT) as resp:
         return resp.read(), resp.geturl()
 
 

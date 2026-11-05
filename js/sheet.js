@@ -40,7 +40,7 @@ const readBlock = (cell, row, spec) => Object.fromEntries(Object.entries(spec).m
 }));
 
 const readMember = (cell, row, schema) => {
-  const [, code, name, role] = cell('B', row).match(/^(\d+)\s*-\s*(.+?)\s*-\s*(.+)$/);
+  const [, code = '', name = '', role = ''] = /^(\d+)\s*-\s*(.+?)(?:\s*-\s*(.+))?$/.exec(String(cell('B', row) ?? '')) ?? [];   // chưa ghi vai trò vẫn đọc được
   const member = { code, name, role, level: cell(schema.level, row), kpi: cell(schema.kpi, row) };
   for (const key of ['need', 'main', 'addon', 'extra', 'talk']) {
     if (schema[key]) member[key] = readBlock(cell, row, schema[key]);
@@ -49,9 +49,14 @@ const readMember = (cell, row, schema) => {
 };
 
 /** "Update 2h30 10/10" -> { time: '2h30', date: '2026-10-10' } */
-const parseUpdated = (text, year) => {
+const parseUpdated = (text, month) => {
   const m = /Update\s+(\S+)\s+(\d+)\/(\d+)/.exec(text ?? '');
-  return m && { time: m[1], date: `${year}-${m[3].padStart(2, '0')}-${m[2].padStart(2, '0')}` };
+  if (!m) return null;
+  const [y, mo] = month.split('-').map(Number);
+  if (Number(m[3]) === mo) return { time: m[1], date: `${y}-${String(mo).padStart(2, '0')}-${m[2].padStart(2, '0')}` };
+  // Sheet chốt số sau nửa đêm ("Update 8h 1/11" trong tab tháng 10): vẫn là số liệu của tháng này, tính đến ngày cuối tháng.
+  const last = String(new Date(y, mo, 0).getDate()).padStart(2, '0');
+  return { time: m[1], date: Number(m[3]) === (mo % 12) + 1 ? `${month}-${last}` : fallbackAsOf(month) };
 };
 
 /** Tab chưa có dòng "Update …" (ví dụ tháng mới vừa mở): hôm nay nếu đang trong tháng, tháng đã qua thì ngày cuối tháng, tháng chưa tới thì ngày 1. */
@@ -74,7 +79,6 @@ export function parseKpi(rows, month) {
   const cell = makeReader(rows);
   const start = findOnlineStart(rows);
 
-  const year = Number(month.slice(0, 4));
   const queue = [...TEAMS];
   const teams = [];
   let updated = null;
@@ -84,7 +88,7 @@ export function parseKpi(rows, month) {
     const a = cell('A', row);
     const b = cell('B', row);
     if (typeof a === 'string' && a.startsWith('Update')) {
-      updated = parseUpdated(a, year);
+      updated = parseUpdated(a, month);
     } else if (typeof a === 'number' && /^\d+\s*-/.test(b ?? '') && (current || queue.length)) {
       current ??= { ...queue.shift(), updatedTime: updated?.time ?? '—', asOf: updated?.date ?? fallbackAsOf(month), members: [] };
       current.members.push(readMember(cell, row, ONLINE));

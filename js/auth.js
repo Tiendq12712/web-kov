@@ -50,20 +50,26 @@ export function getRemembered() {
 export const loadGis = () => new Promise((resolve, reject) => {
   if (window.google?.accounts?.oauth2) return resolve();
   const script = Object.assign(document.createElement('script'), { src: GIS_SRC, async: true });
-  script.onload = resolve;
-  script.onerror = () => reject(new Error('Không tải được dịch vụ đăng nhập Google'));
+  const timer = setTimeout(() => { script.remove(); reject(new Error('Không tải được dịch vụ đăng nhập Google (quá thời gian). Kiểm tra mạng rồi thử lại.')); }, 20_000);
+  script.onload = () => { clearTimeout(timer); resolve(); };
+  script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error('Không tải được dịch vụ đăng nhập Google')); };
   document.head.append(script);
 });
 
+let cancelPending = null;   // yêu cầu token đang chờ: GIS chỉ có một callback chung, nên yêu cầu mới thay thế yêu cầu cũ (cũ báo lỗi chứ không treo mãi)
 const requestToken = (override = {}) => new Promise((resolve, reject) => {
+  cancelPending?.(new Error('Yêu cầu đăng nhập trước đó đã bị thay thế'));
+  const timer = setTimeout(() => finish(reject, new Error('Cửa sổ đăng nhập Google không phản hồi. Bấm đăng nhập để thử lại.')), 120_000);
+  const finish = (fn, value) => { clearTimeout(timer); cancelPending = null; fn(value); };
+  cancelPending = (err) => finish(reject, err);
   tokenClient ??= google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.clientId,
     scope: SCOPE,
     hd: CONFIG.allowedDomain,          // gợi ý Google chỉ hiện tài khoản của tên miền này
     callback: () => {},
   });
-  tokenClient.callback = (res) => (res.error ? reject(new Error(res.error_description || res.error)) : resolve(res));
-  tokenClient.error_callback = (err) => reject(new Error(err.type === 'popup_closed' ? 'Bạn đã đóng cửa sổ đăng nhập' : err.type));
+  tokenClient.callback = (res) => (res.error ? finish(reject, new Error(res.error_description || res.error)) : finish(resolve, res));
+  tokenClient.error_callback = (err) => finish(reject, new Error(err.type === 'popup_closed' ? 'Bạn đã đóng cửa sổ đăng nhập' : err.type));
   tokenClient.requestAccessToken(override);
 });
 
@@ -121,7 +127,7 @@ export async function getWriteToken() {
   await loadGis();
   const { access_token: token, expires_in: seconds } = await requestToken({ scope: `${SCOPE} ${WRITE_SCOPE}`, login_hint: session?.email });
   rememberWrite(true);
-  writeSession({ ...session, token, write: true, expiresAt: Date.now() + seconds * 1000 });
+  if (session) writeSession({ ...session, token, write: true, expiresAt: Date.now() + seconds * 1000 });   // không có phiên thì không ghi phiên rỗng
   return token;
 }
 

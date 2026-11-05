@@ -402,6 +402,39 @@ await test('Thư viện → Gian hàng: nhận Product/Vai trò, Zalo lên đầ
   eq(new Set([...host.querySelectorAll('.lib-item--store')].map((li) => li.querySelector('svg').innerHTML)).size, 5, 'Retail/FnB/Booking/Salon/Hotel mỗi loại một biểu tượng');
   eq(host.querySelectorAll('.lib-item:not(.lib-item--store)').length, 1, 'tab khác vẫn hiện như cũ');
 });
+await test('Rà soát: đọc dòng nhân sự thiếu vai trò, ngày Update sang tháng sau, ngày giờ PBI, ô Product trống', async () => {
+  const sh = await import(`${root}js/sheet.js`), pb = await import(`${root}js/pbi.js`), lib = await import(`${root}js/library.js`), mt = await import(`${root}js/metrics.js`);
+  const rows = [['TEAM ONLINE'], ['Update 8h 1/11'], [1, '8618 - Mai Thị Hương'], ['Total']];
+  let data = null; try { data = sh.parseKpi(rows, '2026-10'); } catch (e) { data = e; }
+  eq(data instanceof Error ? data.message : 'ok', 'ok', 'thiếu vai trò không làm sập cả tháng');
+  eq(data.teams?.[0]?.members?.[0]?.code, '8618', 'vẫn nhận mã nhân sự');
+  eq(data.teams?.[0]?.asOf, '2026-10-31', 'Update 1/11 trong tab tháng 10 → ngày cuối tháng 10, không nhảy sang tháng 11');
+  eq(sh.parseKpi([['TEAM ONLINE'], ['Update 8h 1/1'], [1, '8618 - A - B'], ['Total']], '2026-12').teams[0].asOf, '2026-12-31', 'tab tháng 12 ghi 1/1 → 31/12');
+  eq(pb.toIsoDate(46326.7), pb.toIsoDate(46326), 'giờ chiều không đẩy sang ngày hôm sau');
+  eq(lib.productOf(undefined), null, 'ô Product trống không hiện chữ undefined');
+  eq(mt.elapsedRatio('2026-10-31'), 1, 'tiến độ thời gian cuối tháng = 100%');
+});
+await test('Rà soát: bản lưu khác phiên bản bị bỏ, tháng ẩn không mở lại được qua bản lưu, đăng xuất xóa dữ liệu của người trước', async () => {
+  const sn = await import(`${root}js/snapshot.js`), au = await import(`${root}js/auth.js`), st = await import(`${root}js/app/state.js`), dt = await import(`${root}js/data.js`);
+  const saved = localStorage.getItem('kpi.snapshot');
+  try {
+    sn.saveSnapshot({ email: 'a@kiotviet.com', month: '2026-10', data: {} });
+    eq(Boolean(sn.loadSnapshot('a@kiotviet.com')), true, 'bản lưu đúng phiên bản dùng được');
+    const old = JSON.parse(localStorage.getItem('kpi.snapshot')); old.version = 1; localStorage.setItem('kpi.snapshot', JSON.stringify(old));
+    eq(sn.loadSnapshot('a@kiotviet.com'), null, 'bản lưu phiên bản cũ bị bỏ');
+  } finally { saved == null ? localStorage.removeItem('kpi.snapshot') : localStorage.setItem('kpi.snapshot', saved); }
+  const prev = { data: st.state.hr.data, me: st.state.me };
+  st.state.hr.data = { x: 1 }; st.state.library.data = { y: 1 }; st.state.cinfo.evals.set('k', 1);
+  st.resetUserData();
+  eq([st.state.hr.data, st.state.library.data, st.state.cinfo.evals.size, st.state.data], [null, null, 0, null], 'xóa dữ liệu theo người dùng');
+  st.state.me = prev.me;
+  const cfg = (await import(`${root}js/config.js`)).CONFIG, hiddenBefore = cfg.hiddenMonths;
+  cfg.hiddenMonths = ['2026-11'];
+  try {
+    dt.restoreData({ months: [{ month: '2026-11' }, { month: '2026-10' }], entries: [] });
+    eq((await dt.loadMonths()).map((m) => m.month), ['2026-10'], 'tháng đang ẩn bị lọc khỏi bản lưu');
+  } finally { cfg.hiddenMonths = hiddenBefore; }
+});
 await test('Google Sheets báo 429 (vượt hạn mức đọc): tự chờ rồi thử lại, hết lượt thì báo lỗi dễ hiểu', async () => {
   const sh = await import(`${root}js/sheet.js`), st = await import(`${root}js/sheetTable.js`);
   const saved = [...sh.RETRY_429], realFetch = window.fetch;

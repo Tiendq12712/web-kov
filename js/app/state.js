@@ -47,6 +47,17 @@ export const state = {
   me: null,                  // { email, role } — role: admin | manager | member
 };
 
+const USER_SLICES = ['report', 'cinfo', 'trend', 'compare', 'calls', 'segmentM', 'segment', 'callctl', 'addons', 'hr', 'library'];
+/** Xóa mọi dữ liệu đã tải theo người dùng (khi về màn hình đăng nhập): tài khoản đăng nhập sau không được thấy dữ liệu của người trước. */
+export function resetUserData() {
+  for (const key of USER_SLICES) Object.assign(state[key], { data: null, loading: false, error: '' });
+  Object.assign(state.cinfo, { evals: new Map(), evalsLoaded: false, evalsLoading: false, evalNotice: '' });
+  Object.assign(state.compare, { key: '' });
+  Object.assign(state.segment, { key: '' });
+  Object.assign(state.listen, { heard: new Map(), heardLoaded: false, heardLoading: false, heardNotice: '', hasScores: false });
+  Object.assign(state, { data: null, todo: null, coach: null, accounts: [] });
+}
+
 /** Ngày số liệu mới nhất trong các team (mốc tính tuổi data cho SLA). */
 export const latestAsOf = (data) => data.teams.map((t) => t.asOf).sort().at(-1);
 

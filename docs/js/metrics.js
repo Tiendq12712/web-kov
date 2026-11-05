@@ -4,7 +4,7 @@ const WEIGHT_ADDON = 0.3;  // Add-on 30%
 const ON_TRACK = 1;        // KPI/tiến độ thời gian ≥ 100%
 const WATCH = 0.7;         // ≥ 70% là "cần đẩy", dưới là "chậm"
 
-const sum = (items, pick) => items.reduce((s, m) => s + (pick(m) ?? 0), 0);
+const sum = (items, pick) => items.reduce((s, m) => { const v = Number(pick(m)); return s + (Number.isFinite(v) ? v : 0); }, 0);
 const ratio = (a, b) => (b ? a / b : 0);
 
 /** Tỷ lệ thời gian đã qua của tháng tại thời điểm cập nhật (theo ngày lịch). */
