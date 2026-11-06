@@ -119,7 +119,7 @@ async function yearFromTitle(link, tab) {
     const title = row.find((cell) => typeof cell === 'string' && /\d{1,2}\s*\/\s*\d{4}/.test(cell));
     return title ? monthFromText(title) : null;
   } catch (err) {
-    if (err.code === 'auth') throw err;
+    if (err.code === 'auth' || err.code === 'rate') throw err;   // vượt hạn mức: báo lỗi thay vì đoán sai năm của tháng
     return null;
   }
 }

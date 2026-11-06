@@ -8,10 +8,15 @@ const avg = (list) => { const v = list.filter((x) => x != null); return v.length
 
 export const MIN_WEEK_ACTS = 30;   // tuần ít hơn số act này chỉ để tham khảo
 
+export const MIN_MEASURED = 30;   // tuần có ít act đã đo impact hơn số này chỉ để tham khảo (act mới chưa đủ 7 ngày để đo)
+
 export function statsOf(acts) {
   const advised = acts.filter((a) => a.advised);
   const matched = advised.filter((a) => a.match);
+  const measured = acts.filter((a) => a.impact && a.impact !== 'N/A'), up = measured.filter((a) => a.impact === 'Tăng').length;
   return {
+    measured: measured.length, up, upRate: ratio(up, measured.length),
+    featGain: avg(acts.map((a) => a.featGain)), setupGain: avg(acts.map((a) => a.setupGain)),
     total: acts.length, notUsed: acts.filter((a) => !a.used).length, advised: advised.length, matched: matched.length,
     useRate: ratio(acts.length - acts.filter((a) => !a.used).length, acts.length), adviceRate: ratio(advised.length, acts.length), matchRate: ratio(matched.length, advised.length),
     feat: avg(acts.map((a) => a.featScore)), setup: avg(acts.map((a) => a.setupScore)),
@@ -51,4 +56,15 @@ export function peopleCompare(acts, [wa, wb]) {
     by.set(a.code, p);
   }
   return [...by.values()].map((p) => ({ code: p.code, name: p.name, a: statsOf(p.a), b: statsOf(p.b) })).sort((x, y) => (y.a.total + y.b.total) - (x.a.total + x.b.total));
+}
+
+/** Impact theo nhóm act: tư vấn khớp gợi ý, tư vấn không khớp, không tư vấn tính năng. */
+export function impactGroups(acts) {
+  const adv = acts.filter((a) => a.advised);
+  return [
+    ['Tư vấn khớp hệ thống gợi ý', statsOf(adv.filter((a) => a.match))],
+    ['Tư vấn không khớp gợi ý', statsOf(adv.filter((a) => !a.match))],
+    ['Không tư vấn tính năng', statsOf(acts.filter((a) => !a.advised))],
+    ['Tất cả act', statsOf(acts)],
+  ];
 }

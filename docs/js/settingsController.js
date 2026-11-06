@@ -23,14 +23,15 @@ const byId = (id) => document.getElementById(id);
  * `getMe()` trả về { email, role }; các callback giúp ứng dụng chính phản ứng khi dữ liệu đổi.
  */
 export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLinksChanged, onSynced, onHistory }) {
-  const ui = {
+  const initial = () => ({
     section: 'accounts', accounts: [], links: [], tasks: [], status: null, serverError: '',
     access: { loading: false, error: '', result: null },
     audit: { rows: [], loaded: false, loading: false, error: '', action: 'all', who: 'all', q: '' },
     visits: { rows: [], loaded: false, loading: false, error: '', enabled: false, writing: visitsEnabled(), who: 'all' },
     alert: null, job: null, editing: null, error: '', busy: false, loaded: false, loading: false, me: null, months: [],
     call: { gsheet_url: '', tab_name: '', agents: '', cuser: '', date_mode: 'month_to_yesterday', date_from: '', date_to: '' },
-  };
+  });
+  const ui = initial();
   let timer = null;
 
   /* ---------- Máy chủ cục bộ & công việc đồng bộ ---------- */
@@ -354,6 +355,6 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
       return ui.loading ? html`<p class="muted" role="status">Đang tải thiết lập…</p>` : settingsView(ui);
     },
     /** Đọc lại toàn bộ khi người dùng đăng xuất/đăng nhập. */
-    reset() { clearTimeout(timer); Object.assign(ui, { loaded: false, loading: false, job: null, editing: null, error: '' }); },
+    reset() { clearTimeout(timer); Object.assign(ui, initial()); },   // đăng xuất: xóa sạch dữ liệu của người trước (tài khoản, nhật ký, lượt truy cập…)
   };
 }

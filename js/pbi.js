@@ -34,12 +34,14 @@ export function parsePbi(rows) {
     id: col('activityid'), retailer: col('retailer_id'), type: col('Loại công việc'), who: col('last_name'), used: col('used_stt'),
     match: col('is_match_feature'), status: col('status'), created: col('createdtime'), modified: col('modifiedtime'),
     support: col('Công việc hỗ trợ'), matched: col('matched_feature'), sc: col('Tính năng SC tư vấn'), rcm: col('Tính năng rcm tư vấn'), featScore: col('feature_score_t'), setupScore: col('setup_score_t'),
+    impact: col('diem_tang'), featNext: col('feature_score_t7'), setupNext: col('setup_score_t7'),
   };
   if (idx.who < 0 || idx.used < 0) throw new Error('Tab dữ liệu Power BI thiếu cột last_name hoặc used_stt');
   const get = (r, k) => (idx[k] >= 0 ? r[idx[k]] : '');
   const acts = rows.slice(1).filter((r) => text(get(r, 'who'))).map((r) => {
     const m = MEMBER.exec(text(get(r, 'who')));
     const sc = features(get(r, 'sc'));
+    const featScore = score(get(r, 'featScore')), setupScore = score(get(r, 'setupScore')), featNext = score(get(r, 'featNext')), setupNext = score(get(r, 'setupNext'));
     return {
       id: text(get(r, 'id')), retailer: text(get(r, 'retailer')), type: text(get(r, 'type')),
       code: m?.[1] ?? '', name: m?.[2] ?? text(get(r, 'who')),
@@ -49,7 +51,9 @@ export function parsePbi(rows) {
       // Tư vấn tính năng: cột "Công việc hỗ trợ" có công việc "Tư vấn tính năng" (có thể kèm công việc khác, ngăn bằng "|##|").
       support: text(get(r, 'support')), advised: /tư vấn tính năng/i.test(text(get(r, 'support'))), scFeatures: sc,
       matchedFeatures: features(get(r, 'matched')), rcmFeatures: features(get(r, 'rcm')),
-      featScore: score(get(r, 'featScore')), setupScore: score(get(r, 'setupScore')),
+      featScore, setupScore,
+      // Impact: điểm 7 ngày sau (cột _t7) so với ngày act; `impact` là kết luận của báo cáo ("Tăng", "Giảm or Không đổi", "N/A" = chưa đủ 7 ngày để đo).
+      impact: text(get(r, 'impact')), featGain: featScore != null && featNext != null ? featNext - featScore : null, setupGain: setupScore != null && setupNext != null ? setupNext - setupScore : null,
     };
   });
   if (!acts.length) throw new Error('Không có activity nào trong tab dữ liệu Power BI');

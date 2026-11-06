@@ -10,7 +10,9 @@ export function num(v) {
   if (typeof v === 'number') return v;
   const t = text(v).replace(/\s+/g, '');
   if (!t || t === '-') return null;
-  const n = Number(t.replace(/\./g, '').replace(',', '.'));
+  // Dấu chấm chỉ là phân cách hàng nghìn khi có dạng 1.234 hoặc đi kèm dấu phẩy thập phân; "1.5" là 1,5 (không phải 15).
+  const dotsAreThousands = t.includes(',') || /^-?\d{1,3}(\.\d{3})+$/.test(t);
+  const n = Number((dotsAreThousands ? t.replace(/\./g, '') : t).replace(',', '.'));
   return Number.isFinite(n) ? n : null;
 }
 

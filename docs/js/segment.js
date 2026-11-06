@@ -104,7 +104,10 @@ const distribution = (rows, pick, base) => {
   return map;
 };
 
-export function analyzeSegment(all, { key, month = 'all', today = new Date().toISOString().slice(0, 10) } = {}) {
+/** Hôm nay theo giờ máy (YYYY-MM-DD): toISOString là giờ UTC nên từ 0h đến 7h sáng ở Việt Nam sẽ ra ngày hôm qua. */
+const localToday = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
+
+export function analyzeSegment(all, { key, month = 'all', today = localToday() } = {}) {
   const inMonth = month === 'all' ? all : all.filter((r) => r.month === month);
   const seg = inMonth.filter((r) => sourceKey(r.source) === key);
   const rest = inMonth.filter((r) => sourceKey(r.source) !== key);

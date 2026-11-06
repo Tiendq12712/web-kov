@@ -10,7 +10,7 @@ import { todoControl, todoAlerts, preloadDetail, currentSla } from './app/backgr
 import { renderToday } from './app/today.js';
 import { readHash, readLast, writeHash } from './app/route.js';
 import { state, resetUserData, saveCoachPref, latestAsOf, myCode, team, kpiNames, kpiPeople } from './app/state.js';
-import { getSession, getRemembered, signIn, signOut, loadGis, requireConsentNext } from './auth.js';
+import { getSession, getRemembered, signIn, signOut, loadGis, requireConsentNext, needsConsent } from './auth.js';
 import { saveSnapshot, loadSnapshot, clearSnapshot } from './snapshot.js';
 import { loadAccounts, findAccount, canOpenSettings } from './directory.js';
 import { html, mount } from './dom.js';
@@ -267,7 +267,7 @@ function currentPage() {
   if (state.tab === 'hr' && hasHr()) return { view: lazyTab(state.hr, 'hr', loadHr, (d) => hrView(d, state.hr, { manager: state.me.role !== 'member', code: myCode() })), title: 'Phép năm' };
   if (state.tab === 'library' && hasLibrary()) return { view: lazyTab(state.library, 'library', loadLibrary, (d) => libraryView(d, state.library)), title: 'Thư viện' };
   if (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) return { view: renderCompare(), title: 'So sánh tháng' };
-  if (state.tab === 'trend' && state.me.role !== 'member') return { view: lazyTab(state.trend, 'trend', loadHistory, (h) => trendView(h, state.trend, { manager: state.me.role !== 'member', code: myCode() })), title: 'Xu hướng' };
+  if (state.tab === 'trend' && state.me.role !== 'member') { preloadPbi(); return { view: lazyTab(state.trend, 'trend', loadHistory, (h) => trendView(h, state.trend, { manager: state.me.role !== 'member', code: myCode(), pbi: state.cinfo.data })), title: 'Xu hướng' }; }
   if (state.tab === 'cinfo' && state.me.role !== 'member') ensureEvals();
   if (state.tab === 'cinfo') return { view: lazyTab(state.cinfo, 'cinfo', loadPbi, (d) => cinfoView(d, state.cinfo.f, { evals: state.cinfo.evals, evalNotice: state.cinfo.evalNotice, evalOpen: state.cinfo.evalOpen, manager: state.me.role !== 'member', code: state.me.code ?? findMember(state.me.email, state.data.teams, state.me.name)?.member.code })), title: 'Customer Info' };
   if (state.tab === 'sla') {
@@ -675,7 +675,7 @@ async function recordHistoryNow() {
 /** Tải sẵn dữ liệu Customer Info (nếu có) để "Việc cần làm" biết số act chưa dùng; vẽ lại Tổng quan khi có. */
 function preloadPbi() {
   if (!hasPbi() || state.cinfo.data) return;
-  loadPbi().then((d) => { state.cinfo.data = d; if (state.tab === 'overview') renderView(); }).catch(() => {});
+  loadPbi().then((d) => { state.cinfo.data = d; if (state.tab === 'overview' || state.tab === 'trend') renderView(); }).catch(() => {});
 }
 
 const settings = createSettings({
@@ -731,9 +731,9 @@ function showLogin(message = '') {
       <p class="muted">Chỉ tài khoản <strong>@${CONFIG.allowedDomain}</strong> đã được cấp quyền mới truy cập được. Chưa có quyền? Hãy liên hệ Tiến (<a href="mailto:tien.dq@kiotviet.com">tien.dq@kiotviet.com</a>).</p>
       ${message ? html`<p class="notice" role="alert">${message}</p>` : ''}
       ${remembered
-        ? html`<button class="btn" id="login" data-resume type="button">Tiếp tục với ${remembered.email}</button>
+        ? html`<button class="btn" id="login" data-resume type="button">${needsConsent() ? 'Cấp quyền Google Trang tính cho' : 'Tiếp tục với'} ${remembered.email}</button>
                <p class="muted login__legal"><button class="link-btn" id="login-other" type="button">Dùng tài khoản khác</button></p>`
-        : html`<button class="btn" id="login" type="button">Đăng nhập bằng Google</button>`}
+        : html`<button class="btn" id="login" type="button">${needsConsent() ? 'Cấp quyền Google Trang tính và đăng nhập' : 'Đăng nhập bằng Google'}</button>`}
       <p class="muted login__legal"><a href="privacy.html">Chính sách quyền riêng tư</a> · <a href="terms.html">Điều khoản dịch vụ</a></p>
     </section>`);
 }
@@ -830,7 +830,7 @@ async function startApp() {
     else if (err.code === 'forbidden' && !startApp.retried) {
       // Vừa đăng nhập mà bị từ chối đọc Sheet (thường do bỏ tích quyền xem Google Sheets ở màn hình Google): quay về màn hình đăng nhập và lần sau hiện lại màn hình cấp quyền.
       startApp.retried = true; requireConsentNext(); signOut(); clearCache();
-      showLogin('Google chưa cho web đọc báo cáo bằng tài khoản này. Bấm đăng nhập lại, rồi ở màn hình Google nhớ tích chọn quyền xem Google Sheets.');
+      showLogin('Google chưa cho web đọc báo cáo bằng tài khoản này. Bấm nút bên dưới và TÍCH CHỌN quyền Google Trang tính ở màn hình Google. Nếu vẫn bị từ chối, tài khoản chưa được chia sẻ báo cáo: hãy liên hệ Tiến.');
     } else { console.error(err); showError(`${err.message}${where(err)}`); }   // startApp.retried: chỉ tự quay về đăng nhập một lần, tránh lặp vô hạn nếu tài khoản thật sự không có quyền
   }
 }

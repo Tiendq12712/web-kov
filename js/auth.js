@@ -6,9 +6,14 @@ const WRITE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const READ_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 /** Google cho người dùng bỏ tích từng quyền ở màn hình cấp quyền: token trả về có thể thiếu quyền xem Google Sheets. */
 export const hasSheetsScope = (res) => { if (!res?.scope) return true; const granted = String(res.scope).split(/\s+/); return granted.includes(READ_SCOPE) || granted.includes(WRITE_SCOPE); };   // không có thông tin quyền thì không chặn
-let forceConsent = false;
+const CONSENT_FLAG = 'kpi.consent';   // lần đăng nhập trước thiếu quyền Sheets: nhớ qua cả lần tải lại trang (Ctrl+F5) cho tới khi cấp đủ quyền
+const readConsent = () => { try { return localStorage.getItem(CONSENT_FLAG) === '1'; } catch { return false; } };
+const rememberConsent = (on) => { try { on ? localStorage.setItem(CONSENT_FLAG, '1') : localStorage.removeItem(CONSENT_FLAG); } catch {} };
+let forceConsent = readConsent();
+/** Lần đăng nhập kế tiếp sẽ hiện lại màn hình cấp quyền của Google (để màn hình đăng nhập đổi nhãn nút cho rõ). */
+export const needsConsent = () => forceConsent;
 /** Gọi khi vừa đăng nhập mà vẫn bị từ chối đọc Sheet: lần đăng nhập kế tiếp hiện lại màn hình cấp quyền. */
-export const requireConsentNext = () => { forceConsent = true; };   // lần đăng nhập trước thiếu quyền Sheets: lần sau luôn hiện lại màn hình cấp quyền
+export const requireConsentNext = () => { forceConsent = true; rememberConsent(true); };   // lần đăng nhập trước thiếu quyền Sheets: lần sau luôn hiện lại màn hình cấp quyền
 const STORAGE_KEY = 'kpi.session';
 const DAY_KEY = 'kpi.day';   // nhớ đăng nhập trong ngày: { email, date } (không chứa token)
 const EXPIRY_MARGIN_MS = 60_000;
@@ -103,10 +108,10 @@ export async function signIn({ resume = false, silent = false } = {}) {
   const { access_token: token, expires_in: seconds } = granted;
   if (!hasSheetsScope(granted)) {
     google.accounts.oauth2.revoke(token);
-    forceConsent = true;
-    throw new Error('Bạn chưa cấp quyền "Xem Google Trang tính" ở màn hình Google. Bấm đăng nhập lại và nhớ tích chọn ô quyền xem Google Sheets (nếu không, web không đọc được báo cáo).');
+    forceConsent = true; rememberConsent(true);
+    throw new Error('Google chưa cấp quyền xem Google Trang tính (Google Sheets) cho web này, nên chưa đọc được báo cáo. Bấm nút bên dưới, ở màn hình Google hãy TÍCH CHỌN ô quyền Google Trang tính rồi bấm Tiếp tục. Không cần tải lại trang.');
   }
-  forceConsent = false;
+  forceConsent = false; rememberConsent(false);
   const profile = await fetchProfile(token);
   if (!isAllowed(profile)) {
     google.accounts.oauth2.revoke(token);

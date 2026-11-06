@@ -130,7 +130,7 @@ export async function fetchRows(urlOrId, token, { tab, range: area = 'A1:AZ1000'
     throw Object.assign(new Error('Tài khoản của bạn chưa được cấp quyền xem Google Sheet này'), { code: 'forbidden' });
   }
   if (res.status === 400) throw new Error(`Không tìm thấy tab "${tab}" trong Google Sheet`);
-  if (res.status === 429) throw new Error('Google Sheets đang giới hạn số lần đọc (quá nhiều yêu cầu trong 1 phút). Đợi khoảng 1 phút rồi tải lại trang.');
+  if (res.status === 429) throw Object.assign(new Error('Google Sheets đang giới hạn số lần đọc (quá nhiều yêu cầu trong 1 phút). Đợi khoảng 1 phút rồi tải lại trang.'), { code: 'rate' });
   if (!res.ok) throw new Error(`Google Sheets trả lỗi ${res.status}`);
   return (await res.json()).values ?? [];
 }

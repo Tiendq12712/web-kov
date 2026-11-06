@@ -1,6 +1,8 @@
 import { html } from '../dom.js';
 import { num } from '../format.js';
 import { lineChart, chartCard, sparkline } from './charts.js';
+import { weeklyStats, impactGroups, statsOf, MIN_WEEK_ACTS, MIN_MEASURED } from '../cinfoWeekly.js';
+import { countedActs } from '../pbi.js';
 import { METRICS, series, lastN, movers, dayMatrix, trendInsights, fmtMetric, fmtDeltaMetric, toneOf } from '../history.js';
 
 const dm = (iso) => iso.split('-').slice(1).reverse().map(Number).join('/');
@@ -55,11 +57,69 @@ function heatTable(records, metric, range) {
     </table></div>`;
 }
 
+
+const pc = (r) => (r == null ? '—' : `${(r * 100).toFixed(1).replace('.', ',')}%`);
+const gain = (v) => (v == null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1).replace('.', ',')}`);
+const gainCls = (v) => (v == null || v === 0 ? '' : v > 0 ? 'is-good' : 'is-bad');
+const dmIso = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+
+/**
+ * Customer Info theo tuần (theo ngày chỉnh sửa act): tỉ lệ tư vấn tính năng, khớp gợi ý hệ thống và impact
+ * (điểm tính năng/setup sau 7 ngày so với ngày act). Lấy từ dữ liệu Power BI nên có sẵn lịch sử, không cần chờ lưu từng ngày.
+ */
+function cinfoTrend(pbi, who) {
+  if (!pbi) return '';   // chưa tải xong (hoặc chưa có link PBI): mục này hiện khi có dữ liệu
+  const acts = countedActs(pbi.acts).filter((a) => who === 'all' || a.code === who);
+  const weeks = weeklyStats(acts);
+  if (!acts.length || !weeks.length) return '';
+  const rated = weeks.filter((w) => !w.small), impacted = weeks.filter((w) => w.measured >= MIN_MEASURED);
+  const label = (w) => `${dmIso(w.start)}${w.partial ? '*' : ''}`;
+  const percent = (v) => `${Math.round(v)}%`, p1 = (v) => `${v.toFixed(1).replace('.', ',')}%`, pts1 = (v) => v.toFixed(1).replace('.', ',');
+  const charts = html`<div class="grid cinfo-charts">
+    ${rated.length >= 2 ? chartCard('Tư vấn tính năng & khớp gợi ý theo tuần', lineChart({ labels: rated.map(label), format: percent, valueFormat: p1, values: true, series: [
+      { name: '% act tư vấn tính năng', cls: 's1', values: rated.map((w) => (w.adviceRate ?? 0) * 100) }, { name: '% khớp / tư vấn', cls: 's2', values: rated.map((w) => (w.matchRate ?? 0) * 100) }] })) : ''}
+    ${impacted.length >= 2 ? chartCard('% act có điểm tăng sau 7 ngày', lineChart({ labels: impacted.map(label), format: percent, valueFormat: p1, values: true, series: [{ name: '% act tăng điểm', cls: 's1', values: impacted.map((w) => (w.upRate ?? 0) * 100) }] })) : ''}
+    ${impacted.length >= 2 ? chartCard('Điểm tăng thêm sau 7 ngày (trung bình)', lineChart({ labels: impacted.map(label), format: (v) => `${Math.round(v)}`, valueFormat: pts1, values: true, series: [
+      { name: 'Điểm tính năng', cls: 's1', values: impacted.map((w) => w.featGain ?? 0) }, { name: 'Điểm setup', cls: 's2', values: impacted.map((w) => w.setupGain ?? 0) }] })) : ''}
+  </div>`;
+  const groups = impactGroups(acts);
+  const people = who === 'all' ? [...acts.reduce((m, a) => (m.get(a.code)?.acts.push(a) ?? m.set(a.code, { code: a.code, name: a.name, acts: [a] }), m), new Map()).values()]
+    .map((p) => ({ ...p, ...statsOf(p.acts) })).sort((a, b) => b.total - a.total) : [];
+  return html`
+    <div class="toolbar"><h2 class="section-title">Customer Info & impact theo tuần</h2>
+      <p class="muted">Theo ngày chỉnh sửa act, mỗi tuần từ thứ 2 đến chủ nhật. Impact là mức tăng điểm của retailer sau 7 ngày kể từ act; act mới chưa đủ 7 ngày thì chưa đo được. Tuần có dấu * chưa đủ ngày; tuần dưới ${MIN_WEEK_ACTS} act hoặc dưới ${MIN_MEASURED} act đã đo bị ẩn khỏi biểu đồ.</p></div>
+    ${charts}
+    <div class="table-wrap"><table class="trend-table sortable">
+      <thead><tr><th class="sticky-col">Tuần</th><th>Số act</th><th>% tư vấn tính năng</th><th>% khớp / tư vấn</th><th>Đã đo impact</th><th>% act tăng điểm</th><th>Δ điểm tính năng</th><th>Δ điểm setup</th></tr></thead>
+      <tbody>${[...weeks].reverse().map((w) => html`<tr class="static ${w.partial || w.small || w.measured < MIN_MEASURED ? 'is-partial' : ''}">
+        <td class="sticky-col"><strong>${dmIso(w.start)} – ${dmIso(w.end)}</strong>${w.partial ? html`<small class="cinfo-rate">chưa đủ tuần</small>` : w.small ? html`<small class="cinfo-rate">ít dữ liệu</small>` : ''}</td>
+        <td class="num">${num(w.total)}</td><td class="num">${pc(w.adviceRate)}</td><td class="num">${pc(w.matchRate)}<small class="cinfo-rate">${w.matched}/${w.advised} act</small></td>
+        <td class="num">${num(w.measured)}</td><td class="num">${pc(w.upRate)}</td>
+        <td class="num"><span class="trend-delta ${gainCls(w.featGain)}">${gain(w.featGain)}</span></td><td class="num"><span class="trend-delta ${gainCls(w.setupGain)}">${gain(w.setupGain)}</span></td></tr>`)}</tbody>
+    </table></div>
+    <div class="toolbar"><h2 class="section-title">Theo cách tư vấn: có theo gợi ý thì impact cao hơn không?</h2>
+      <p class="muted">So sánh nhóm, chưa loại trừ khác biệt giữa các retailer nên chưa chứng minh được quan hệ nhân quả. Nhóm ít act đã đo thì kết quả dao động.</p></div>
+    <div class="table-wrap"><table class="trend-table">
+      <thead><tr><th class="sticky-col">Nhóm act</th><th>Số act</th><th>Đã đo impact</th><th>% act tăng điểm</th><th>Δ điểm tính năng</th><th>Δ điểm setup</th></tr></thead>
+      <tbody>${groups.map(([name, g]) => html`<tr class="static"><td class="sticky-col"><strong>${name}</strong></td><td class="num">${num(g.total)}</td><td class="num">${num(g.measured)}</td><td class="num">${pc(g.upRate)}</td>
+        <td class="num"><span class="trend-delta ${gainCls(g.featGain)}">${gain(g.featGain)}</span></td><td class="num"><span class="trend-delta ${gainCls(g.setupGain)}">${gain(g.setupGain)}</span></td></tr>`)}</tbody>
+    </table></div>
+    ${people.length ? html`
+      <div class="toolbar"><h2 class="section-title">Impact theo nhân sự</h2><p class="muted">Toàn bộ act đã hoàn tất trong dữ liệu Power BI. Bấm tiêu đề cột để sắp xếp.</p></div>
+      <div class="table-wrap"><table class="trend-table sortable">
+        <thead><tr><th class="sticky-col">Nhân sự</th><th>Số act</th><th>% tư vấn tính năng</th><th>% khớp / tư vấn</th><th>Đã đo impact</th><th>% act tăng điểm</th><th>Δ điểm tính năng</th><th>Δ điểm setup</th></tr></thead>
+        <tbody>${people.map((p) => html`<tr class="static"><td class="sticky-col"><span class="person"><strong>${p.name}</strong><small>${p.code}</small></span></td>
+          <td class="num">${num(p.total)}</td><td class="num" data-sort="${p.adviceRate ?? -1}">${pc(p.adviceRate)}</td><td class="num" data-sort="${p.matchRate ?? -1}">${pc(p.matchRate)}</td>
+          <td class="num">${num(p.measured)}</td><td class="num" data-sort="${p.upRate ?? -1}">${pc(p.upRate)}</td>
+          <td class="num" data-sort="${p.featGain ?? -999}"><span class="trend-delta ${gainCls(p.featGain)}">${gain(p.featGain)}</span></td><td class="num" data-sort="${p.setupGain ?? -999}"><span class="trend-delta ${gainCls(p.setupGain)}">${gain(p.setupGain)}</span></td></tr>`)}</tbody>
+      </table></div>` : ''}`;
+}
+
 /**
  * Xu hướng theo ngày. Quản lý chọn "Toàn bộ" hoặc một nhân sự; nhân sự chỉ thấy số liệu của mình.
  * `history` là các ảnh chụp đã lưu mỗi lần đồng bộ CRM.
  */
-export function trendView(history, ui, { manager, code }) {
+export function trendView(history, ui, { manager, code, pbi = null }) {
   const own = manager ? history : history.filter((r) => r.code === String(code));
   if (!manager && !code) return html`<p class="notice">Chưa nhận ra bạn trong báo cáo (thiếu <strong>Đầu số</strong> trong tab Tài khoản). Hãy liên hệ quản lý để được bổ sung.</p>`;
   const metric = METRICS[ui.metric] ? ui.metric : 'kpi';
@@ -86,7 +146,8 @@ export function trendView(history, ui, { manager, code }) {
       <div class="toolbar"><h2 class="section-title">Xu hướng theo ngày</h2></div>
       ${controls}
       <section class="card"><p class="muted">Chưa đủ dữ liệu để vẽ xu hướng: hiện có <strong>${days}</strong> ngày lưu lịch sử, cần ít nhất <strong>2 ngày</strong>.
-        Mỗi lần bấm <strong>Đồng bộ CRM</strong> trong Thiết lập, web tự lưu số liệu của ngày đó.</p>${recordBtn}</section>`;
+        Mỗi lần bấm <strong>Đồng bộ CRM</strong> trong Thiết lập, web tự lưu số liệu của ngày đó.</p>${recordBtn}</section>
+      ${cinfoTrend(pbi, who)}`;
   }
   const first = s[0], last = s.at(-1), prev = full.at(-2);
   // Với chỉ số dạng tỉ lệ/trung bình, vẽ thêm đường trung bình đội để so khi xem một nhân sự.
@@ -107,5 +168,6 @@ export function trendView(history, ui, { manager, code }) {
       <tbody>${[...s].reverse().map((p, i, arr) => html`<tr class="static"><td data-sort="${p.date.replace(/-/g, '')}">${dm(p.date)}</td><td class="num strong">${fmt(p.value)}</td>
         <td class="num" data-sort="${arr[i + 1] ? p.value - arr[i + 1].value : ''}">${arr[i + 1] ? deltaText(m, p.value - arr[i + 1].value) : (prev && full.indexOf(p) > 0 ? deltaText(m, p.value - full[full.indexOf(p) - 1].value) : '—')}</td></tr>`)}</tbody>
     </table></div>
+    ${cinfoTrend(pbi, who)}
     ${recordBtn}`;
 }
