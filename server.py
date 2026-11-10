@@ -385,10 +385,10 @@ COOKIE_NAME = re.compile(r'^[\w.-]+=[^;\s]+(;\s*[\w.-]+=[^;\s]*)*;?$')
 
 def api_set_call_cookie(payload):
     cookie = str(payload.get('cookie', '')).strip()
-    if 'JSESSIONID' not in cookie and '=' not in cookie:
-        cookie = f'JSESSIONID={cookie}' if re.fullmatch(r'[\w-]{16,}', cookie) else cookie
+    if '=' not in cookie:
+        cookie = f'__Host-kv_sid={cookie}' if re.fullmatch(r'[\w-]{16,}', cookie) else cookie
     if not COOKIE_NAME.match(cookie):
-        raise ValueError('Cookie không đúng định dạng (dạng JSESSIONID=giá_trị hoặc chỉ giá trị JSESSIONID).')
+        raise ValueError('Cookie không đúng định dạng (dạng __Host-kv_sid=giá_trị hoặc chỉ giá trị của cookie __Host-kv_sid).')
     state.call_cookie = cookie
     state.call_cookie_at = time.time()
     return {'callCookieSet': True}

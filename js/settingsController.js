@@ -174,17 +174,20 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   /* ---------- Biểu mẫu ---------- */
   const emailOk = (email) => new RegExp(`^[^\\s@]+@${CONFIG.allowedDomain.replace('.', '\\.')}$`, 'i').test(email);
 
+  /** Cấu hình xuất call đang hiện trên màn hình (kể cả phần chưa bấm "Lưu cấu hình"). */
+  const callConfigOf = (form) => ({
+    gsheet_url: form.elements.gsheet_url.value.trim(), tab_name: form.elements.tab_name.value.trim(), cuser: form.elements.cuser.value.trim(),
+    agents: splitAgents(form.elements.agents.value).join('\n'),
+    date_mode: form.elements.date_mode.value, date_from: form.elements.date_from.value, date_to: form.elements.date_to.value,
+  });
+
   const FORMS = {
     cookie: (form) => run(async () => { await crmServer.setCookie(form.elements.cookie.value); await refreshStatus(); note('Đặt cookie CRM', 'CRM'); }),
 
     'call-cookie': (form) => run(async () => { await callServer.setCookie(form.elements.cookie.value); await refreshStatus(); note('Đặt cookie xuất call', 'Xuất call'); }),
 
     'call-config'(form) {
-      const config = {
-        gsheet_url: form.elements.gsheet_url.value.trim(), tab_name: form.elements.tab_name.value.trim(), cuser: form.elements.cuser.value.trim(),
-        agents: splitAgents(form.elements.agents.value).join('\n'),
-        date_mode: form.elements.date_mode.value, date_from: form.elements.date_from.value, date_to: form.elements.date_to.value,
-      };
+      const config = callConfigOf(form);
       if (!SHEET_LINK.test(config.gsheet_url)) return fail('Link Google Sheet đích không hợp lệ');
       if (!config.agents) return fail('Hãy nhập ít nhất một agent');
       const range = resolveRange(config);
@@ -235,8 +238,10 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
 
   /** Xuất call; `dryRun` chỉ lấy dữ liệu để kiểm tra, không ghi lên Google Sheet. */
   const runCall = (dryRun) => run(async () => {
-    const { gsheet_url, tab_name, agents, cuser } = ui.call;
-    const range = resolveRange(ui.call);   // tính theo ngày chạy, nên chế độ "đến hôm qua" luôn mới
+    const form = document.querySelector('[data-sform="call-config"]');
+    const config = form ? callConfigOf(form) : ui.call;   // chạy đúng những gì đang chọn trên màn hình, không bắt buộc phải bấm "Lưu cấu hình" trước
+    const { gsheet_url, tab_name, agents, cuser } = config;
+    const range = resolveRange(config);   // tính theo ngày chạy, nên chế độ "đến hôm qua" luôn mới
     if (range.error) throw new Error(range.error);
     const { jobId } = await callServer.run({ gsheet_url, tab_name, agents: splitAgents(agents), cuser, date_from: range.from, date_to: range.to, dry_run: dryRun });
     resumeJob(jobId);

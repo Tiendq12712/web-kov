@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Lấy cookie call-report",
   "version": "1.0.0",
-  "description": "Gửi nhanh cookie JSESSIONID của call-report.kiotviet.com vào web-kov chạy trên máy này (localhost). Chỉ đọc cookie của đúng trang này.",
+  "description": "Gửi nhanh cookie __Host-kv_sid của call-report.kiotviet.com vào web-kov chạy trên máy này (localhost). Chỉ đọc cookie của đúng trang này.",
   "permissions": [
     "cookies"
   ],

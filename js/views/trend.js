@@ -1,7 +1,7 @@
 import { html } from '../dom.js';
 import { num } from '../format.js';
 import { lineChart, chartCard, sparkline } from './charts.js';
-import { weeklyStats, impactGroups, statsOf, MIN_WEEK_ACTS, MIN_MEASURED } from '../cinfoWeekly.js';
+import { weeklyStats, impactGroups, statsOf, weekChanges, impactDecline, MIN_WEEK_ACTS, MIN_MEASURED, MIN_PERSON_MEASURED } from '../cinfoWeekly.js';
 import { countedActs } from '../pbi.js';
 import { METRICS, series, lastN, movers, dayMatrix, trendInsights, fmtMetric, fmtDeltaMetric, toneOf } from '../history.js';
 
@@ -63,11 +63,30 @@ const gain = (v) => (v == null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${M
 const gainCls = (v) => (v == null || v === 0 ? '' : v > 0 ? 'is-good' : 'is-bad');
 const dmIso = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
+
+const actsOf = (pbi, who) => (pbi ? countedActs(pbi.acts).filter((a) => who === 'all' || a.code === who) : []);
+
+/** Nhận định Customer Info: tuần mới nhất so với tuần trước, và nhân sự có impact giảm hai tuần liên tiếp. */
+function cinfoInsights(pbi, who) {
+  const acts = actsOf(pbi, who), weeks = weeklyStats(acts), items = [];
+  const range = (w) => `${dmIso(w.start)}–${dmIso(w.end)}`;
+  const ch = weekChanges(weeks);
+  if (ch) {
+    const moved = ch.changes.filter((c) => Math.abs(c.delta) >= 1);
+    for (const c of moved) items.push({ tone: c.delta > 0 ? 'good' : 'bad', text: `Customer Info, tuần ${range(ch.b)} so với tuần ${range(ch.a)}: ${c.label} ${c.delta > 0 ? 'tăng' : 'giảm'} ${Math.abs(c.delta).toFixed(1).replace('.', ',')} điểm % (${pc(c.from)} → ${pc(c.to)}).` });
+    if (!moved.length) items.push({ tone: 'info', text: `Customer Info, tuần ${range(ch.b)} so với tuần ${range(ch.a)}: các chỉ số gần như không đổi (dưới 1 điểm %).` });
+  }
+  const dec = impactDecline(acts, weeks);
+  for (const p of dec?.list.slice(0, 5) ?? []) items.push({ tone: 'bad', text: `${p.name} (${p.code}): % act tăng điểm giảm hai tuần liên tiếp, ${p.rates.map(pc).join(' → ')} (tuần ${dmIso(dec.weeks[0].start)}, ${dmIso(dec.weeks[1].start)}, ${dmIso(dec.weeks[2].start)}).` });
+  if ((dec?.list.length ?? 0) > 5) items.push({ tone: 'bad', text: `Còn ${dec.list.length - 5} nhân sự khác có impact giảm hai tuần liên tiếp (xem cột "Xu hướng impact" ở bảng bên dưới).` });
+  return { items, decline: new Map((dec?.list ?? []).map((p) => [p.code, p])) };
+}
+
 /**
  * Customer Info theo tuần (theo ngày chỉnh sửa act): tỉ lệ tư vấn tính năng, khớp gợi ý hệ thống và impact
  * (điểm tính năng/setup sau 7 ngày so với ngày act). Lấy từ dữ liệu Power BI nên có sẵn lịch sử, không cần chờ lưu từng ngày.
  */
-function cinfoTrend(pbi, who) {
+function cinfoTrend(pbi, who, decline = new Map()) {
   if (!pbi) return '';   // chưa tải xong (hoặc chưa có link PBI): mục này hiện khi có dữ liệu
   const acts = countedActs(pbi.acts).filter((a) => who === 'all' || a.code === who);
   const weeks = weeklyStats(acts);
@@ -107,11 +126,12 @@ function cinfoTrend(pbi, who) {
     ${people.length ? html`
       <div class="toolbar"><h2 class="section-title">Impact theo nhân sự</h2><p class="muted">Toàn bộ act đã hoàn tất trong dữ liệu Power BI. Bấm tiêu đề cột để sắp xếp.</p></div>
       <div class="table-wrap"><table class="trend-table sortable">
-        <thead><tr><th class="sticky-col">Nhân sự</th><th>Số act</th><th>% tư vấn tính năng</th><th>% khớp / tư vấn</th><th>Đã đo impact</th><th>% act tăng điểm</th><th>Δ điểm tính năng</th><th>Δ điểm setup</th></tr></thead>
+        <thead><tr><th class="sticky-col">Nhân sự</th><th>Số act</th><th>% tư vấn tính năng</th><th>% khớp / tư vấn</th><th>Đã đo impact</th><th>% act tăng điểm</th><th>Δ điểm tính năng</th><th>Δ điểm setup</th><th title="% act tăng điểm giảm hai tuần liên tiếp (cần từ ${MIN_PERSON_MEASURED} act đã đo mỗi tuần)">Xu hướng impact</th></tr></thead>
         <tbody>${people.map((p) => html`<tr class="static"><td class="sticky-col"><span class="person"><strong>${p.name}</strong><small>${p.code}</small></span></td>
           <td class="num">${num(p.total)}</td><td class="num" data-sort="${p.adviceRate ?? -1}">${pc(p.adviceRate)}</td><td class="num" data-sort="${p.matchRate ?? -1}">${pc(p.matchRate)}</td>
           <td class="num">${num(p.measured)}</td><td class="num" data-sort="${p.upRate ?? -1}">${pc(p.upRate)}</td>
-          <td class="num" data-sort="${p.featGain ?? -999}"><span class="trend-delta ${gainCls(p.featGain)}">${gain(p.featGain)}</span></td><td class="num" data-sort="${p.setupGain ?? -999}"><span class="trend-delta ${gainCls(p.setupGain)}">${gain(p.setupGain)}</span></td></tr>`)}</tbody>
+          <td class="num" data-sort="${p.featGain ?? -999}"><span class="trend-delta ${gainCls(p.featGain)}">${gain(p.featGain)}</span></td><td class="num" data-sort="${p.setupGain ?? -999}"><span class="trend-delta ${gainCls(p.setupGain)}">${gain(p.setupGain)}</span></td>
+          <td class="num" data-sort="${decline.has(p.code) ? 1 : 0}">${decline.has(p.code) ? html`<span class="trend-delta is-bad" title="${decline.get(p.code).rates.map(pc).join(' → ')}">▼ giảm 2 tuần</span>` : '·'}</td></tr>`)}</tbody>
       </table></div>` : ''}`;
 }
 
@@ -129,6 +149,7 @@ export function trendView(history, ui, { manager, code, pbi = null }) {
   const full = series(own, metric, who), s = lastN(full, range);
   const people = [...new Map(own.map((r) => [r.code, r.name]))].sort((a, b) => a[1].localeCompare(b[1], 'vi'));
   const days = new Set(own.map((r) => r.date)).size;
+  const ci = cinfoInsights(pbi, who);
   const scopeName = who === 'all' ? 'Toàn đội' : (people.find(([c]) => c === who)?.[1] ?? 'Nhân sự');
 
   const controls = html`
@@ -147,7 +168,8 @@ export function trendView(history, ui, { manager, code, pbi = null }) {
       ${controls}
       <section class="card"><p class="muted">Chưa đủ dữ liệu để vẽ xu hướng: hiện có <strong>${days}</strong> ngày lưu lịch sử, cần ít nhất <strong>2 ngày</strong>.
         Mỗi lần bấm <strong>Đồng bộ CRM</strong> trong Thiết lập, web tự lưu số liệu của ngày đó.</p>${recordBtn}</section>
-      ${cinfoTrend(pbi, who)}`;
+      ${insightsCard(ci.items)}
+      ${cinfoTrend(pbi, who, ci.decline)}`;
   }
   const first = s[0], last = s.at(-1), prev = full.at(-2);
   // Với chỉ số dạng tỉ lệ/trung bình, vẽ thêm đường trung bình đội để so khi xem một nhân sự.
@@ -157,7 +179,7 @@ export function trendView(history, ui, { manager, code, pbi = null }) {
     <div class="toolbar"><h2 class="section-title">Xu hướng theo ngày</h2><p class="muted">${scopeName} · ${days} ngày lưu lịch sử · đang xem ${s.length} ngày (${dm(first.date)} – ${dm(last.date)})</p></div>
     ${metricCards(own, who, metric)}
     ${controls}
-    ${insightsCard(trendInsights(own, metric, who, scopeName))}
+    ${insightsCard([...ci.items, ...trendInsights(own, metric, who, scopeName)])}
     ${chartCard(`${m.label} theo ngày`, lineChart({ labels: s.map((p) => dm(p.date)), series: chartSeries, format: fmt, values: s.length <= 14 }),
       who === 'all' ? (m.agg === 'sum' ? 'Tổng của toàn bộ nhân sự.' : 'Trung bình của toàn bộ nhân sự.') : (teamLine ? 'Đường cam là trung bình đội để so sánh.' : ''))}
     ${manager && who === 'all' ? moversCards(own, metric) : ''}
@@ -168,6 +190,6 @@ export function trendView(history, ui, { manager, code, pbi = null }) {
       <tbody>${[...s].reverse().map((p, i, arr) => html`<tr class="static"><td data-sort="${p.date.replace(/-/g, '')}">${dm(p.date)}</td><td class="num strong">${fmt(p.value)}</td>
         <td class="num" data-sort="${arr[i + 1] ? p.value - arr[i + 1].value : ''}">${arr[i + 1] ? deltaText(m, p.value - arr[i + 1].value) : (prev && full.indexOf(p) > 0 ? deltaText(m, p.value - full[full.indexOf(p) - 1].value) : '—')}</td></tr>`)}</tbody>
     </table></div>
-    ${cinfoTrend(pbi, who)}
+    ${cinfoTrend(pbi, who, ci.decline)}
     ${recordBtn}`;
 }

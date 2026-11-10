@@ -68,3 +68,45 @@ export function impactGroups(acts) {
     ['Tất cả act', statsOf(acts)],
   ];
 }
+
+/** Thay đổi giữa hai tuần đủ dữ liệu gần nhất (tuần sau so với tuần trước); chỉ lấy chỉ số có đủ act để so (độ lệch dưới ngưỡng thì tuần ít act dao động mạnh). */
+export function weekChanges(weeks) {
+  const full = weeks.filter((w) => !w.partial && !w.small);
+  if (full.length < 2) return null;
+  const [a, b] = full.slice(-2);
+  const rows = [
+    ['useRate', '% act dùng Customer Info', true],
+    ['adviceRate', '% act tư vấn tính năng', true],
+    ['matchRate', '% khớp gợi ý hệ thống', a.advised >= 10 && b.advised >= 10],
+    ['upRate', '% act tăng điểm sau 7 ngày', a.measured >= MIN_MEASURED && b.measured >= MIN_MEASURED],
+  ];
+  const changes = rows.filter(([key, , enough]) => enough && a[key] != null && b[key] != null)
+    .map(([key, label]) => ({ key, label, from: a[key], to: b[key], delta: (b[key] - a[key]) * 100 }));
+  return { a, b, changes };
+}
+
+export const MIN_PERSON_MEASURED = 8;   // một người cần ít nhất chừng này act đã đo impact ở mỗi tuần mới được xét xu hướng
+
+/**
+ * Nhân sự có % act tăng điểm giảm hai tuần liên tiếp (3 tuần gần nhất có đủ dữ liệu đo impact), tổng mức giảm từ 5 điểm % trở lên.
+ * Trả về { weeks: [3 tuần], list: [{ code, name, rates: [r1, r2, r3] }] } hoặc null nếu chưa đủ tuần.
+ */
+export function impactDecline(acts, weeks = weeklyStats(acts)) {
+  const usable = weeks.filter((w) => w.measured >= MIN_MEASURED).slice(-3);
+  if (usable.length < 3) return null;
+  const by = new Map();
+  for (const a of acts) {
+    if (!a.modified) continue;
+    const i = usable.findIndex((w) => a.modified >= w.start && a.modified <= w.end);
+    if (i < 0) continue;
+    const p = by.get(a.code) ?? { code: a.code, name: a.name, weeks: [[], [], []] };
+    p.weeks[i].push(a);
+    by.set(a.code, p);
+  }
+  const list = [...by.values()].map((p) => ({ code: p.code, name: p.name, stats: p.weeks.map(statsOf) }))
+    .filter((p) => p.stats.every((s) => s.measured >= MIN_PERSON_MEASURED))
+    .map((p) => ({ code: p.code, name: p.name, rates: p.stats.map((s) => s.upRate) }))
+    .filter(({ rates: [r1, r2, r3] }) => r2 < r1 && r3 < r2 && r1 - r3 >= 0.05)
+    .sort((x, y) => (y.rates[0] - y.rates[2]) - (x.rates[0] - x.rates[2]));
+  return { weeks: usable, list };
+}

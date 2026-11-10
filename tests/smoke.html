@@ -526,6 +526,22 @@ await test('Đăng nhập: thiếu quyền Sheets được nhớ qua lần tải
   } finally { localStorage.removeItem('kpi.consent'); }
 });
 
+await test('Xu hướng: so tuần với tuần trước và cảnh báo impact giảm hai tuần liên tiếp', async () => {
+  const cw = await import(`${root}js/cinfoWeekly.js`), tv = await import(`${root}js/views/trend.js`);
+  const acts = [];
+  // 3 tuần × 2 người, mỗi người 20 act/tuần đã đo. A: tỉ lệ tăng điểm 60% → 40% → 20% (giảm liên tiếp); B: 30% → 50% → 50% (không giảm).
+  const rate = { A: [12, 8, 4], B: [6, 10, 10] }, days = ['2026-10-06', '2026-10-13', '2026-10-20'];
+  for (const code of ['A', 'B']) days.forEach((d, wi) => { for (let i = 0; i < 20; i++) acts.push({ code, name: `NS${code}`, modified: d, created: d, used: true, advised: i < 10, match: i < (code === 'A' ? 8 - wi * 2 : 3), impact: i < rate[code][wi] ? 'Tăng' : 'Giảm or Không đổi', featGain: 0, setupGain: 0 }); });
+  const weeks = cw.weeklyStats(acts).map((w) => ({ ...w, partial: false }));   // dữ liệu giả chỉ có 3 ngày: coi mỗi tuần là đủ
+  const ch = cw.weekChanges(weeks);
+  eq(ch == null, false, 'có hai tuần đủ dữ liệu để so'); eq(ch.changes.some((c) => c.key === 'upRate'), true, 'có so % act tăng điểm');
+  const d = cw.impactDecline(acts, weeks);
+  eq(d.list.map((p) => [p.code, p.rates.map((r) => Math.round(r * 100))]), [['A', [60, 40, 20]]], 'chỉ A bị cảnh báo giảm hai tuần liên tiếp');
+  eq(cw.impactDecline(acts.filter((a) => a.modified !== days[0])), null, 'chưa đủ 3 tuần thì không cảnh báo');
+  const out = String(tv.trendView([{ date: '2026-10-01', code: 'A', name: 'NSA', kpi: 0.5 }, { date: '2026-10-02', code: 'A', name: 'NSA', kpi: 0.6 }], { metric: 'kpi', who: 'all', range: 'all' }, { manager: true, code: null, pbi: { acts, people: [], types: [], statuses: [] } }));
+  eq(out.includes('giảm hai tuần liên tiếp') && out.includes('▼ giảm 2 tuần'), true, 'tab Xu hướng hiện cảnh báo nhân sự và dấu ▼ ở bảng');
+});
+
 await test('Xu hướng: impact theo tuần và theo nhóm tư vấn', async () => {
   const cw = await import(`${root}js/cinfoWeekly.js`), tv = await import(`${root}js/views/trend.js`), { parsePbi } = await import(`${root}js/pbi.js`);
   const head = ['activityid', 'last_name', 'used_stt', 'is_match_feature', 'status', 'createdtime', 'modifiedtime', 'Công việc hỗ trợ', 'feature_score_t', 'feature_score_t7', 'setup_score_t', 'setup_score_t7', 'diem_tang'];

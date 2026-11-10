@@ -180,8 +180,8 @@ const CRM_COOKIE = {
   help: 'Lấy bằng tiện ích Chrome “KV CRM Cookie Grabber” rồi dán vào đây.',
 };
 const CALL_COOKIE = {
-  title: 'Cookie call-report', formName: 'call-cookie', clearAct: 'call-cookie-clear', placeholder: 'Dán giá trị JSESSIONID của call-report.kiotviet.com',
-  help: 'DevTools → Application → Cookies → call-report.kiotviet.com → JSESSIONID (hoặc dòng Cookie ở tab Network).',
+  title: 'Cookie call-report', formName: 'call-cookie', clearAct: 'call-cookie-clear', placeholder: 'Dán giá trị cookie __Host-kv_sid của call-report.kiotviet.com',
+  help: 'DevTools → Application → Cookies → call-report.kiotviet.com → __Host-kv_sid (hoặc dòng Cookie ở tab Network).',
 };
 
 const taskFields = (t = {}) => html`

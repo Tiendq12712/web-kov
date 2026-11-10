@@ -28,16 +28,16 @@ Chỉ chạy trên máy này, qua `server.py` (nghe ở 127.0.0.1) dùng Python 
 - `credentials.json` và `cookie.txt` của tool KHÔNG được đưa vào repo này.
 
 ## Thiết lập · Xuất Call (call-report.kiotviet.com)
-Mục **Xuất Call** nhập cookie `JSESSIONID` của call-report (chỉ giữ trong bộ nhớ), danh sách agent, Google Sheet đích và tab đích
+Mục **Xuất Call** nhập cookie `__Host-kv_sid` của call-report (chỉ giữ trong bộ nhớ), danh sách agent, Google Sheet đích và tab đích
 (lưu trong tab `Cấu hình call` của Sheet cấu hình). Khi chạy, `call_report.py` tính khoảng ngày (ngày 1 của tháng → hôm qua),
-gọi `list_call_outbound_cs03` như khi bấm *Tìm Kiếm* (tham số `cuser` = email đăng nhập, `dsnhanvien` = các mã agent cách nhau bằng dấu phẩy),
-tải file **Excel** ở cuối bảng rồi ghi lên Google Sheet. Có nút **Chạy thử** để kiểm tra mà không ghi Sheet.
+mở báo cáo `/report/custom-report/cs03` như khi bấm *Tìm kiếm* (tham số `cuser` = email đăng nhập, mỗi mã agent là một `user=`, `from_datetime`/`to_datetime`),
+đọc bảng kết quả rồi ghi lên Google Sheet. Mỗi lần tìm trang chỉ trả tối đa 500 dòng mới nhất, nên tool tự chia đôi khoảng thời gian cho tới khi mỗi đoạn dưới 500 dòng rồi ghép lại (loại dòng trùng ở ranh giới). Có nút **Chạy thử** để kiểm tra mà không ghi Sheet.
 `certs/` chứa chứng chỉ trung gian GlobalSign (máy chủ call-report không gửi kèm), đã kiểm tra chuỗi tin cậy.
 
 ### Tiện ích Chrome lấy cookie call-report
 Thư mục `extension/call-report-cookie/` (Manifest V3). Quyền: đọc cookie của `call-report.kiotviet.com` và gọi `localhost:8080`.
 Cài: `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục này (đã thay đổi thì bấm biểu tượng tải lại ⟳).
-Đăng nhập call-report, chạy `server.py`, bấm biểu tượng tiện ích: cookie `JSESSIONID` được **gửi thẳng vào web-kov** (Thiết lập → Xuất Call);
+Đăng nhập call-report, chạy `server.py`, bấm biểu tượng tiện ích: cookie `__Host-kv_sid` được **gửi thẳng vào web-kov** (Thiết lập → Xuất Call);
 server không chạy thì tiện ích sao chép vào clipboard. Server chỉ nhận đường này từ đúng tiện ích (ID cố định `adlmjjkfhfjbfphjgkfocgikbakpmngb`
 nhờ khóa trong manifest; ID nằm ở `EXTENSION_ORIGIN` trong `server.py`) và chỉ cho `POST /api/call/cookie`.
 

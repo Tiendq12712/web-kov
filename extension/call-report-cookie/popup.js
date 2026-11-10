@@ -1,7 +1,7 @@
-/* Đọc cookie JSESSIONID của call-report (kể cả HttpOnly) rồi gửi vào web-kov chạy trên máy này (localhost),
-   hoặc sao chép dạng "JSESSIONID=giá_trị". Cookie không đi ra khỏi máy. */
-const SITE = 'https://call-report.kiotviet.com/jw/web/';
-const COOKIE_NAME = 'JSESSIONID';
+/* Đọc cookie __Host-kv_sid của call-report (kể cả HttpOnly) rồi gửi vào web-kov chạy trên máy này (localhost),
+   hoặc sao chép dạng "__Host-kv_sid=giá_trị". Cookie không đi ra khỏi máy. */
+const SITE = 'https://call-report.kiotviet.com/report/';
+const COOKIE_NAME = '__Host-kv_sid';
 const WEBKOV = 'http://localhost:8080';   // cổng mặc định của server.py
 
 const $ = (id) => document.getElementById(id);
