@@ -10,7 +10,7 @@ import { todoControl, todoAlerts, preloadDetail, currentSla } from './app/backgr
 import { renderToday } from './app/today.js';
 import { readHash, readLast, writeHash } from './app/route.js';
 import { state, resetUserData, saveCoachPref, latestAsOf, myCode, team, kpiNames, kpiPeople } from './app/state.js';
-import { getSession, getRemembered, signIn, signOut, loadGis, requireConsentNext, needsConsent } from './auth.js';
+import { getSession, getRemembered, signIn, signOut, loadGis, requireConsentNext, needsConsent, hasFreshToken } from './auth.js';
 import { saveSnapshot, loadSnapshot, clearSnapshot } from './snapshot.js';
 import { loadAccounts, findAccount, canOpenSettings } from './directory.js';
 import { html, mount } from './dom.js';
@@ -697,6 +697,7 @@ const settings = createSettings({
 function syncLogout() {
   const email = getSession()?.email ?? (staleSession ? state.me?.email : null);   // đang dùng dữ liệu đã lưu vẫn coi là đã đăng nhập
   els.logout.hidden = !email;
+  $('reload-data').hidden = !email;
   $('settings-btn').hidden = !(email && canSettings());
   setAccount(email);
 }
@@ -881,12 +882,14 @@ const authHint = (err) => (/popup_failed_to_open|popup/i.test(String(err?.messag
   ? 'Trình duyệt đang chặn cửa sổ đăng nhập Google. Hãy cho phép cửa sổ bật lên (popup) cho trang này rồi bấm nút bên cạnh.'
   : `Chưa làm mới được (${err?.message ?? err}). Bấm nút bên cạnh hoặc chạm bất kỳ đâu để thử lại.`);
 
-async function refreshSession({ interactive = false } = {}) {
+async function refreshSession({ interactive = false, notify = false } = {}) {
   refreshBar.replaceChildren(Object.assign(document.createElement('span'), { textContent: 'Đang làm mới dữ liệu…' }));
+  refreshBar.hidden = false;
   try {
     // Bấm nút "Đăng nhập lại": mở cửa sổ ngay trong lần bấm (không qua bước chờ nên trình duyệt không chặn).
     // Chạm bình thường: thử cấp lại âm thầm trước (cửa sổ Google tự đóng ngay); không được mới hiện cửa sổ thường.
-    if (interactive) await signIn({ resume: true });
+    if (hasFreshToken()) { /* token còn hạn (bấm nút Làm mới dữ liệu): đọc lại luôn, không mở cửa sổ đăng nhập */ }
+    else if (interactive) await signIn({ resume: true });
     else { try { await signIn({ resume: true, silent: true }); } catch { await signIn({ resume: true }); } }
     reloadMonths();   // đọc lại danh sách link (có thể vừa thêm link mới, ví dụ PBI) và xóa dữ liệu cũ
     const months = await loadMonths();
@@ -903,18 +906,30 @@ async function refreshSession({ interactive = false } = {}) {
     Object.assign(state.callctl, { data: null, error: '' });
     Object.assign(state.addons, { data: null, error: '' });
     Object.assign(state.compare, { data: null, error: '', key: '' });
+    Object.assign(state.trend, { data: null, error: '' });
     preloadPbi();
     state.data = await loadMonth(state.month);
     staleSession = false;
     syncLogout();
     withKeptInputs(renderView);
-    refreshBar.hidden = true;
+    if (notify) {
+      refreshBar.replaceChildren(Object.assign(document.createElement('span'), { textContent: `Đã làm mới dữ liệu lúc ${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}.` }));
+      setTimeout(() => { if (!staleSession) refreshBar.hidden = true; }, 3500);
+    } else refreshBar.hidden = true;
     persistSnapshot();
     chat.watch();
   } catch (err) {
     armRefresh(authHint(err), { button: true });
   }
 }
+
+/** Menu tài khoản, mục Làm mới dữ liệu: xóa bản đã lưu (bộ nhớ trang và IndexedDB) rồi đọc lại tháng đang xem từ Google Sheet. */
+let reloadingData = false;
+$('reload-data').addEventListener('click', async () => {
+  if (reloadingData || !state.me) return;
+  reloadingData = true;
+  try { await refreshSession({ interactive: true, notify: true }); } finally { reloadingData = false; }
+});
 
 /** Mở lại trong ngày khi token đã hết: dựng trang chủ từ bản đã lưu (sau màn hình loading), rồi làm mới ở lần chạm đầu. */
 async function startFromSnapshot(snap) {

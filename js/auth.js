@@ -87,6 +87,8 @@ const fetchProfile = async (token) => {
 const isAllowed = ({ email, email_verified: verified, hd }) =>
   verified && email?.toLowerCase().endsWith(`@${CONFIG.allowedDomain}`) && (!hd || hd === CONFIG.allowedDomain);
 
+/** Token Google còn dùng được (chưa tới hạn): làm mới dữ liệu khi token còn thì không cần mở cửa sổ đăng nhập. */
+export const hasFreshToken = () => Boolean(session && session.expiresAt - EXPIRY_MARGIN_MS > Date.now());
 export const getSession = () => session;
 export const getToken = () => session?.token;
 

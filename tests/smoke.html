@@ -522,6 +522,17 @@ await test('Đăng nhập: thiếu quyền Sheets được nhớ qua lần tải
   try {
     eq(au.needsConsent(), false, 'ban đầu không ép cấp quyền'); au.requireConsentNext();
     eq([au.needsConsent(), localStorage.getItem('kpi.consent')], [true, '1'], 'ghi nhớ cần cấp quyền lại');
+    {   // nút Làm mới dữ liệu: token còn hạn thì đọc lại luôn, sắp hết hạn (< 60 giây) thì phải đăng nhập lại
+      const keep = localStorage.getItem('kpi.session');
+      const session = (ms) => JSON.stringify({ token: 't', email: 'a@kiotviet.com', date: au.today(), write: false, expiresAt: Date.now() + ms });
+      localStorage.setItem('kpi.session', session(3_600_000));
+      eq((await import(`${root}js/auth.js?fresh1`)).hasFreshToken(), true, 'token còn 1 giờ: làm mới dữ liệu không cần đăng nhập lại');
+      localStorage.setItem('kpi.session', session(30_000));
+      eq((await import(`${root}js/auth.js?fresh2`)).hasFreshToken(), false, 'token sắp hết hạn: phải đăng nhập lại');
+      localStorage.removeItem('kpi.session');
+      eq((await import(`${root}js/auth.js?fresh3`)).hasFreshToken(), false, 'chưa đăng nhập: không có token');
+      if (keep != null) localStorage.setItem('kpi.session', keep);
+    }
     const again = await import(`${root}js/auth.js?consent2`); eq(again.needsConsent(), true, 'nạp lại trang vẫn nhớ, không phải bấm Ctrl+F5 nhiều lần');
   } finally { localStorage.removeItem('kpi.consent'); }
 });

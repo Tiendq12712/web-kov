@@ -14,6 +14,7 @@ import { parseCallScores } from './callScores.js';
 import { parseDetail } from './segment.js';
 import { parseAddons } from './addons.js';
 import { parseAddonScores, applyAddonScores, findMissing } from './addonScore.js';
+import { addonActs } from './addonDetail.js';
 import { CONFIG } from './config.js';
 import { persistGet, persistSet, persistClear } from './persist.js';
 
@@ -194,6 +195,15 @@ async function completeAddon(ym, rows) {
   try {
     const [data, scores] = await Promise.all([cache.get(ym), loadAddonScores()]);
     if (data?.teams && scores) data.addonOrphans = applyAddonScores(data.teams, scores, ym, findMissing(rows, scores, ym)).orphans;
+    // Tổng quan cộng đủ 10 loại add-on như tab Chi tiết Add-on (Sheet Addon chỉ có điểm của Payment/Kship/HDDT).
+    if (data?.teams) {
+      const members = data.teams.flatMap((t) => t.members);
+      const acts = addonActs(rows, members, ym);
+      for (const m of members) {
+        const mine = acts.filter((a) => a.code === m.code && a.points != null);
+        m.addonAll = m.addonScore ? { acts: mine.length, earned: mine.reduce((s, a) => s + a.points, 0), full: mine.length * 5 } : null;
+      }
+    }
   } catch { /* giữ nguyên số đã tính từ Sheet Addon */ }
 }
 /** Chi tiết chỉ của các tháng được chọn (SLA, Kiểm soát, Công việc chỉ cần tháng đang xem): nhanh hơn vì không tải các tháng khác. */

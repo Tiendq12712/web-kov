@@ -125,7 +125,8 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 const addonScoreCells = (m) => {
   const a = m.addonScore;
   if (!a) return html`<td class="right num muted">—</td><td class="right num muted">—</td>`;
-  return html`<td class="right num" title="${a.acts} act Payment/Kship/HDDT, ${a.full} act đủ 5đ">${num(a.earned)}/${num(a.acts * 5)}</td><td class="right num ${a.lost ? 'addon-lost' : 'is-done'}">${a.lost ? `−${num(a.lost)}` : '✓'}</td>`;
+  const all = m.addonAll ?? { earned: a.earned, full: a.acts * 5 };   // đủ 10 loại khi data chi tiết đã tải
+  return html`<td class="right num" title="${all.full / 5} act add-on, điểm thực đạt ${num(all.earned)}/${num(all.full)}">${num(all.earned)}/${num(all.full)}</td><td class="right num ${a.lost ? 'addon-lost' : 'is-done'}">${a.lost ? `−${num(a.lost)}` : '✓'}</td>`;
 };
 
 function memberRow({ team, member: m }, workdays, mode, podium) {
@@ -232,7 +233,7 @@ const MEMBER_COLUMNS = [
   { key: 'need', label: 'Điều kiện cần', value: ({ member }) => member.need.rate },
   { key: 'main', label: 'Điểm tổng', value: ({ member }) => member.main.rate },
   { key: 'addon', label: 'Add-on', value: ({ member }) => member.addon.rate },
-  { key: 'addonEarned', label: 'Add-on đạt', value: ({ member }) => member.addonScore?.earned },
+  { key: 'addonEarned', label: 'Add-on đạt', value: ({ member }) => (member.addonAll ?? member.addonScore)?.earned },
   { key: 'addonLost', label: 'Add-on trừ', value: ({ member }) => member.addonScore?.lost },
   { key: 'act', label: 'Act đã làm', value: ({ member }) => ratio(member.extra.actDone, member.extra.assigned) },
   { key: 'talk', label: 'Talk time', value: ({ member }) => ratio(member.talk.actual, member.talk.target) },
@@ -277,7 +278,7 @@ function averageRow(rows, workdays, full) {
   const ms = rows.map((r) => r.member);
   const wd = avgOf(ms.map((m) => workdays.get(m.code) ?? m.extra.workdays));
   const scored = ms.filter((m) => m.addonScore);
-  const addonAvg = scored.length ? html`<td class="right num">${num(Math.round(avgOf(scored.map((m) => m.addonScore.earned))))}/${num(Math.round(avgOf(scored.map((m) => m.addonScore.acts * 5))))}</td><td class="right num">−${num(Math.round(avgOf(scored.map((m) => m.addonScore.lost))))}</td>` : html`<td></td><td></td>`;
+  const addonAvg = scored.length ? html`<td class="right num">${num(Math.round(avgOf(scored.map((m) => (m.addonAll ?? { earned: m.addonScore.earned }).earned))))}/${num(Math.round(avgOf(scored.map((m) => (m.addonAll ?? { full: m.addonScore.acts * 5 }).full))))}</td><td class="right num">−${num(Math.round(avgOf(scored.map((m) => m.addonScore.lost))))}</td>` : html`<td></td><td></td>`;
   const lead = html`<td class="sticky-col"><span class="person"><strong>Trung bình</strong><small>${rows.length} nhân sự</small></span></td><td></td><td class="right num">${pct(avgOf(ms.map((m) => m.kpi)), 1)}</td><td></td>`;
   if (full) {
     const cells = METRICS.flatMap(([, , read]) => {
