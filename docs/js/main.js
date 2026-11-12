@@ -1,4 +1,4 @@
-import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData, hasPbi, loadPbi, hasLibrary, loadLibrary, hasHr, loadHr, hasCalls, loadCalls, hasDetail, loadDetail, loadDetailFor, hasScores, loadScores, hasAddons, loadAddons } from './data.js';
+import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData, hasPbi, loadPbi, hasLibrary, loadLibrary, hasHr, loadHr, hasCalls, loadCalls, hasDetail, loadDetail, loadDetailFor, hasScores, loadScores, hasAddons, loadAddons, hasZalo, loadZalo } from './data.js';
 import { CONFIG } from './config.js';
 import { tabIcon, buildNav } from './app/nav.js';
 import { hooks } from './app/hooks.js';
@@ -24,6 +24,7 @@ import { logVisit } from './visits.js';
 import { jobTypeView } from './views/jobType.js';
 import { teamView, rowsView } from './views/team.js';
 import { detailView } from './views/detail.js';
+import { zaloView } from './views/zalo.js';
 import { workView, workRowsView } from './views/work.js';
 import { reportView, reportRowsView, reportDetailView } from './views/report.js';
 import { connectView } from './views/connect.js';
@@ -255,6 +256,7 @@ function currentPage() {
   if (state.tab === 'callctl' && hasScores()) return { view: lazyTab(state.callctl, 'callctl', loadScores, (d) => callScoreView(d, state.callctl, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Kiểm soát call' };
   if (state.tab === 'control' && hasDetail()) return { view: lazyTab(state.segmentM, 'control', (m) => loadDetailFor([m]), (d) => withQuality('control', d, controlView(d, state.control, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month }))), title: 'Kiểm soát' };
   if (state.tab === 'addondetail' && hasDetail()) return { view: lazyTab(state.segmentM, 'addondetail', (m) => loadDetailFor([m]), (d) => addonDetailView(d, state.addonD, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month, members: state.data.teams.flatMap((t) => t.members) })), title: 'Chi tiết Add-on' };
+  if (state.tab === 'zalo' && hasZalo() && hasDetail()) return { view: lazyTab(state.zalo, 'zalo', () => Promise.all([loadZalo(), loadDetail()]).then(([zalo, detail]) => ({ zalo, detail })), (d) => zaloView(d, { names: kpiNames(), manager: state.me.role !== 'member', filters: state.zalo.f })), title: 'Zalo' };
   if (state.tab === 'addon' && hasAddons()) return { view: lazyTab(state.addons, 'addon', loadAddons, (d) => addonView(d, state.addons, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Add-on' };
   if (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'segment', loadDetail, (data) => withQuality('segment', data, segmentView(data, state.segment))), title: 'Phân tích tệp data' };
   if (state.tab === 'connect' && state.me.role !== 'member') {
@@ -344,7 +346,7 @@ async function setMonth(ym, { boot = false } = {}) {
   Object.assign(state.report, { data: report, error: '', query: '' });
   Object.assign(state.segmentM, { data: null, error: '', loading: false });   // chi tiết data theo tháng: tải lại cho tháng mới
   state.work.query = '';
-  const validTab = (state.tab === 'me' && findMember(state.me.email, state.data.teams, state.me.name, state.me.code)) || (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'addondetail' && hasDetail()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
+  const validTab = (state.tab === 'me' && findMember(state.me.email, state.data.teams, state.me.name, state.me.code)) || (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'zalo' && hasZalo() && hasDetail()) || (state.tab === 'addondetail' && hasDetail()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
@@ -423,6 +425,7 @@ document.addEventListener('click', (e) => {
   if (hit('[data-close]') || e.target === els.detail) return els.detail.close();
   if (hit('[data-tab]')) { e.preventDefault(); els.detail.close(); return setTab(hit('[data-tab]').dataset.tab); }
   if (hit('[data-timesheet]')) return openMember(hit('[data-timesheet]').dataset.timesheet, { timesheet: true });
+  if (hit('[data-zf-clear]')) { state.zalo.f = {}; return renderView(); }
   if (hit('[data-ad-clear]')) { sharePerson('all'); state.addonD.type = 'all'; return renderView(); }
   if (hit('[data-addon-person]')) { sharePerson(hit('[data-addon-person]').dataset.addonPerson); return renderView(); }
   if (hit('[data-member]')) return openMember(hit('[data-member]').dataset.member);
@@ -524,6 +527,7 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'cs-person') { sharePerson(e.target.value); return renderView(); }
   if (e.target.id === 'ctl-rule') { state.control.rule = e.target.value; return renderView(); }
   if (e.target.id === 'ad-person' || e.target.id === 'ad-person2') { sharePerson(e.target.value); return renderView(); }
+  if (e.target.dataset?.zf) { state.zalo.f = { ...state.zalo.f, [e.target.dataset.zf]: e.target.value }; return renderView(); }
   if (e.target.id === 'ad-type' || e.target.id === 'ad-type2') { state.addonD.type = e.target.value; return renderView(); }
   if (e.target.id === 'ctl-person') { sharePerson(e.target.value); return renderView(); }
   if (e.target.id === 'addon-month') { state.addons.month = e.target.value; state.addons.person = 'all'; state.addons.type = 'all'; return renderView(); }
@@ -687,7 +691,7 @@ const settings = createSettings({
   onHistory: saveHistory,
   onSynced: async () => {
     clearCache();
-    for (const slice of [state.segment, state.segmentM, state.callctl]) Object.assign(slice, { data: null, error: '', loading: false });   // đồng bộ xong thì dữ liệu chi tiết cũ không còn đúng
+    for (const slice of [state.segment, state.segmentM, state.callctl, state.zalo]) Object.assign(slice, { data: null, error: '', loading: false });   // đồng bộ xong thì dữ liệu chi tiết cũ không còn đúng
     state.data = await loadMonth(state.month);
   },
 });
@@ -904,6 +908,7 @@ async function refreshSession({ interactive = false, notify = false } = {}) {
     Object.assign(state.segment, { data: null, error: '' });
     Object.assign(state.segmentM, { data: null, error: '', loading: false });
     Object.assign(state.callctl, { data: null, error: '' });
+    Object.assign(state.zalo, { data: null, error: '', loading: false });
     Object.assign(state.addons, { data: null, error: '' });
     Object.assign(state.compare, { data: null, error: '', key: '' });
     Object.assign(state.trend, { data: null, error: '' });

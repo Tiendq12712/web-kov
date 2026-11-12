@@ -1,6 +1,6 @@
 /** Mô hình điều hướng (các tab, nhóm tab, biểu tượng) dựng từ dữ liệu và quyền hiện tại. */
 import { raw } from '../dom.js';
-import { hasReport, hasPbi, hasLibrary, hasHr, hasCalls, hasDetail, hasAddons, hasScores } from '../data.js';
+import { hasReport, hasPbi, hasLibrary, hasHr, hasCalls, hasDetail, hasAddons, hasScores, hasZalo } from '../data.js';
 import { findMember } from '../welcome.js';
 import { state } from './state.js';
 
@@ -14,6 +14,7 @@ export const ICONS = {
   hr: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>',
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M18 14.5c2.2.6 3.5 2.4 3.5 5.5"/>',
   report: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  zalo: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8l-8 4h8"/>',
   chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
   cinfo: '<circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/>',
   library: '<path d="M3 5.5C5 4.5 8 4.5 12 6.5c4-2 7-2 9-1v13c-2-1-5-1-9 1-4-2-7-2-9-1z"/><path d="M12 6.5v13"/>',
@@ -40,6 +41,7 @@ export function buildNav(monthList) {
   if (hasScores()) reports.push(item('callctl', 'Kiểm soát call', 'Chấm call', 'Kết quả chấm chất lượng cuộc gọi'));
   if (hasDetail()) reports.push(item('control', 'Kiểm soát', 'Kiểm soát', 'Data điền đúng quy trình, SLA và mức trừ'));
   if (hasDetail()) reports.push(item('addondetail', 'Chi tiết Add-on', 'Add-on', 'Thống kê toàn bộ add-on theo loại, team và nhân sự'));
+  if (hasZalo() && hasDetail()) reports.push(item('zalo', 'Zalo', 'Zalo', 'Kết nối Zalo với khách và kết quả impact'));
   if (hasAddons()) reports.push(item('addon', 'Add-on', 'Add-on', 'Add-on đã chọn và được ghi nhận'));
   if (hasReport(state.month)) reports.push(item('report', 'Năng suất', 'Năng suất', 'Cuộc gọi, talktime, ngày công'));
   const analysis = [];

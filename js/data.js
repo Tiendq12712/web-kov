@@ -13,6 +13,7 @@ import { parseCalls } from './calls.js';
 import { parseCallScores } from './callScores.js';
 import { parseDetail } from './segment.js';
 import { parseAddons } from './addons.js';
+import { parseZalo } from './zalo.js';
 import { parseAddonScores, applyAddonScores, findMissing } from './addonScore.js';
 import { addonActs } from './addonDetail.js';
 import { CONFIG } from './config.js';
@@ -28,6 +29,7 @@ let scoreLink = null;    // link "Chấm call" (Google Form chấm chất lượ
 let callLink = null;     // link "Dữ liệu call" (từng cuộc gọi do mục Xuất Call ghi ra)
 let visitsLink = null;   // link "Lịch sử truy cập" (Sheet phản hồi của Google Form ghi lượt vào)
 let addonLink = null;    // link "Addon" (điểm thực đạt Payment, Kship, HDDT)
+let zaloLink = null;     // link "Zalo và hotline" (retailer đã kết bạn Zalo)
 let libraryLink = null;  // link "Thư viện" (dòng Thư viện trong tab Danh sách link)
 
 /** Danh sách tháng được dựng từ tab "Danh sách link" của Sheet cấu hình. */
@@ -38,9 +40,11 @@ const isScore = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').r
 const isAddonScore = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'addon';
 const isVisits = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'lich su truy cap';
 const isLibrary = (l) => l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase().replace(/\s+/g, ' ') === 'thu vien';
+const isZalo = (l) => /^zalo/.test(l.info.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').trim().toLowerCase());
 export const loadMonths = () => (monthsPromise ??= loadLinks().then((links) => {
   pbiLink = links.find(isPbi) ?? null;
   libraryLink = links.find(isLibrary) ?? null;
+  zaloLink = links.find(isZalo) ?? null;
   addonLink = links.find(isAddonScore) ?? null;
   visitsLink = links.find(isVisits) ?? null;
   hrLink = links.find(isHr) ?? null;
@@ -128,6 +132,16 @@ export const loadAddons = () => memo('addons', async () => {
   const tab = tabs.find((t) => /chi tiet addon|chi tiet add-on/.test(plainTab(t)));
   if (!tab) throw new Error('Sheet PBI chưa có tab "Chi tiết addon"');
   return parseAddons(await fetchRows(pbiLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:L5000', render: 'FORMATTED_VALUE' }));
+});
+
+/** Kết nối Zalo: Sheet "Zalo và hotline" (mọi tab có cột Retailer ID và Tình trạng kết nối). */
+export const hasZalo = () => Boolean(zaloLink);
+export const loadZalo = () => memo('zalo', async () => {
+  if (!zaloLink) throw new Error('Chưa có link "Zalo và hotline" trong tab Danh sách link');
+  const token = getToken();
+  const tabs = zaloLink.tab ? [zaloLink.tab] : await fetchTabs(zaloLink.id, token);
+  const sets = await Promise.all(tabs.map((tab) => fetchRows(zaloLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:L3000', render: 'FORMATTED_VALUE' })));
+  return parseZalo(sets);
 });
 
 /** Thư viện tài liệu: mỗi tab hiển thị của Sheet là một nhóm (Quy trình/quy định, Chính sách, Giải trình…). */
@@ -223,8 +237,8 @@ export const loadDetail = () => memo('detail', async () => {
 export const clearCache = () => { cache.clear(); store.clear(); persistClear(); monthsPromise = null; };
 
 /** Ảnh chụp dữ liệu đã tải, lưu cục bộ để mở lại trong ngày là thấy ngay dù token Google đã hết hạn. */
-export const snapshotData = () => ({ months, pbi: pbiLink, addon: addonLink, visits: visitsLink, library: libraryLink, hr: hrLink, calls: callLink, scores: scoreLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'scores' && !key.startsWith('detail')) });
-export function restoreData({ months: saved, pbi, addon, visits, library, hr, calls, scores, entries }) {
+export const snapshotData = () => ({ months, pbi: pbiLink, addon: addonLink, visits: visitsLink, library: libraryLink, hr: hrLink, calls: callLink, scores: scoreLink, zalo: zaloLink, entries: [...store].filter(([key]) => key !== 'sync' && key !== 'calls' && key !== 'scores' && key !== 'zalo' && !key.startsWith('detail')) });
+export function restoreData({ months: saved, pbi, addon, visits, library, hr, calls, scores, zalo, entries }) {
   months = saved.filter((m) => !CONFIG.hiddenMonths?.includes(m.month));   // tháng đã ẩn không được mở lại qua bản lưu
   pbiLink = pbi ?? null;
   addonLink = addon ?? null;
@@ -233,6 +247,7 @@ export function restoreData({ months: saved, pbi, addon, visits, library, hr, ca
   hrLink = hr ?? null;
   callLink = calls ?? null;
   scoreLink = scores ?? null;
+  zaloLink = zalo ?? null;
   monthsPromise = Promise.resolve(months);
   entries.forEach(([key, value]) => { cache.set(key, Promise.resolve(value)); store.set(key, value); });
 }

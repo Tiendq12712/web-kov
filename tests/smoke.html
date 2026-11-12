@@ -641,6 +641,25 @@ await test('Đăng nhập: nhận ra token thiếu quyền xem Google Sheets (ng
   eq(hasSheetsScope({ scope: 'openid email profile' }), false, 'thiếu quyền Sheets'); eq(hasSheetsScope({}), true, 'không có thông tin quyền thì không chặn (tránh chặn nhầm)');
 });
 
+await test('Zalo: đọc Sheet và đối chiếu retailer ID với data nhân sự, tính impact', async () => {
+  const z = await import(`${root}js/zalo.js`), zv = await import(`${root}js/views/zalo.js`);
+  const sheet = [['Retailer ID', 'Tên GH', 'SĐT', 'Tình trạng kết nối', 'TÌnh trạng phản hồi', 'Ngày kết bạn zalo', 'Ghi chú'], ['1', 'A', '', 'Đồng ý kết bạn', 'Có phản hồi', '6/11', ''], ['2', 'B', '', 'Chưa đồng ý kết bạn', 'Không phản hồi', '7/11', ''], ['3', 'C', '', 'Đồng ý kết bạn', 'Không phản hồi', '7/11', ''], ['1', 'A lặp', '', 'Đồng ý kết bạn', 'Có phản hồi', '8/11', ''], ['', 'trống', '', '', '', '', '']];
+  const zalo = z.parseZalo([sheet, [['Cột khác']]]);
+  eq(zalo.length, 3, 'bỏ dòng trùng, dòng trống và tab không phải bảng Zalo'); eq(zalo.map((x) => [x.accepted, x.replied]), [[true, true], [false, false], [true, false]], 'nhận Đồng ý / Chưa đồng ý và có / không phản hồi');
+  const job = (retailer, handler, status, impact, ts) => ({ retailer, handler, status, contact: 'Kết nối thành công', impact, source: 'OI', createdTs: ts });
+  const detail = [job('1', '8455 - Quyên - CS', 'Đã làm', true, 1), job('1', '8455 - Quyên - CS', 'Đã làm', false, 5), job('2', '8474 - Lợi - CS', 'Đã làm', false, 2)];
+  const a = z.analyzeZalo(zalo, detail);
+  eq(a.items[0].job.impact, false, 'lấy ca mới nhất của retailer'); eq(a.missing.map((x) => x.retailer), ['3'], 'retailer không có trong data');
+  const g = Object.fromEntries(a.groups.map((x) => [x.key, x]));
+  eq([g.all.n, g.all.found, g.all.done, g.all.impact], [3, 2, 2, 0], 'tổng nhóm'); eq(g.acc.n, 2, 'nhóm đồng ý kết bạn');
+  eq(a.people.map((p) => [p.code, p.n]), [['8455', 1], ['8474', 1]], 'thống kê theo nhân sự');
+  eq([z.sourceOf({ source: '(Chưa gán nguồn)', jobType: 'CSKH T15 - DVKH' }), z.sourceOf({ source: '(Chưa gán nguồn)', jobType: 'CSKH OI - DVKH' }), z.sourceOf({ source: 'NA', jobType: 'CSKH T15 - DVKH' })], ['T15', '(Chưa gán nguồn)', 'NA'], 'chưa gán nguồn + loại công việc T15 → nguồn T15');
+  const f1 = z.analyzeZalo(zalo, detail, { accept: 'yes' }), f2 = z.analyzeZalo(zalo, detail, { person: '8455' }), f3 = z.analyzeZalo(zalo, detail, { impact: 'yes' });
+  eq([f1.shown.length, f1.total, f2.shown.map((x) => x.retailer), f3.shown.length, f1.groups[0].n], [2, 3, ['1'], 0, 3], 'bộ lọc Zalo chỉ lọc bảng từng retailer, thống kê vẫn tính đủ');
+  const out = String(zv.zaloView({ zalo, detail: { rows: detail } }, { names: new Map(), manager: true }));
+  eq(out.includes('Impact là gì') && out.includes('Từng retailer'), true, 'tab hiện giải thích impact và bảng từng retailer');
+});
+
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {
   const as = await import(`${root}js/addonScore.js`), ad = await import(`${root}js/addonDetail.js`), fx = await import(`${root}tests/fixtures.js`);
   const tabs = fx.buildFixtures('cfg', 'x@kiotviet.com')[fx.IDS.addon];

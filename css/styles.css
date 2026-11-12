@@ -1326,3 +1326,15 @@ details.mm-multi--good summary { border-color: var(--good-fill); color: var(--go
 .tag--zalo { color: #fff; background: #0068ff; box-shadow: 0 2px 8px -2px rgba(0, 104, 255, .6); }
 .store-account { white-space: pre-line; overflow-wrap: anywhere; }
 .lib-item--store.is-zalo { border-color: #0068ff; border-left-width: 4px; background: color-mix(in srgb, #0068ff 9%, var(--surface)); }
+
+/* Tab Zalo: bảng nhóm dạng cây, mỗi tình trạng kết bạn một màu để dễ phân biệt */
+.zalo-tree tr.z-all td { font-weight: 700; border-bottom: 2px solid var(--line, rgba(148,163,184,.35)); }
+.zalo-tree tr.z-acc td { background: color-mix(in srgb, var(--good) 14%, transparent); }
+.zalo-tree tr.z-acc td:first-child { box-shadow: inset 4px 0 0 var(--good-fill); }
+.zalo-tree tr.z-acc-leaf td { background: color-mix(in srgb, var(--good) 6%, transparent); }
+.zalo-tree tr.z-acc-leaf td:first-child { box-shadow: inset 4px 0 0 color-mix(in srgb, var(--good-fill) 45%, transparent); }
+.zalo-tree tr.z-noacc td { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.zalo-tree tr.z-noacc td:first-child { box-shadow: inset 4px 0 0 var(--warn-fill); }
+.zalo-tree tr.z-noacc-leaf td { background: color-mix(in srgb, var(--warn) 6%, transparent); }
+.zalo-tree tr.z-noacc-leaf td:first-child { box-shadow: inset 4px 0 0 color-mix(in srgb, var(--warn-fill) 45%, transparent); }
+.zalo-tree tr.z-leaf td:first-child { font-weight: 500; }
