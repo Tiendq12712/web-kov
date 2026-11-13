@@ -6,6 +6,7 @@ import { stackRow, legendList as legend } from './components.js';
 import { contactDonut, sourceDonut } from './donuts.js';
 import { taskStats } from '../tasks.js';
 import { taskChart } from './tasks.js';
+import { suggestDivide } from '../divide.js';
 
 /** Các bảng ma trận (nhân sự × ngày) có thể chuyển qua lại. */
 const MATRICES = {
@@ -233,10 +234,85 @@ function divideTable(work, rows) {
     ${block ? '' : html`<p class="muted">Chưa tìm thấy bảng chia data theo nguồn trong tab; hiển thị tổng theo tình trạng xử lý.</p>`}`;
 }
 
+
+/* ---------- Gợi ý chia data ---------- */
+const REGIONS = ['Miền Nam', 'Miền Bắc'];   // nhóm 1 / nhóm 2 của bảng nhân sự đầu tab KPI (Sài Gòn / Hà Nội)
+const whole = (v) => Math.max(0, Math.floor(Number(String(v).replace(/[^\d]/g, '')) || 0));
+
+/** Số data đang chờ chia (dòng nhóm CSKH SC Miền Nam/Bắc, ngày mới nhất có data) để tham khảo. */
+function poolHint(work) {
+  const day = work.lastDay;
+  const pick = (re) => work.assigned?.groups.find((g) => re.test(g.name))?.values[day - 1] ?? 0;
+  return day ? { day, south: pick(/Miền Nam/i), north: pick(/Miền Bắc/i) } : null;
+}
+
+function divideModel(work, d) {
+  const backlog = new Map(work.status.members.map((m) => [m.code, (m.values[1] ?? 0) + (m.values[2] ?? 0)]));
+  const people = (work.staff ?? []).map((s) => ({
+    code: s.code, name: s.name, level: s.level, region: REGIONS[s.group] ?? REGIONS.at(-1), backlog: backlog.get(s.code) ?? 0,
+    off: d.off.includes(s.code), booking: d.bookingTo.includes(s.code), fnb: d.fnbTo.includes(s.code),
+  }));
+  return suggestDivide(people, { booking: whole(d.booking), fnb: whole(d.fnb), rest: { 'Miền Nam': whole(d.south), 'Miền Bắc': whole(d.north) } }, Number(d.step) || 0, whole(d.cap));
+}
+
+export function divideOutView(work, ui) {
+  const d = ui.divide;
+  if (!work.staff?.length) return html`<p class="muted">Chưa đọc được bảng nhân sự và level ở đầu tab KPI nên chưa gợi ý được.</p>`;
+  const { rows, warnings, totals } = divideModel(work, d);
+  const box = (flag, r) => html`<input type="checkbox" data-dv="${flag}" data-code="${r.code}" ${r[flag === 'off' ? 'off' : flag] ? 'checked' : ''} aria-label="${flag} ${r.name}">`;
+  const total = totals.give;
+  const note = (r) => {
+    if (r.off) return 'Không nhận hôm nay';
+    const parts = [];
+    if (r.special) parts.push(`${r.special} tệp riêng`);
+    if (r.extra) parts.push(`${r.extra} chia thêm`);
+    if (!r.give) parts.push(r.backlog >= Math.max(...rows.filter((x) => x.region === r.region && !x.off).map((x) => x.backlog)) ? 'tồn cao nhất miền' : 'tồn cao so với sức làm');
+    return parts.join(' · ');
+  };
+  const tr = (r) => html`<tr class="static ${r.off ? 'muted' : ''}">
+    <td class="sticky-col"><span class="person"><strong>${r.name}</strong><small>${r.code} · ${r.region}</small></span></td>
+    <td class="right num">${r.level ?? '·'}</td><td class="right num">${num(r.backlog)}</td>
+    <td class="center">${box('off', r)}</td><td class="center">${box('booking', r)}</td><td class="center">${box('fnb', r)}</td>
+    <td class="right num">${r.special ? num(r.special) : '·'}</td><td class="right num">${r.extra ? num(r.extra) : '·'}</td>
+    <td class="right num strong">${r.give ? num(r.give) : '·'}</td><td class="right num">${num(r.after)}</td><td class="muted">${note(r)}</td></tr>`;
+  const regionRows = (region) => rows.filter((r) => r.region === region);
+  return html`
+    ${warnings.map((w) => html`<p class="notice" role="alert">${w}</p>`)}
+    <div class="table-wrap"><table class="divide-table">
+      <thead><tr><th scope="col" class="sticky-col">Nhân sự</th><th scope="col" class="right">Level</th><th scope="col" class="right">Tồn hiện tại</th>
+        <th scope="col" class="center">Nghỉ</th><th scope="col" class="center">Booking</th><th scope="col" class="center">FnB lỗi</th>
+        <th scope="col" class="right">Chia riêng</th><th scope="col" class="right">Chia thêm</th><th scope="col" class="right">Tổng chia</th><th scope="col" class="right">Tồn sau chia</th><th scope="col">Ghi chú</th></tr></thead>
+      <tbody>${REGIONS.map((region) => html`${regionRows(region).map(tr)}`)}</tbody>
+      <tfoot><tr><td class="sticky-col"><strong>Tổng</strong></td><td></td><td class="right num">${num(rows.reduce((a, r) => a + r.backlog, 0))}</td><td></td><td></td><td></td>
+        <td class="right num">${num(totals.special)}</td><td class="right num">${num(totals.extra)}</td><td class="right num strong">${num(total)}</td><td class="right num">${num(rows.reduce((a, r) => a + r.after, 0))}</td><td></td></tr></tfoot>
+    </table></div>`;
+}
+
+function divideView(work, ui) {
+  const d = ui.divide, hint = poolHint(work);
+  const field = (id, label, value, extra = '') => html`<label class="field"><span>${label}</span><input id="dv-${id}" type="number" min="0" inputmode="numeric" value="${value}" ${extra}></label>`;
+  return html`
+    <div class="toolbar">
+      <h2 class="section-title">Gợi ý chia data</h2>
+      <p class="muted">Nhập số data cần chia hôm nay theo từng tệp; bảng bên dưới gợi ý mỗi người nhận bao nhiêu.</p>
+    </div>
+    <div class="divide-form">
+      ${field('booking', 'Booking (chia hết cho người nhận Booking)', d.booking)}
+      ${field('fnb', 'FnB lỗi (chia đều cho người nhận FnB lỗi)', d.fnb)}
+      ${field('south', 'Còn lại · Miền Nam', d.south)}
+      ${field('north', 'Còn lại · Miền Bắc', d.north)}
+      ${field('cap', 'Tối đa chia thêm / người (0 = không giới hạn)', d.cap)}
+      ${field('step', 'Level chênh nhau mỗi bậc (%)', d.step, 'max="50"')}
+    </div>
+    ${hint ? html`<p class="muted">Theo Sheet, data chờ chia ngày ${hint.day}: Miền Nam ${num(hint.south)} · Miền Bắc ${num(hint.north)} (tổng các tệp, đã gồm Booking/FnB lỗi nếu có).</p>` : ''}
+    <div id="divide-out">${divideOutView(work, ui)}</div>
+    <p class="muted">Cách tính: Booking và FnB lỗi chia cho người đã tích ở cột tương ứng. Phần còn lại chia theo từng miền sao cho "tồn sau chia" so với sức làm của mọi người xấp xỉ nhau: người đang tồn nhiều nhận ít hoặc không nhận; level cao được tính sức làm lớn hơn. Tích "Nghỉ" để loại người đó khỏi lần chia.</p>`;
+}
+
 const selector = (ui, people) => (code) => ui.team === 'all' || people.get(code)?.team === ui.team;
 
 /* ---------- Trang báo cáo ---------- */
-export function workView(work, ui, people, teams, industry) {
+export function workView(work, ui, people, teams, industry, manager = false) {
   const selected = selector(ui, people);
   const rows = buildRows(work, selected);
   const ariaSort = (k) => (ui.sort.key === k ? (ui.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
@@ -269,6 +345,7 @@ export function workView(work, ui, people, teams, industry) {
       </div>
     </div>
     ${matrixTable(work, ui, selected)}
+    ${manager ? divideView(work, ui) : ''}
     <div class="toolbar">
       <h2 class="section-title">Chi tiết nhân sự</h2>
       <input class="search" id="work-search" type="search" placeholder="Tìm theo tên hoặc mã…" value="${ui.query}" aria-label="Tìm nhân sự" autocomplete="off">

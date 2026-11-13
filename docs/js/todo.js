@@ -22,7 +22,7 @@ function unpaidDays(report, code, asOf) {
  * item = { tone: 'bad' | 'warn' | 'info', count, text, hint, tab?, timesheet? }.
  * Trả về [] nếu không có gì (view sẽ hiện lời chúc mừng).
  */
-export function buildTodo({ me, found, data, report, pbi, unread, control, alerts = [], sla: slaIn = null }) {
+export function buildTodo({ me, found, data, report, pbi, control, alerts = [], sla: slaIn = null }) {
   const asOf = data.teams.map((t) => t.asOf).sort().at(-1);
   const sla = slaIn ?? computeSla(data.work, asOf, data.month);   // slaIn: SLA tính từ data chi tiết (chính xác hơn bảng tồn khi chưa kịp đồng bộ)
   const items = [];
@@ -62,8 +62,7 @@ export function buildTodo({ me, found, data, report, pbi, unread, control, alert
       if (not) push({ tone: 'warn', count: not, text: 'act chưa dùng Customer Info', hint: `Tỉ lệ dùng hiện ${pct(1 - not / own.length, 1).replace('.', ',')}, mục tiêu ${pct(TARGET_CINFO)}`, tab: 'cinfo' });
     }
     const status = memberStatus(found.member, found.team);
-    if (status.key !== 'good') push({ tone: status.key === 'bad' ? 'bad' : 'warn', count: null, text: `KPI ${pct(found.member.kpi, 1)} đang chậm hơn tiến độ tháng (${pct(elapsedRatio(found.team.asOf))})`, hint: 'Cần hỗ trợ? Chia sẻ với quản lý', tab: 'chat' });
+    if (status.key !== 'good') push({ tone: status.key === 'bad' ? 'bad' : 'warn', count: null, text: `KPI ${pct(found.member.kpi, 1)} đang chậm hơn tiến độ tháng (${pct(elapsedRatio(found.team.asOf))})`, hint: 'Xem chi tiết KPI của bạn', tab: 'me' });
   }
-  if (unread) push({ tone: 'info', count: unread, text: 'tin nhắn chưa đọc', hint: 'Trong mục Chia sẻ', tab: 'chat' });
   return items;
 }

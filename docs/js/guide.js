@@ -58,9 +58,6 @@ const SECTIONS = [
   { id: 'library', icon: '📚', title: 'Thư viện', body: [
     ['ul', ['Kho tài liệu của team (quy trình, biểu mẫu, hướng dẫn), mỗi mục có biểu tượng theo loại tệp.', 'Bấm vào tài liệu để mở trong tab mới. Chỉ hiện khi đã có link thư viện trong cấu hình.']],
   ] },
-  { id: 'chat', icon: '💬', title: 'Chia sẻ', body: [
-    ['ul', ['Gửi tin cho quản lý khi gặp khó khăn và xem phản hồi; hội thoại chưa có tin nhắn sẽ không hiện.', 'Tin mới tự cập nhật, có chấm báo số tin chưa đọc trên tab.', 'Lần đầu gửi tin Google xin thêm quyền ghi Sheet; sau khi đồng ý sẽ không hỏi lại trong ngày.', 'Quản lý xem được danh sách các hội thoại và trả lời từng người.']],
-  ] },
   { id: 'settings', icon: '⚙️', title: 'Thiết lập (Admin / Quản trị)', roles: MANAGER, body: [
     ['p', 'Mở từ menu tài khoản. Quyền vào từng mục:'],
     ['ul', ['Tài khoản (Admin và Quản trị): thêm, sửa, xóa người dùng với Email, Phân quyền, Tên/Biệt danh, Giới tính và Đầu số. Admin quản lý được mọi người trừ Admin khác; Quản trị chỉ quản lý Thành viên.', 'Cấu hình (chỉ Admin): danh sách link Sheet (KPI, Năng suất, PBI, Thư viện, Danh sách nhân sự SC), cấu hình đồng bộ và kiểm tra quyền Sheet.', 'Đồng bộ CRM (chỉ Admin): chạy đồng bộ từ CRM về Sheet qua server cục bộ 127.0.0.1:8080; xem tiến độ và nhật ký, có nút Dừng.', 'Xuất Call (chỉ Admin): xuất dữ liệu cuộc gọi theo khoảng ngày vào Sheet.']],

@@ -272,7 +272,6 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
         const wanted = [
           ...ui.links.map((l, i) => ({ key: `l${i}`, label: l.info || `Link ${i + 1}`, id: l.id, need: 'reader' })),
           { key: 'cfg', label: 'Sheet cấu hình', id: CONFIG.configSheet, need: 'reader' },
-          { key: 'chat', label: 'Sheet chat', id: CONFIG.chatSheet, need: 'writer' },
         ];
         const byId = new Map();   // cùng một Sheet xuất hiện nhiều lần thì gộp, lấy mức quyền cao nhất cần có
         for (const s of wanted) {

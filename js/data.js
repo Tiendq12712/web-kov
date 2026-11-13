@@ -13,7 +13,7 @@ import { parseCalls } from './calls.js';
 import { parseCallScores } from './callScores.js';
 import { parseDetail } from './segment.js';
 import { parseAddons } from './addons.js';
-import { parseZalo } from './zalo.js';
+import { parseZalo, parseHotline } from './zalo.js';
 import { parseAddonScores, applyAddonScores, findMissing } from './addonScore.js';
 import { addonActs } from './addonDetail.js';
 import { CONFIG } from './config.js';
@@ -141,7 +141,7 @@ export const loadZalo = () => memo('zalo', async () => {
   const token = getToken();
   const tabs = zaloLink.tab ? [zaloLink.tab] : await fetchTabs(zaloLink.id, token);
   const sets = await Promise.all(tabs.map((tab) => fetchRows(zaloLink.id, token, { tab: `'${tab.replace(/'/g, "''")}'`, range: 'A1:L3000', render: 'FORMATTED_VALUE' })));
-  return parseZalo(sets);
+  return Object.assign(parseZalo(sets), { hotline: parseHotline(sets) });   // danh sách retailer kèm số liệu hotline
 });
 
 /** Thư viện tài liệu: mỗi tab hiển thị của Sheet là một nhóm (Quy trình/quy định, Chính sách, Giải trình…). */
@@ -193,14 +193,16 @@ export const loadScores = () => memo('scores', async () => {
 
 /** Chi tiết từng việc của file KPI (tab "Data Txx" của mỗi tháng): dùng để phân tích theo tệp data. */
 export const hasDetail = () => months.some((m) => m.detail);
+const LATEST_TTL = 30 * 60_000;   // tháng mới nhất: 30 phút (nút Làm mới dữ liệu xóa bản lưu)
 const DETAIL_TTL = 12 * 3_600_000;   // tháng đã qua ít đổi: dùng lại bản lưu trong trình duyệt tối đa 12 giờ
-/** Chi tiết của một tháng, đọc song song theo tháng. Tháng mới nhất luôn tải mới; các tháng cũ dùng bản lưu nếu còn hạn. */
+/** Chi tiết của một tháng, đọc song song theo tháng. Tháng mới nhất dùng bản lưu tối đa 30 phút; các tháng cũ tối đa 12 giờ. */
 const loadDetailMonth = (m, isLatest) => memo(`detail:${m.month}`, async () => {
   const key = `detail:${m.detail.id}:${m.detail.tab}:${m.month}`;
-  if (!isLatest) { const saved = await persistGet(key, DETAIL_TTL); if (saved) { await completeAddon(m.month, saved); return saved; } }
+  const saved = await persistGet(key, isLatest ? LATEST_TTL : DETAIL_TTL);   // tháng mới nhất chỉ dùng lại bản lưu trong thời gian ngắn
+  { if (saved) { await completeAddon(m.month, saved); return saved; } }
   const set = await fetchRows(m.detail.id, getToken(), { tab: `'${m.detail.tab.replace(/'/g, "''")}'`, range: 'A1:AK30000', timeout: 180_000 });
   const rows = parseDetail(set, m.month);
-  if (!isLatest) persistSet(key, rows);
+  persistSet(key, rows);
   await completeAddon(m.month, rows);
   return rows;
 });

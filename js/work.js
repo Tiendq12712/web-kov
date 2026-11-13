@@ -46,6 +46,19 @@ function classify(b) {
   return null;
 }
 
+/** Bảng đầu tab: nhân sự theo từng nhóm (cách nhau bởi dòng tổng) kèm LEVEL. group 0, 1… theo thứ tự trong Sheet. */
+export function parseStaff(rows) {
+  const staff = [];
+  let group = 0, seen = false;
+  for (let r = 1; r < rows.length && text(rows[r]?.[1]) !== 'Người xử lý' && r < 60; r++) {
+    const m = MEMBER.exec(text(rows[r][1]));
+    const level = number(rows[r][2]) ?? (Number.isFinite(Number(rows[r][2])) && rows[r][2] !== '' ? Number(rows[r][2]) : null);
+    if (m && level != null) { staff.push({ code: m[1], name: m[2], level, group }); seen = true; }
+    else if (seen) { group += 1; seen = false; }
+  }
+  return staff;
+}
+
 export function parseWork(rows) {
   const blocks = {};
   let title = '';
@@ -62,7 +75,7 @@ export function parseWork(rows) {
   const days = blocks.assigned ? Array.from({ length: dayCount(blocks.assigned) }, (_, i) => i + 1) : [];
   // Ngày cuối cùng đã có data được chia (những ngày sau chưa tới nên bỏ qua).
   const lastDay = days.filter((d) => blocks.assigned.members.some((m) => m.values[d - 1] > 0)).at(-1) ?? 0;
-  return { ...blocks, lastDay };
+  return { ...blocks, lastDay, staff: parseStaff(rows) };
 }
 
 /** Đọc khối công việc nếu tab có; tab không có các bảng này thì trả về null (tab Công việc sẽ ẩn). */

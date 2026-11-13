@@ -24,6 +24,43 @@ export function parseZalo(sets) {
   return out;
 }
 
+const secOf = (v) => { const m = /^(\d+):(\d{2})(?::(\d{2}))?$/.exec(String(v ?? '').trim()); return m ? (+m[1] * 3600 + +m[2] * 60 + +(m[3] ?? 0)) : null; };
+
+/** Tab hotline của Sheet Zalo: mỗi dòng một cuộc gọi đã kết nối (Ngày gọi, Giờ gọi, Thời gian đàm thoại, Khu vực, Loại mạng);
+ *  bảng nhỏ bên cạnh (Khu vực / Tổng cuộc gọi) là tổng số cuộc gọi vào, gồm cả cuộc không kết nối. Không đọc số điện thoại khách. */
+export function parseHotline(sets) {
+  const calls = [], totals = {};
+  for (const rows of sets) {
+    const head = (rows[0] ?? []).map(plain);
+    const at = (name) => head.findIndex((h) => h.startsWith(name));
+    const col = { date: at('ngay goi'), talk: at('thoi gian dam thoai'), region: at('khu vuc'), net: at('loai mang'), total: at('tong cuoc goi') };
+    if (col.date < 0 || col.talk < 0) continue;
+    const sideRegion = head.findIndex((h, i) => h.startsWith('khu vuc') && i > col.region);   // cột Khu vực thứ hai: bảng tổng
+    for (const r of rows.slice(1)) {
+      const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(r[col.date] ?? '').trim()), talk = secOf(r[col.talk]);
+      if (m && talk != null) calls.push({ day: `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`, talk, region: String(r[col.region] ?? '').trim(), net: String(r[col.net] ?? '').trim() });
+      const reg = sideRegion >= 0 ? String(r[sideRegion] ?? '').trim() : '', tot = Number(String(r[col.total] ?? '').replace(/[^\d]/g, ''));
+      if (reg && col.total >= 0 && tot > 0) totals[reg] = tot;
+    }
+  }
+  return { calls, totals };
+}
+
+/** Báo cáo hotline: tổng cuộc gọi (từ bảng tổng), kết nối thành công (các dòng có đàm thoại), tỉ lệ, tổng và trung bình đàm thoại; theo khu vực và theo ngày. */
+export function hotlineStats({ calls, totals }) {
+  const sum = (l) => l.reduce((a, c) => a + c.talk, 0);
+  const block = (list, total) => ({ conn: list.length, total: total ?? null, rate: total ? list.length / total : null, talk: sum(list), avg: list.length ? sum(list) / list.length : null });
+  const regions = [...new Set([...calls.map((c) => c.region).filter(Boolean), ...Object.keys(totals)])].sort();
+  const byRegion = regions.map((region) => ({ region, ...block(calls.filter((c) => c.region === region), totals[region]) }));
+  const known = regions.every((r) => totals[r] != null), allTotal = known && regions.length ? regions.reduce((a, r) => a + totals[r], 0) : null;
+  const days = [...new Set(calls.map((c) => c.day))].sort();
+  return {
+    all: block(calls, allTotal), byRegion, byDay: days.map((day) => ({ day, ...block(calls.filter((c) => c.day === day), null) })),
+    nets: [...new Set(calls.map((c) => c.net).filter(Boolean))].map((net) => ({ net, n: calls.filter((c) => c.net === net).length })),
+    inconsistent: byRegion.filter((r) => r.total != null && r.total < r.conn).map((r) => r.region),
+  };
+}
+
 const codeOf = (h) => /^(\d+)\s*-/.exec(h ?? '')?.[1] ?? '';
 const rate = (a, b) => (b ? a / b : null);
 
@@ -54,7 +91,8 @@ export function analyzeZalo(zalo, detail, f = {}) {
   }
   const every = zalo.map((z) => ({ ...z, job: latest.get(z.retailer) ?? null, source: sourceOf(latest.get(z.retailer)), product: latest.get(z.retailer)?.product ?? '', code: codeOf(latest.get(z.retailer)?.handler) }));
   const options = { persons: [...new Map(every.filter((x) => x.code).map((x) => [x.code, /^\d+\s*-\s*([^-]+)/.exec(x.job.handler)?.[1]?.trim() ?? x.code])).entries()].map(([code, name]) => ({ code, name })), products: [...new Set(every.map((x) => x.product).filter(Boolean))].sort(), sources: [...new Set(every.map((x) => x.source).filter(Boolean))].sort() };
-  const keep = (x) => (!f.accept || f.accept === 'all' || (f.accept === 'yes') === x.accepted) && (!f.reply || f.reply === 'all' || (f.reply === 'yes') === x.replied)
+  const q = plain(f.q ?? '');
+  const keep = (x) => (!q || plain(x.name).includes(q) || x.retailer.includes(q)) && (!f.accept || f.accept === 'all' || (f.accept === 'yes') === x.accepted) && (!f.reply || f.reply === 'all' || (f.reply === 'yes') === x.replied)
     && (!f.person || f.person === 'all' || x.code === f.person) && (!f.product || f.product === 'all' || x.product === f.product) && (!f.source || f.source === 'all' || x.source === f.source)
     && (!f.impact || f.impact === 'all' || (f.impact === 'yes' ? Boolean(x.job?.impact) : Boolean(x.job) && !x.job.impact));
   const items = every, shown = every.filter(keep);   // thống kê tính trên toàn bộ retailer; bộ lọc chỉ áp dụng cho bảng từng retailer

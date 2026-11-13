@@ -15,7 +15,6 @@ export const ICONS = {
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 11a3 3 0 1 0 0-6M18 14.5c2.2.6 3.5 2.4 3.5 5.5"/>',
   report: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
   zalo: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8l-8 4h8"/>',
-  chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
   cinfo: '<circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8h.01"/>',
   library: '<path d="M3 5.5C5 4.5 8 4.5 12 6.5c4-2 7-2 9-1v13c-2-1-5-1-9 1-4-2-7-2-9-1z"/><path d="M12 6.5v13"/>',
   compare: '<path d="M7 4v16M17 4v16M3 9h8M13 15h8"/>',
@@ -54,6 +53,6 @@ export function buildNav(monthList) {
   if (manager && monthList.length > 1) analysis.push(item('compare', 'So sánh tháng', 'So sánh', 'Đặt hai tháng cạnh nhau'));
   const me = findMember(state.me.email, d.teams, state.me.name, state.me.code) ? [item('me', 'Hôm nay của tôi', 'Hôm nay')] : [];   // trang riêng cho người có trong báo cáo KPI
   return [item('overview', 'Tổng quan'), ...me, group('team', 'Team', 'team', teams), group('ops', 'Vận hành', 'report', reports), group('analysis', 'Phân tích', 'trend', analysis),
-    hasLibrary() ? item('library', 'Thư viện') : null, item('chat', 'Chia sẻ')].filter(Boolean);
+    hasLibrary() ? item('library', 'Thư viện') : null].filter(Boolean);
 }
 

@@ -34,8 +34,7 @@ export function timesheetView(report, code, talkTarget = 0) {
   return html`
     <details class="card timesheet">
       <summary><strong>Chi tiết ngày công</strong> <span class="badge badge--good">${num(total)} ngày</span></summary>
-      <p class="muted">Đối chiếu ngày công của bạn: <strong>X</strong> = 1 ngày, <strong>X/2</strong> = nửa ngày, để trống = không tính công.${talkTarget > 0 ? html` Talktime: <strong class="talk-ok">xanh</strong> = đạt chỉ tiêu ngày (X/2 tính nửa chỉ tiêu), <strong class="talk-bad">đỏ</strong> = chưa đạt.` : ''}
-        Thấy chưa đúng? <button class="link-btn" type="button" data-tab="chat">Báo cho quản lý</button></p>
+      <p class="muted">Đối chiếu ngày công của bạn: <strong>X</strong> = 1 ngày, <strong>X/2</strong> = nửa ngày, để trống = không tính công.${talkTarget > 0 ? html` Talktime: <strong class="talk-ok">xanh</strong> = đạt chỉ tiêu ngày (X/2 tính nửa chỉ tiêu), <strong class="talk-bad">đỏ</strong> = chưa đạt.` : ''}</p>
       <div class="table-wrap"><table class="timesheet__table sortable">
         <thead><tr><th>Ngày</th><th>Thứ</th><th class="right">Công</th><th>Ghi chú</th><th class="right">Call</th><th class="right">Talktime</th>${talkTarget > 0 ? html`<th class="right" title="Talktime trừ chỉ tiêu của ngày (X/2 tính nửa chỉ tiêu)">Thừa/thiếu</th>` : ''}</tr></thead>
         <tbody>${rows.map((r) => html`

@@ -38,7 +38,7 @@ export function preloadDetail() {
   preloadScores();
   if (!hasDetail() || state.segmentM.data || state.segment.data || state.segmentM.loading) return;
   const month = state.month;
-  setTimeout(() => loadDetailFor([month]).then((d) => { if (month === state.month && !state.segmentM.data) { state.segmentM.data = d; if (state.tab === 'overview') hooks.renderView(); } }).catch(() => {}), 2500);
+  setTimeout(() => loadDetailFor([month]).then((d) => { if (month === state.month && !state.segmentM.data) { state.segmentM.data = d; if (state.tab === 'overview') hooks.renderView(); } }).catch(() => {}), 0);
 }
 
 

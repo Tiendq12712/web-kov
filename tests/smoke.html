@@ -149,7 +149,24 @@ await test('Báo cáo tuần/tháng: thêm xu hướng, chấm call và nghe l�
   const none = pr.buildPeriodReport({ data: kpiData, rows, period: 'week' });
   eq(none.charts.some((c) => c.kind === 'line'), false, 'không có lịch sử thì không vẽ xu hướng'); eq(none.sections.some((x) => x.title.startsWith('Kiểm soát call')), false);
 });
+const zl = await import(`${root}js/zalo.js`);
+await test('Hotline: tổng cuộc gọi, kết nối, tỉ lệ, đàm thoại tổng và trung bình', () => {
+  const rows = [['STT', 'SĐT', 'Ngày gọi', 'Giờ gọi', 'Thời gian đàm thoại', 'Khu vực', 'Loại mạng', '', '', 'Khu vực', 'Tổng cuộc gọi'],
+    ['1', '09', '05/11/2026', '10:00:00', '0:02:00', 'HN', 'Nội mạng', '', '', 'HCM', '4'], ['2', '09', '05/11/2026', '11:00:00', '0:01:00', 'HCM', 'Ngoại mạng', '', '', 'HN', '2'],
+    ['3', '09', '06/11/2026', '11:00:00', '0:03:00', 'HCM', 'Nội mạng', '', '', '', ''], ['4', '09', '06/11/2026', '12:00:00', '0:01:00', 'HCM', 'Nội mạng']];
+  const h = zl.hotlineStats(zl.parseHotline([rows]));
+  eq([h.all.total, h.all.conn, h.all.talk, h.all.avg], [6, 4, 420, 105]); eq(h.all.rate, 4 / 6);
+  eq(h.byRegion.map((r) => [r.region, r.total, r.conn, r.talk]), [['HCM', 4, 3, 300], ['HN', 2, 1, 120]]); eq(h.byDay.map((d) => d.conn), [2, 2]); eq(h.inconsistent, []);
+  eq(zl.parseHotline([[['Retailer ID', 'Tình trạng kết nối']]]).calls.length, 0, 'tab Zalo không bị đọc nhầm là hotline');
+});
 const tk = await import(`${root}js/tasks.js`);
+await test('Công việc hỗ trợ: xu hướng theo tháng và lọc nhân sự', () => {
+  const mk = (month, tasks, handler = '1001 - An - CS') => ({ month, status: 'Đã làm', tasks, impact: true, contact: 'Kết nối thành công', handler });
+  const rows = [mk('2026-09', ['A']), mk('2026-09', []), mk('2026-10', ['A']), mk('2026-10', ['A', 'B']), mk('2026-10', ['B'], '1002 - Bình - CS')];
+  const t = tk.taskTrend(rows, ['2026-09', '2026-10']);
+  eq(t.list.map((x) => x.task), ['A', 'B']); eq(t.list[0].cells.map((c) => c?.n), [1, 2]); eq(t.list[0].cells[0].share, 0.5); eq(t.list[1].cells[0], null); eq(t.done, [2, 3]);
+  eq(tk.taskTrend(rows, ['2026-09', '2026-10'], '1002').list.map((x) => x.task), ['B'], 'lọc theo mã nhân sự');
+});
 await test('Công việc hỗ trợ: thống kê chung và có trong báo cáo tuần/tháng', () => {
   const mkr = (tasks, impact, status = 'Đã làm') => ({ status, tasks, impact, contact: 'Kết nối thành công', month: 'T10', created: '2026-10-19', createdTs: Date.UTC(2026, 9, 19), modifiedTs: Date.UTC(2026, 9, 19), handler: '1001 - An - CS', add: [], desc: '' });
   const rows = [mkr(['Tư vấn tính năng'], true), mkr(['Tư vấn tính năng', 'Tạo ticket QA support'], true), mkr([], false), mkr([], false, 'Chưa làm'), mkr(['Tư vấn setting'], true, 'Hủy')];
@@ -159,7 +176,7 @@ await test('Công việc hỗ trợ: thống kê chung và có trong báo cáo t
   eq(rep.sections.some((x) => x.title.startsWith('Công việc hỗ trợ')), true, 'báo cáo có phần công việc hỗ trợ'); eq(rep.charts.some((c) => c.title === 'Công việc hỗ trợ'), true); eq(rep.insights.some((x) => x.includes('công việc hỗ trợ')), true);
 });
 await test('Việc cần làm: nhân sự talktime thấp và lỗi Kiểm soát', () => {
-  const me = { role: 'admin', email: 'a@kiotviet.com' }, base = { me, found: null, data: kpiData, report: null, pbi: null, unread: 0 };
+  const me = { role: 'admin', email: 'a@kiotviet.com' }, base = { me, found: null, data: kpiData, report: null, pbi: null };
   const items = todo.buildTodo({ ...base, control: { flaggedCount: 4, errRate: 0.1, people: [{ code: '1001', flagged: 4, errRate: 0.1 }] } });
   eq(items.some((i) => i.tab === 'control' && i.count === 4), true, 'có mục Kiểm soát'); eq(items.some((i) => i.tab === 'report'), true, 'có mục talktime');
   eq(todo.buildTodo({ ...base, control: null }).some((i) => i.tab === 'control'), false);
@@ -656,8 +673,28 @@ await test('Zalo: đọc Sheet và đối chiếu retailer ID với data nhân s
   eq([z.sourceOf({ source: '(Chưa gán nguồn)', jobType: 'CSKH T15 - DVKH' }), z.sourceOf({ source: '(Chưa gán nguồn)', jobType: 'CSKH OI - DVKH' }), z.sourceOf({ source: 'NA', jobType: 'CSKH T15 - DVKH' })], ['T15', '(Chưa gán nguồn)', 'NA'], 'chưa gán nguồn + loại công việc T15 → nguồn T15');
   const f1 = z.analyzeZalo(zalo, detail, { accept: 'yes' }), f2 = z.analyzeZalo(zalo, detail, { person: '8455' }), f3 = z.analyzeZalo(zalo, detail, { impact: 'yes' });
   eq([f1.shown.length, f1.total, f2.shown.map((x) => x.retailer), f3.shown.length, f1.groups[0].n], [2, 3, ['1'], 0, 3], 'bộ lọc Zalo chỉ lọc bảng từng retailer, thống kê vẫn tính đủ');
+  eq([z.analyzeZalo(zalo, detail, { q: 'b' }).shown.map((x) => x.retailer), z.analyzeZalo(zalo, detail, { q: '3' }).shown.map((x) => x.retailer), String(zv.zaloRowsView({ zalo, detail: { rows: detail } }, { filters: { q: 'a' } }).rows).includes('>A<')], [['2'], ['3'], true], 'tìm theo tên gian hàng hoặc Retailer ID, không phân biệt hoa thường');
   const out = String(zv.zaloView({ zalo, detail: { rows: detail } }, { names: new Map(), manager: true }));
   eq(out.includes('Impact là gì') && out.includes('Từng retailer'), true, 'tab hiện giải thích impact và bảng từng retailer');
+});
+
+await test('Gợi ý chia data: Booking, FnB lỗi chia riêng, phần còn lại san bằng theo tồn và level', async () => {
+  const dv = await import(`${root}js/divide.js`), wk = await import(`${root}js/work.js`);
+  const P = (code, level, region, backlog, x = {}) => ({ code, name: code, level, region, backlog, off: false, booking: false, fnb: false, ...x });
+  const people = [P('1', 4, 'N', 100, { booking: true }), P('2', 2, 'N', 100, { fnb: true }), P('3', 2, 'N', 100, { fnb: true }), P('4', 2, 'N', 300), P('5', 3, 'B', 20), P('6', 3, 'B', 120)];
+  const r = dv.suggestDivide(people, { booking: 10, fnb: 61, rest: { N: 50, B: 100 } }), by = Object.fromEntries(r.rows.map((x) => [x.code, x]));
+  eq([by[1].special, by[2].special + by[3].special, Math.abs(by[2].special - by[3].special)], [10, 61, 1], 'Booking chia hết cho người nhận Booking; FnB lỗi chia đôi, lẻ 1');
+  eq([by[2].special >= by[3].special, r.totals.give], [true, 221], 'phần lẻ về người đang tồn ít hơn (hoặc mã nhỏ hơn khi bằng nhau); tổng chia đủ');
+  eq([by[4].extra, by[5].extra + by[6].extra], [0, 100], 'người tồn quá cao không nhận thêm; phần còn lại của miền chia hết');
+  eq(by[5].extra > by[6].extra, true, 'người tồn ít nhận nhiều hơn');
+  const off = dv.suggestDivide(people.map((p) => (p.code === '5' ? { ...p, off: true } : p)), { booking: 0, fnb: 0, rest: { B: 40 } });
+  eq([off.rows.find((x) => x.code === '5').give, off.rows.find((x) => x.code === '6').extra], [0, 40], 'người nghỉ không nhận data');
+  const cap = dv.suggestDivide(people, { booking: 0, fnb: 0, rest: { B: 100 } }, 15, 60);
+  eq([Math.max(...cap.rows.filter((x) => x.region === 'B').map((x) => x.extra)), cap.rows.filter((x) => x.region === 'B').reduce((a, x) => a + x.extra, 0)], [60, 100], 'mức tối đa mỗi người; phần dư chia lại cho người còn lại');
+  eq(dv.suggestDivide(people, { booking: 5, fnb: 0, rest: {} }, 15).rows.find((x) => x.code === '1').special, 5, 'chạy được khi không có phần còn lại');
+  eq(dv.suggestDivide(people.map((p) => ({ ...p, booking: false })), { booking: 5, fnb: 0, rest: {} }).warnings.length, 1, 'không có người nhận thì cảnh báo');
+  const rows = [['STT', 'Nhân sự', 'LEVEL'], ['1', '8427 - Thương - CS', '4'], ['2', '8455 - Quyên - CS', 3], ['', '', '', '1.157'], ['1', '8410 - Vân - CS', '3'], ['', '', '', '9']];
+  eq(wk.parseStaff(rows).map((x) => [x.code, x.level, x.group]), [['8427', 4, 0], ['8455', 3, 0], ['8410', 3, 1]], 'đọc level và nhóm nhân sự từ bảng đầu tab KPI');
 });
 
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {

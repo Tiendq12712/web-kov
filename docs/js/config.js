@@ -20,6 +20,5 @@ export const CONFIG = {
   // Diện mạo nhân vật robot (nhân vật riêng): armor = màu giáp, accent = màu khiên/ánh sáng.
   mascot: { armor: '#2f63e0', accent: '#38bdf8' },
   // Sheet lưu tin nhắn chia sẻ (mặc định cùng Sheet cấu hình; nên dùng Sheet riêng để nhân sự không sửa được tab Tài khoản).
-  chatSheet: '1EiTaC-AyjL8ZzINGgcQolzpIjfyskqIk1jui5A7r3ns',
-  tabs: { history: 'Lịch sử', updated: 'Cập nhật', thread: 'Hội thoại', chat: 'Chia sẻ', accounts: 'Tài khoản', links: 'Danh sách link', sync: 'Cấu hình đồng bộ', call: 'Cấu hình call', slaExtra: 'Gia hạn SLA', heard: 'Đã nghe lại', mismatch: 'Đánh giá không khớp', audit: 'Nhật ký thao tác' },
+  tabs: { history: 'Lịch sử', updated: 'Cập nhật', accounts: 'Tài khoản', links: 'Danh sách link', sync: 'Cấu hình đồng bộ', call: 'Cấu hình call', slaExtra: 'Gia hạn SLA', heard: 'Đã nghe lại', mismatch: 'Đánh giá không khớp', audit: 'Nhật ký thao tác' },
 };

@@ -24,8 +24,8 @@ import { logVisit } from './visits.js';
 import { jobTypeView } from './views/jobType.js';
 import { teamView, rowsView } from './views/team.js';
 import { detailView } from './views/detail.js';
-import { zaloView } from './views/zalo.js';
-import { workView, workRowsView } from './views/work.js';
+import { zaloView, zaloRowsView } from './views/zalo.js';
+import { workView, workRowsView, divideOutView } from './views/work.js';
 import { reportView, reportRowsView, reportDetailView } from './views/report.js';
 import { connectView } from './views/connect.js';
 import { connectCallsView } from './views/connectCalls.js';
@@ -37,7 +37,6 @@ import { controlView } from './views/control.js';
 import { transferView } from './views/transfer.js';
 import { workdaysByCode } from './report.js';
 import { createSettings } from './settingsController.js';
-import { createChat } from './chatController.js';
 import { slaView } from './views/sla.js';
 import { cinfoView, DEFAULT_FILTERS } from './views/cinfo.js';
 import { ensureEvals, setEval } from './app/mismatchEval.js';
@@ -68,8 +67,6 @@ let navModel = [];
 /** Cùng một danh sách: thanh ngang trên desktop, thanh dưới cùng trên mobile. */
 function renderTabs() {
   navModel = buildNav(monthList);
-  const unread = state.me ? chat.unread() : 0;
-  const badge = (n) => (n.id === 'chat' && unread ? html`<span class="chat-badge" aria-label="${unread} tin chưa đọc">${unread > 99 ? '99+' : unread}</span>` : '');
   const active = (n) => (n.items ? n.items.some((i) => i.id === state.tab) : n.id === state.tab);
   const label = (n, short) => {
     const cur = n.items?.find((i) => i.id === state.tab);
@@ -78,10 +75,10 @@ function renderTabs() {
   const attrs = (n) => (n.items ? html`data-nav-group="${n.id}" aria-haspopup="menu" aria-expanded="false"` : html`data-tab="${n.id}"`);
   const cur = (n) => (active(n) ? html`aria-current="page"` : '');
   mount(els.tabs, html`${navModel.map((n) => html`
-    <button class="tab ${n.items ? 'tab--group' : ''}" type="button" title="${label(n)}" ${attrs(n)} ${cur(n)}>${tabIcon(n.icon ?? n.id)}<span class="tab__label">${label(n)}</span>${n.items ? html`<span class="tab__caret" aria-hidden="true">▾</span>` : ''}${badge(n)}</button>`)}`);
+    <button class="tab ${n.items ? 'tab--group' : ''}" type="button" title="${label(n)}" ${attrs(n)} ${cur(n)}>${tabIcon(n.icon ?? n.id)}<span class="tab__label">${label(n)}</span>${n.items ? html`<span class="tab__caret" aria-hidden="true">▾</span>` : ''}</button>`)}`);
   mount(els.bottomNav, html`${navModel.map((n) => html`
     <button class="bottom-nav__item" type="button" ${attrs(n)} ${cur(n)}>
-      <span class="bottom-nav__icon">${tabIcon(n.icon ?? n.id)}${badge(n)}</span><span>${n.items ? (n.items.find((i) => i.id === state.tab)?.short ?? n.short) : n.short}</span>
+      <span class="bottom-nav__icon">${tabIcon(n.icon ?? n.id)}</span><span>${n.items ? (n.items.find((i) => i.id === state.tab)?.short ?? n.short) : n.short}</span>
     </button>`)}`);
 }
 
@@ -159,9 +156,6 @@ function lazyTab(slice, tab, loader, render) {
   return html`<div class="loading" role="status"><p class="muted">Đang tải dữ liệu… lần đầu có thể mất vài giây, các lần sau sẽ nhanh hơn.</p><div class="loading__bar"><i></i></div></div>`;
 }
 
-/** Hội thoại (Cả nhóm + riêng tư): trạng thái nằm trong chatController. */
-const myName = () => state.me.name || findMember(state.me.email, state.data.teams, state.me.name, state.me.code)?.member.name || state.me.email.split('@')[0];
-
 /**
  * Vẽ lại mà giữ nguyên chữ đang nhập dở trong các ô (form Thiết lập…): dùng cho các lần vẽ lại tự động
  * (lấy lại tiêu điểm cửa sổ, làm mới token, job xong) — không dùng sau khi người dùng bấm Lưu/Thêm.
@@ -181,32 +175,14 @@ function withKeptInputs(render) {
   }
 }
 
-/** Vẽ lại hội thoại/huy hiệu khi có tin mới, giữ nguyên chữ đang gõ và vị trí con trỏ. */
-function onChatChange(kind) {
-  if (!state.me || !state.data) return;
-  if (kind === 'badge') { renderTabs(); applyTitle(); return; }
-  if (state.tab !== 'chat') return;
-  const box = $('chat-input'), focused = box && document.activeElement === box, caret = box?.selectionStart;
-  const list = $('chat-messages'), nearBottom = !list || list.scrollHeight - list.scrollTop - list.clientHeight < 80;
-  renderView();
-  const after = $('chat-input');
-  if (focused && after) { after.focus(); after.setSelectionRange(caret, caret); }
-  const msgs = $('chat-messages');
-  if (msgs && nearBottom) msgs.scrollTop = msgs.scrollHeight;
-}
-const chat = createChat({
-  getMe: () => state.me, getAccounts: () => state.accounts, getName: myName,
-  onChange: onChatChange, onAuthExpired: (message) => authLost(message), isOpen: () => state.tab === 'chat',
-});
-const renderChat = () => chat.view();
 let baseTitle = document.title;
-const applyTitle = () => { const n = state.me ? chat.unread() : 0; document.title = n ? `(${n}) ${baseTitle}` : baseTitle; };
+const applyTitle = () => { document.title = baseTitle; };
 
 const renderWork = () => {
   // Ngành hàng lấy từ data chi tiết (cột Product); đang tải thì báo "đang tải", chưa có link thì để trống.
   const loaded = hasDetail() ? lazyTab(state.segmentM, 'work', (m) => loadDetailFor([m]), (d) => d) : null;
   const industry = hasDetail() && !state.segmentM.error ? (loaded?.rows ? { rows: loaded.rows, month: state.month } : { loading: true }) : undefined;
-  return workView(state.data.work, state.work, kpiPeople(), state.data.teams.map(({ id, name }) => ({ id, name })), industry);
+  return workView(state.data.work, state.work, kpiPeople(), state.data.teams.map(({ id, name }) => ({ id, name })), industry, state.me.role !== 'member');
 };
 
 /** Tổng quan cũng cần dữ liệu năng suất: tải nền (không chặn trang), có rồi thì vẽ lại. Không có hoặc lỗi thì bỏ qua phần đó. */
@@ -243,7 +219,7 @@ function overviewTasks() {
 function currentPage() {
   const t = team();
   if (state.tab === 'overview') {
-    state.todo = buildTodo({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, report: state.report.data, pbi: state.cinfo.data, unread: chat.unread(), control: todoControl(), alerts: todoAlerts(), sla: state.data.work?.backlogAll ? currentSla() : null });
+    state.todo = buildTodo({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, report: state.report.data, pbi: state.cinfo.data, control: todoControl(), alerts: todoAlerts(), sla: state.data.work?.backlogAll ? currentSla() : null });
   }
   const report = preloadReport();   // ngày công và năng suất lấy từ file năng suất, nên luôn tải nền
   if (state.tab === 'me') return { view: renderToday(report), title: 'Hôm nay của tôi' };
@@ -265,7 +241,6 @@ function currentPage() {
       : lazyTab(state.report, 'connect', loadReport, (data) => connectView(data, state.connect, kpiNames()));
     return { view, title: 'Chất lượng kết nối' };
   }
-  if (state.tab === 'chat') return { view: renderChat(), title: 'Chia sẻ' };
   if (state.tab === 'hr' && hasHr()) return { view: lazyTab(state.hr, 'hr', loadHr, (d) => hrView(d, state.hr, { manager: state.me.role !== 'member', code: myCode() })), title: 'Phép năm' };
   if (state.tab === 'library' && hasLibrary()) return { view: lazyTab(state.library, 'library', loadLibrary, (d) => libraryView(d, state.library)), title: 'Thư viện' };
   if (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) return { view: renderCompare(), title: 'So sánh tháng' };
@@ -301,7 +276,7 @@ function monthBar() {
 /** Nhân vật nổi ở góc: hiện ở các tab xem số liệu; ẩn ở Chia sẻ/Thiết lập (tránh che ô soạn tin). */
 function renderCoach() {
   const el = $('coach');
-  const show = CONFIG.coachEnabled && state.me && state.data && !['chat', 'settings'].includes(state.tab);
+  const show = CONFIG.coachEnabled && state.me && state.data && state.tab !== 'settings';
   state.coach = show ? coachFor({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, bump: state.coachBump }) : null;
   mount(el, state.coach ? coachFloat(state.coach, state.coachPref) : html``);
 }
@@ -324,7 +299,6 @@ function renderView() {
   baseTitle = monthly ? `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE` : `${page.title} · Report SC ONLINE`;
   applyTitle();
   writeHash();
-  if (state.tab === 'chat') { const msgs = $('chat-messages'); if (msgs) msgs.scrollTop = msgs.scrollHeight; }
 }
 
 async function setMonth(ym, { boot = false } = {}) {
@@ -346,17 +320,16 @@ async function setMonth(ym, { boot = false } = {}) {
   Object.assign(state.report, { data: report, error: '', query: '' });
   Object.assign(state.segmentM, { data: null, error: '', loading: false });   // chi tiết data theo tháng: tải lại cho tháng mới
   state.work.query = '';
-  const validTab = (state.tab === 'me' && findMember(state.me.email, state.data.teams, state.me.name, state.me.code)) || (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || state.tab === 'chat' || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'zalo' && hasZalo() && hasDetail()) || (state.tab === 'addondetail' && hasDetail()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
+  const validTab = (state.tab === 'me' && findMember(state.me.email, state.data.teams, state.me.name, state.me.code)) || (state.tab === 'work' && state.data.work) || (state.tab === 'settings' && canSettings()) || (state.tab === 'sla' && state.data.work?.backlogAll) || (state.tab === 'cinfo' && hasPbi()) || (state.tab === 'library' && hasLibrary()) || (state.tab === 'hr' && hasHr()) || (state.tab === 'trend' && state.me.role !== 'member') || (state.tab === 'compare' && state.me.role !== 'member' && monthList.length > 1) || (state.tab === 'report' && hasReport(ym)) || (state.tab === 'connect' && state.me.role !== 'member' && (hasCalls() || hasReport(ym))) || (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'addon' && hasAddons()) || (state.tab === 'zalo' && hasZalo() && hasDetail()) || (state.tab === 'addondetail' && hasDetail()) || (state.tab === 'control' && hasDetail()) || (state.tab === 'callctl' && hasScores()) || (state.tab === 'listen' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'jobs' && state.me.role !== 'member' && hasDetail()) || (state.tab === 'xfer' && state.me.role !== 'member' && hasDetail()) || team();
   if (state.tab !== 'overview' && !validTab) state.tab = 'overview';
   renderView();
 }
 
-Object.assign(hooks, { renderView, authLost, setTab, unread: () => chat.unread() });   // để các module trong js/app gọi lại được
+Object.assign(hooks, { renderView, authLost, setTab });   // để các module trong js/app gọi lại được
 
 function setTab(tab) {
   state.tab = tab;
   if (tab === 'trend') state.trend.error = '';
-  if (tab === 'chat') chat.refresh({ silent: true });
   state.query = '';
   renderView();
   window.scrollTo({ top: 0 });
@@ -479,6 +452,13 @@ document.addEventListener('keydown', (e) => {
 
 // Tìm kiếm chỉ vẽ lại phần thân bảng để giữ focus và tránh render thừa.
 document.addEventListener('input', (e) => {
+  if (e.target.id === 'zalo-q' && state.zalo.data) {   // chỉ vẽ lại thân bảng để giữ con trỏ gõ
+    state.zalo.f = { ...state.zalo.f, q: e.target.value };
+    const part = zaloRowsView(state.zalo.data, { names: kpiNames(), filters: state.zalo.f });
+    mount($('zalo-rows'), part.rows);
+    $('zalo-count').textContent = part.count;
+    return;
+  }
   if (e.target.id === 'report-search') {
     state.report.query = e.target.value;
     return mount($('report-rows'), reportRowsView(state.report.data, state.report, kpiNames()));
@@ -488,6 +468,10 @@ document.addEventListener('input', (e) => {
     mount($('member-rows'), memberRowsView(state.data, state, state.report.data));
     $('member-count').textContent = `Hiển thị ${$('member-rows').querySelectorAll('tr.clickable').length}/${state.data.teams.reduce((n, t) => n + (state.filter === 'all' || t.id === state.filter ? t.members.length : 0), 0)} nhân sự`;
     return;
+  }
+  if (e.target.id?.startsWith('dv-') && $('divide-out')) {   // gợi ý chia data: chỉ vẽ lại bảng kết quả để giữ con trỏ gõ
+    state.work.divide[e.target.id.slice(3)] = e.target.value;
+    return mount($('divide-out'), divideOutView(state.data.work, state.work));
   }
   if (e.target.id === 'work-search') {
     state.work.query = e.target.value;
@@ -511,6 +495,8 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'xfer-month') { shareMonth(e.target.value); return renderView(); }
   if (e.target.id === 'jt-month') { shareMonth(e.target.value); return renderView(); }
   if (e.target.id === 'jt-product') { state.jobs.product = e.target.value; return renderView(); }
+  if (e.target.id === 'jt-tmetric') { state.jobs.metric = e.target.value; return renderView(); }
+  if (e.target.id === 'jt-tperson') { state.jobs.person = e.target.value; return renderView(); }
   if (e.target.id === 'jt-job') { state.jobs.job = e.target.value; return renderView(); }
   if (e.target.id === 'ls-heard') { state.listen.heardFilter = e.target.value; return renderView(); }
   if (e.target.matches?.('[data-heard-select]')) return markHeard(e.target);
@@ -525,6 +511,12 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'cs-text') { state.callctl.text = e.target.value; return renderView(); }
   if (e.target.id === 'cs-month') { shareMonth(e.target.value); return renderView(); }
   if (e.target.id === 'cs-person') { sharePerson(e.target.value); return renderView(); }
+  if (e.target.dataset?.dv && $('divide-out')) {   // tích Nghỉ / Booking / FnB lỗi
+    const d = state.work.divide, list = { off: d.off, booking: d.bookingTo, fnb: d.fnbTo }[e.target.dataset.dv], code = e.target.dataset.code;
+    const next = e.target.checked ? [...new Set([...list, code])] : list.filter((c) => c !== code);
+    if (e.target.dataset.dv === 'off') d.off = next; else if (e.target.dataset.dv === 'booking') d.bookingTo = next; else d.fnbTo = next;
+    return mount($('divide-out'), divideOutView(state.data.work, state.work));
+  }
   if (e.target.id === 'ctl-rule') { state.control.rule = e.target.value; return renderView(); }
   if (e.target.id === 'ad-person' || e.target.id === 'ad-person2') { sharePerson(e.target.value); return renderView(); }
   if (e.target.dataset?.zf) { state.zalo.f = { ...state.zalo.f, [e.target.dataset.zf]: e.target.value }; return renderView(); }
@@ -583,30 +575,12 @@ document.addEventListener('click', (e) => {
   if (hit('[data-rmember]')) openReportMember(hit('[data-rmember]').dataset.rmember, { timesheet: Boolean(hit('[data-rmember]').closest('.work-table')) });
 });
 
-document.addEventListener('submit', (e) => {
-  if (!e.target.matches('[data-chat-form]')) return;
-  e.preventDefault();
-  chat.send(e.target.querySelector('textarea').value);
-});
-document.addEventListener('keydown', (e) => {   // Enter gửi tin, Shift+Enter xuống dòng
-  if (e.target.id !== 'chat-input' || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
-  e.preventDefault();
-  e.target.form.requestSubmit();
-});
-document.addEventListener('input', (e) => { if (e.target.id === 'chat-input') chat.setDraft(e.target.value); });
 document.addEventListener('toggle', (e) => { const box = e.target?.closest?.('[data-mm-multi]'); if (box && state.cinfo) { if (e.target.open) state.cinfo.evalOpen = box.dataset.id; else if (state.cinfo.evalOpen === box.dataset.id) state.cinfo.evalOpen = null; } }, true);   // nhớ ô đánh giá nào đang mở để vẽ lại không làm đóng
-document.addEventListener('change', (e) => { if (e.target.id === 'chat-new' && e.target.value) chat.start(e.target.value); });
-document.addEventListener('click', (e) => {
-  const open = e.target.closest('[data-chat-open]');
-  if (open) return chat.open(open.dataset.chatOpen);
-  if (e.target.closest('[data-chat-back]')) chat.back();
-});
-
 els.welcome.addEventListener('click', (e) => {
   const act = e.target.closest('[data-welcome]')?.dataset.welcome;
   if (!act) return;
   hideWelcome(els.welcome);
-  if (act === 'chat') setTab('chat'); else if (act === 'sla') setTab('sla'); 
+  if (act === 'sla') setTab('sla'); 
 });
 $('help').addEventListener('click', () => openGuide(state.me?.role, { onTour: () => startTour({ email: state.me?.email }) }));
 
@@ -758,7 +732,7 @@ document.addEventListener('click', (e) => {
   if (e.target.id === 'login') handleLogin(e.target, { resume: e.target.hasAttribute('data-resume') });
   if (e.target.id === 'login-other') { clearSnapshot(); signOut(); showLogin(); }
 });
-els.logout.addEventListener('click', () => { hideWelcome(els.welcome); chat.reset(); clearSnapshot(); disarmRefresh(); signOut(); clearCache(); settings.reset(); startApp.retried = false; showLogin(); });
+els.logout.addEventListener('click', () => { hideWelcome(els.welcome); clearSnapshot(); disarmRefresh(); signOut(); clearCache(); settings.reset(); startApp.retried = false; showLogin(); });
 
 /* ---------- Khởi động ---------- */
 /** Email phải có trong tab "Tài khoản" của Sheet cấu hình; quyền lấy từ cột "Phân quyền". */
@@ -797,7 +771,7 @@ async function start() {
   setBoot('Đang xác thực tài khoản…', 1);
   try { await startApp(); } finally { setBoot(); }
   greet();
-  if (state.me && state.data) { logVisit({ email: state.me.email, name: state.me.name, role: state.me.role }); chat.watch(); persistSnapshot(); preloadPbi(); preloadDetail(); }   // thăm dò tin mới + lưu bản dữ liệu hôm nay
+  if (state.me && state.data) { logVisit({ email: state.me.email, name: state.me.name, role: state.me.role }); persistSnapshot(); preloadPbi(); preloadDetail(); }   // thăm dò tin mới + lưu bản dữ liệu hôm nay
 }
 
 /** Thẻ chào mừng theo tiến độ của chính người đăng nhập; chỉ hiện một lần cho mỗi lần đăng nhập. */
@@ -922,7 +896,6 @@ async function refreshSession({ interactive = false, notify = false } = {}) {
       setTimeout(() => { if (!staleSession) refreshBar.hidden = true; }, 3500);
     } else refreshBar.hidden = true;
     persistSnapshot();
-    chat.watch();
   } catch (err) {
     armRefresh(authHint(err), { button: true });
   }

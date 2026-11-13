@@ -74,6 +74,6 @@ export function coachFor({ me, found, data, bump = 0 }) {
   let pool = LINES[key];
   if (key === 'bad' && (v.late || v.soon)) pool = [...pool, ...LINES.badSla];   // có data trễ thì thêm câu nhắc ưu tiên SLA
   const mood = { bad: 'stern', warn: 'worried', good: 'cheer', celebrate: 'celebrate' }[key];
-  const action = key === 'bad' || key === 'warn' ? { label: 'Chia sẻ với quản lý', tab: 'chat' } : null;
+  const action = null;
   return { mood, name: MASCOT_NAME, line: fill(pick(pool, seedDay + Number(m.code || 0)), v), action };
 }

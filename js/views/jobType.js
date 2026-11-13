@@ -1,6 +1,8 @@
 import { html } from '../dom.js';
 import { num, pct } from '../format.js';
 import { analyzeJobTypes } from '../jobType.js';
+import { taskTrend } from '../tasks.js';
+import { lineChart, chartCard } from './charts.js';
 
 const p1 = (v) => (v == null ? '—' : pct(v, 1));
 const mlabel = (ym) => `T${Number(ym.slice(5))}/${ym.slice(2, 4)}`;
@@ -8,6 +10,40 @@ const stat = (title, value, sub, tone = '') => html`<div class="card sla-stat ${
 const noAns = (rate) => (rate == null ? html`<span class="muted">—</span>` : html`<span class="badge badge--${rate >= 0.15 ? 'bad' : rate >= 0.08 ? 'warn' : 'good'}">${p1(rate)}</span>`);
 
 /** Tab "Theo loại công việc": so sánh CSKH T15 / OI / NA… về tình trạng liên hệ, impact, add-on; chia theo ngành hàng, công việc hỗ trợ, nhân sự. */
+const METRICS = { share: ['% data đã làm', 'share'], conn: ['Tỉ lệ kết nối', 'connRate'], impact: ['Tỉ lệ impact', 'impactRate'] };
+
+/** Bảng xu hướng công việc hỗ trợ qua các tháng (mỗi dòng một công việc) kèm biểu đồ đường cho các công việc nhiều nhất. */
+function trendSection(data, ui, names) {
+  const code = ui.person && ui.person !== 'all' ? ui.person : '';
+  const metric = METRICS[ui.metric] ? ui.metric : 'share', key = METRICS[metric][1];
+  const people = new Map();
+  for (const r of data.rows) { const m = /^(\d+)\s*-\s*(.+?)(?:\s*-|$)/.exec(r.handler ?? ''); if (m && !people.has(m[1])) people.set(m[1], names.get(m[1]) ?? m[2]); }
+  const t = taskTrend(data.rows, data.months, code);
+  const cell = (c) => (c ? p1(c[key]) : '—');
+  const delta = (task) => {
+    const v = task.cells.map((c) => c?.[key]).filter((x) => x != null);
+    if (v.length < 2) return html`<span class="muted">—</span>`;
+    const d = (v.at(-1) - v.at(-2)) * 100;
+    return html`<span class="badge badge--${Math.abs(d) < 0.5 ? 'warn' : d > 0 ? 'good' : 'bad'}">${d > 0 ? '▲' : d < 0 ? '▼' : '■'} ${Math.abs(d).toFixed(1)} đ</span>`;
+  };
+  const top = t.list.filter((x) => x.cells.filter(Boolean).length >= 2).slice(0, 4);
+  const chart = top.length && t.months.length > 1 ? chartCard(`Xu hướng ${METRICS[metric][0].toLowerCase()}`, lineChart({ labels: t.months.map(mlabel), format: (v) => pct(v, 0), series: top.map((x, i) => ({ name: x.task, cls: `s${i + 1}`, values: x.cells.map((c) => c?.[key] ?? 0) })) }), `${top.length} công việc nhiều nhất; tháng không có dữ liệu tính 0.`) : '';
+  const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
+  return html`
+    <div class="toolbar"><h2 class="section-title">Công việc hỗ trợ qua từng tháng</h2>
+      <p class="muted">Tỉ lệ chọn từng công việc trên data đã làm của mỗi tháng (không phụ thuộc bộ lọc tháng, ngành hàng ở trên). Một data có thể có nhiều công việc.</p></div>
+    <div class="filters" aria-label="Lọc xu hướng công việc">
+      <label class="filter"><span>Chỉ số</span><select id="jt-tmetric" class="select">${Object.entries(METRICS).map(([k, [label]]) => opt(k, label, metric))}</select></label>
+      <label class="filter"><span>Nhân sự</span><select id="jt-tperson" class="select">${opt('all', 'Tất cả nhân sự', code || 'all')}${[...people].sort((a, b) => a[1].localeCompare(b[1], 'vi')).map(([c, n]) => opt(c, `${c} · ${n}`, code))}</select></label>
+    </div>
+    ${chart}
+    <div class="table-wrap"><table class="connect-table">
+      <thead><tr><th scope="col" class="sticky-col">Công việc hỗ trợ</th>${t.months.map((m) => html`<th scope="col" class="right">${mlabel(m)}</th>`)}<th scope="col" class="right">So tháng trước</th></tr></thead>
+      <tbody>${t.list.map((x) => html`<tr class="static"><td class="sticky-col"><strong>${x.task}</strong></td>${x.cells.map((c) => html`<td class="right num">${cell(c)}${c ? html` <small class="muted">${num(c.n)}</small>` : ''}</td>`)}<td class="right">${delta(x)}</td></tr>`)}</tbody>
+      <tfoot><tr class="static avg-row"><td class="sticky-col"><strong>Data đã làm · % có ghi công việc</strong></td>${t.done.map((d, i) => html`<td class="right num">${num(d)} <small class="muted">${p1(t.withTaskRate[i])}</small></td>`)}<td></td></tr></tfoot>
+    </table></div>`;
+}
+
 export function jobTypeView(data, ui, { names }) {
   const months = data.months, month = ui.month && (ui.month === 'all' || months.includes(ui.month)) ? ui.month : months.at(-1);
   const first = analyzeJobTypes(data.rows, { month });
@@ -56,5 +92,6 @@ export function jobTypeView(data, ui, { names }) {
     <div class="table-wrap"><table class="connect-table sortable">
       <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>${HEAD}</tr></thead>
       <tbody>${a.byPerson.map((p) => row(nm(p), p))}</tbody>
-    </table></div>` : ''}`;
+    </table></div>` : ''}
+    ${trendSection(data, ui, names)}`;
 }

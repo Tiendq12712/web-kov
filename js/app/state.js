@@ -23,7 +23,7 @@ export const state = {
   query: '',
   sort: { key: 'kpi', dir: 'desc' },
   report: { data: null, loading: false, error: '', region: 'all', weekMetric: 'calls', dayMetric: 'calls', query: '', sort: { key: 'talk', dir: 'desc' } },
-  work: { team: 'all', matrix: 'backlogAll', query: '', sort: { key: 'pctDone', dir: 'desc' } },
+  work: { team: 'all', matrix: 'backlogAll', query: '', sort: { key: 'pctDone', dir: 'desc' }, divide: { booking: '', fnb: '', south: '', north: '', cap: '60', step: '15', off: [], bookingTo: ['8427'], fnbTo: ['8474', '8454'] } },
   cinfo: { data: null, loading: false, error: '', f: { ...DEFAULT_FILTERS }, evals: new Map(), evalsLoaded: false, evalsLoading: false, evalNotice: '' },   // báo cáo Customer Info (PBI) + bộ lọc
   trend: { data: null, loading: false, error: '', metric: 'kpi', who: 'all', range: 'all' },   // xu hướng theo ngày (lịch sử đồng bộ)
   compare: { a: null, b: null, key: '', data: null, loading: false, error: '' },   // so sánh hai tháng (quản lý)
@@ -32,7 +32,7 @@ export const state = {
   segmentM: { data: null, loading: false, error: '' },   // chi tiết data của riêng tháng đang xem (SLA, Kiểm soát, Công việc)
   segment: { data: null, loading: false, error: '', key: '', month: 'all' },
   xfer: { month: 'all' },   // data chuyển Offline → Online (dùng chung dữ liệu chi tiết)
-  jobs: { month: null, product: 'all', job: 'T15' },   // thống kê theo loại công việc (dùng chung dữ liệu chi tiết)
+  jobs: { month: null, product: 'all', job: 'T15', metric: 'share', person: 'all' },   // thống kê theo loại công việc (dùng chung dữ liệu chi tiết)
   listen: { month: null, job: 'T15', person: 'all', level: 'attn', heard: new Map(), heardLoaded: false, heardLoading: false, heardFilter: 'all', heardNotice: '', hasScores: false },   // gợi ý nghe lại call (dùng chung dữ liệu chi tiết)
   callctl: { data: null, loading: false, error: '', month: 'all', person: 'all', q: 'all', stars: 'all', has: 'all', err: 'all', sort: 'priority', text: '' },   // kết quả chấm call (Sheet Chấm call)
   zalo: { data: null, loading: false, error: '', f: {} },   // kết nối Zalo (Sheet "Zalo và hotline") đối chiếu với data nhân sự

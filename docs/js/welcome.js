@@ -78,7 +78,6 @@ export function showWelcome(el, { me, found, data }) {
       ${stat}
       ${slaBlock}
       <div class="welcome__actions">
-        ${tone?.cls === 'is-bad' || tone?.cls === 'is-warn' ? html`<button class="btn" type="button" data-welcome="chat">Chia sẻ với quản lý</button>` : ''}
         ${slaNow ? html`<button class="btn btn--ghost" type="button" data-welcome="sla">Xem chi tiết SLA</button>` : ''}
         <button class="btn btn--ghost" type="button" data-welcome="close">${found ? 'Xem báo cáo' : 'Bắt đầu'}</button>
       </div>
