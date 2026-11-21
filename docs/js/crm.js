@@ -96,6 +96,15 @@ export const crmServer = {
   stop: (id) => api('POST', `/jobs/${id}/stop`, {}),
 };
 
+/** Hủy ATC trên CRM bằng cookie đã nhập ở máy chủ cục bộ; mặc định chạy thử, hủy thật cần confirm. */
+export const atcServer = {
+  cancel: ({ ids, reason, dry_run, confirm }) => api('POST', '/atc-cancel', { ids, reason, dry_run, confirm }),
+  /** Chuyển người xử lý của ATC theo danh sách Retailer ID (mặc định chạy thử, chuyển thật cần confirm). */
+  /** Tra Retailer ID từ tên gian hàng (chỉ đọc CRM). */
+  lookup: ({ names, diagnose }) => api('POST', '/retailer-lookup', { names, diagnose }),
+  assign: ({ retailers, to, include_done, dry_run, confirm, diagnose }) => api('POST', '/atc-assign', { retailers, to, include_done, dry_run, confirm, diagnose }),
+};
+
 export const callServer = {
   setCookie: (cookie) => fetchCall('POST', '/cookie', { cookie }),
   clearCookie: () => fetchCall('DELETE', '/cookie'),

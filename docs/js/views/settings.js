@@ -7,7 +7,7 @@ import { ROLES, GENDERS, canManage } from '../directory.js';
 import { monthLabel } from '../format.js';
 import { DATE_MODES, modeOf, resolveRange } from '../crm.js';
 
-const SECTIONS = [['accounts', 'Tài khoản'], ['links', 'Cấu hình'], ['crm', 'Đồng bộ CRM'], ['call', 'Xuất Call'], ['audit', 'Nhật ký'], ['visits', 'Truy cập']];
+const SECTIONS = [['accounts', 'Tài khoản'], ['links', 'Cấu hình'], ['crm', 'Đồng bộ CRM'], ['call', 'Xuất Call'], ['atc', 'Hủy ATC'], ['assign', 'Chuyển người xử lý'], ['lookup', 'Tra Retailer ID'], ['audit', 'Nhật ký'], ['visits', 'Truy cập']];
 const SERVER_COMMAND = '~/Downloads/Tool_KiotViet_CRM_MacOS/venv/bin/python3 server.py 8080';
 const short = (text, n = 40) => (text.length > n ? `${text.slice(0, n)}…` : text);
 const ROLE_TONE = { admin: 'good', manager: 'warn', member: 'neutral' };
@@ -276,11 +276,135 @@ const callSection = (ui) => html`${alertBox(ui, 'call')}${serverCard(ui.status, 
   cookieSet: ui.status?.callCookieSet, needCookie: 'Cần nhập cookie call-report trước khi chạy.',
 })}`;
 
+/* ---------- Hủy ATC (KiotViet CRM, module CSKHSC) ---------- */
+const atcCard = (ui) => {
+  const a = ui.atc, ready = ui.status?.ready && ui.status?.atcReady, hasCookie = ui.status?.cookieSet;
+  return html`
+  <section class="card">
+    <div class="card__head"><h3 class="card__title">Hủy ATC</h3></div>
+    ${notice(ui)}
+    ${ui.status?.ready && !ui.status?.atcReady ? html`<p class="notice" role="alert">Máy chủ chưa nạp được huy_atc.py: chép file vào thư mục tool CRM (~/Downloads/Tool_KiotViet_CRM_MacOS) rồi chạy lại máy chủ.</p>` : ''}
+    <form class="call-form" data-sform="atc">
+      <label class="field"><span>Mã ATC (mỗi dòng một mã, hoặc dán link CRM; tối đa 50)</span>
+        <textarea name="ids" rows="5" placeholder="Mã ATC là số sau record= trên link ATC, ví dụ:&#10;88875043" aria-label="Mã ATC">${a.ids}</textarea></label>
+      <label class="field"><span>Lý do hủy (ghi vào Mô tả và bình luận của ATC)</span>
+        <input name="reason" value="${a.reason}" autocomplete="off" aria-label="Lý do hủy"></label>
+      <div class="inline-form">
+        <button class="btn" type="submit" ${ready && hasCookie && !ui.busy ? '' : 'disabled'} title="Đọc ATC và báo sẽ ghi gì, không thay đổi gì trên CRM">Chạy thử (không hủy)</button>
+        <button class="btn btn--ghost" type="button" data-act="atc-cancel" ${ready && hasCookie && !ui.busy && a.checkedKey ? '' : 'disabled'} title="Chỉ bấm được sau khi chạy thử đúng danh sách và lý do này">Hủy thật</button>
+      </div>
+      ${ready && !hasCookie ? html`<p class="muted">Cần nhập cookie CRM ở trên trước.</p>` : ''}
+    </form>
+    <p class="muted">Luôn chạy thử trước: web kiểm tra từng ATC (chặn ATC đã “Đã làm”), hủy thật xong sẽ tải lại ATC để xác nhận trạng thái đã là Hủy. Mã ATC khác Retailer ID.</p>
+    ${a.results.length ? html`
+      <h4 class="section-title">${a.dry ? 'Kết quả chạy thử (chưa hủy gì)' : 'Kết quả hủy'}</h4>
+      <div class="table-wrap"><table>
+        <thead><tr><th>ATC</th><th>Kết quả</th><th>Chi tiết</th></tr></thead>
+        <tbody>${a.results.map((r) => html`<tr><td class="num">${r.atc}</td><td>${r.ok ? badge('good', a.dry ? 'Hủy được' : 'Đã hủy') : badge('bad', 'Không được')}</td><td style="white-space:pre-wrap">${r.msg}</td></tr>`)}</tbody>
+      </table></div>` : ''}
+  </section>`;
+};
+
+/* ---------- Chuyển người xử lý của ATC theo Retailer ID ---------- */
+const assignCard = (ui) => {
+  const a = ui.assign, ready = ui.status?.ready && ui.status?.assignReady, hasCookie = ui.status?.cookieSet;
+  return html`
+  <section class="card">
+    <div class="card__head"><h3 class="card__title">Chuyển người xử lý</h3></div>
+    ${notice(ui)}
+    ${ui.status?.ready && !ui.status?.assignReady ? html`<p class="notice" role="alert">Máy chủ chưa nạp được atc_assign.py: chép file vào thư mục tool CRM (~/Downloads/Tool_KiotViet_CRM_MacOS) rồi chạy lại máy chủ.</p>` : ''}
+    <form class="call-form" data-sform="assign">
+      <label class="field"><span>Danh sách Retailer ID (mỗi dòng một ID hoặc cách nhau bằng dấu phẩy; tối đa 30)</span>
+        <textarea name="retailers" rows="6" placeholder="501232008&#10;500647939" aria-label="Danh sách Retailer ID">${a.retailers}</textarea></label>
+      <label class="field"><span>Chuyển cho: ID CRM của người nhận kèm tiền tố, ví dụ id:12147 (ID này dùng được cho cả nhóm). Có thể nhập mã đầu số (8201) hoặc tên nhóm khi tool đọc được danh bạ đầy đủ của CRM (bấm Kiểm tra tìm kiếm để biết)</span>
+        <input name="to" value="${a.to}" autocomplete="off" aria-label="Người nhận"></label>
+      <label class="check"><input type="checkbox" name="include_done" ${a.includeDone ? 'checked' : ''}> Chuyển cả ATC đã “Đã làm” hoặc “Hủy” (mặc định chỉ chuyển ATC chưa hoàn tất)</label>
+      <div class="inline-form">
+        <button class="btn" type="submit" ${ready && hasCookie && !ui.busy ? '' : 'disabled'} title="Tìm ATC của từng Retailer ID và báo sẽ chuyển từ ai sang ai, không thay đổi gì trên CRM">Chạy thử (không chuyển)</button>
+        <button class="btn btn--ghost" type="button" data-act="assign-diag" ${ready && hasCookie && !ui.busy ? '' : 'disabled'} title="Chỉ thử tìm ATC của Retailer ID đầu tiên và cho biết CRM trả về gì, không sửa gì">Kiểm tra tìm kiếm</button>
+        <button class="btn btn--ghost" type="button" data-act="assign-run" ${ready && hasCookie && !ui.busy && a.checkedKey ? '' : 'disabled'} title="Chỉ bấm được sau khi chạy thử đúng danh sách và người nhận này">Chuyển thật</button>
+      </div>
+      ${ready && !hasCookie ? html`<p class="muted">Cần nhập cookie CRM ở trên trước.</p>` : ''}
+    </form>
+    <p class="muted">Luôn chạy thử trước. Tool tìm ATC theo Retailer ID (view 18161), rồi gọi API ChangeOwnerAction một lần cho tất cả ATC hợp lệ và đọc lại trang chi tiết từng ATC để xác nhận. Mỗi lần xử lý vài chục Retailer ID có thể mất 1–2 phút.</p>
+    ${a.diag.length ? html`
+      <h4 class="section-title">Kiểm tra tìm ATC của Retailer ID ${a.diagRetailer}</h4>
+      <p class="muted">Mỗi dòng là một cách tìm ATC. "Dòng" là số ATC tìm thấy; các cột còn lại cho biết trang CRM trả về có bảng danh sách hay không.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Cách tìm</th><th>Kết quả</th><th>Dòng</th><th>Thẻ tr</th><th>listViewEntries</th><th>data-id</th><th>Tiêu đề trang</th><th>Đường dẫn</th></tr></thead>
+        <tbody>${a.diag.map((d) => html`<tr><td>${d.cach}</td><td>${d.dong ? badge('good', d.ket_qua) : badge('bad', d.ket_qua)}</td><td class="num">${d.dong ?? '—'}</td><td class="num">${d.the_tr ?? '—'}</td><td class="num">${d.listViewEntries ?? '—'}</td><td class="num">${d.data_id ?? '—'}</td><td>${d.tieu_de ?? ''}</td><td style="word-break:break-all"><small>${d.url}</small></td></tr>`)}</tbody>
+      </table></div>
+      ${a.directory ? html`
+        <h4 class="section-title">Danh bạ người dùng đầy đủ (để nhập mã đầu số như 8201)</h4>
+        <p class="${a.directory.nguon_dung ? 'muted' : 'notice'}" role="status">${a.directory.nguon_dung ? html`Đọc được danh bạ từ: ${a.directory.nguon_dung}. Có thể nhập mã đầu số hoặc tên người/nhóm ở ô "Chuyển cho".` : 'Chưa đọc được danh bạ đầy đủ từ các nguồn dưới đây. Khi đó chỉ nhập được ID CRM (id:12147). Cần đường dẫn của hộp Change Owner (xem hướng dẫn bắt request trong cuộc trò chuyện).'}</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Nguồn đã thử</th><th>Số lựa chọn</th><th>Số nhân sự (mã - tên)</th><th>Ghi chú</th><th>Đường dẫn</th></tr></thead>
+          <tbody>${a.directory.thu.map((d) => html`<tr><td>${d.nguon}</td><td class="num">${d.so_lua_chon ?? '—'}</td><td class="num">${d.so_nhan_vien}</td><td>${d.ghi_chu}</td><td style="word-break:break-all"><small>${d.url}</small></td></tr>`)}</tbody>
+        </table></div>` : ''}
+      ${a.owners ? html`
+        <h4 class="section-title">Danh sách người xử lý trong form ATC ${a.owners.atc}</h4>
+        ${a.owners.loi ? html`<p class="notice" role="alert">${a.owners.loi}</p>` : html`
+        <p class="muted">${a.owners.so_lua_chon} lựa chọn. Ô chọn liên quan: ${a.owners.cac_o_chon.join(', ') || 'không có'}. ${a.owners.co_nhom_cham_soc.length ? html`Có lựa chọn "chăm sóc": ${a.owners.co_nhom_cham_soc.join('; ')}.` : 'Không có lựa chọn nào chứa chữ "chăm sóc".'}</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Nhóm trong danh sách</th><th>Số lựa chọn</th><th>Ví dụ</th></tr></thead>
+          <tbody>${a.owners.nhom.map((g) => html`<tr><td>${g.ten}</td><td class="num">${g.so}</td><td>${g.mau.join('; ')}</td></tr>`)}</tbody>
+        </table></div>`}` : ''}` : ''}
+    ${a.results.length ? html`
+      <h4 class="section-title">${a.dry ? 'Kết quả chạy thử (chưa chuyển gì)' : 'Kết quả chuyển'}</h4>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Retailer ID</th><th>ATC</th><th>Kết quả</th><th>Chi tiết</th></tr></thead>
+        <tbody>${a.results.map((r) => html`<tr><td class="num">${r.retailer}</td><td class="num">${r.atc || '—'}</td><td>${r.unverified ? badge('warn', 'Đã gửi, chưa xác nhận') : r.ok ? badge('good', a.dry ? 'Chuyển được' : 'Đã chuyển') : r.skip ? badge('warn', 'Bỏ qua') : badge('bad', 'Không được')}</td><td style="white-space:pre-wrap">${r.msg}</td></tr>`)}</tbody>
+      </table></div>` : ''}
+  </section>`;
+};
+
+const assignSection = (ui) => html`${serverCard(ui.status, ui.serverError)}${cookieCard(ui.status, { ...CRM_COOKIE, isSet: ui.status?.cookieSet, at: ui.status?.cookieAt })}${assignCard(ui)}`;
+
+/* ---------- Tra Retailer ID từ tên gian hàng ---------- */
+const lookupCard = (ui) => {
+  const l = ui.lookup, ready = ui.status?.ready && ui.status?.lookupReady, hasCookie = ui.status?.cookieSet;
+  const tone = { ok: 'good', multi: 'warn', none: 'bad', error: 'bad' };
+  const label = { ok: 'Đã tìm thấy', multi: 'Nhiều kết quả', none: 'Không thấy', error: 'Lỗi' };
+  return html`
+  <section class="card">
+    <div class="card__head"><h3 class="card__title">Tra Retailer ID từ tên gian hàng</h3></div>
+    ${notice(ui)}
+    ${ui.status?.ready && !ui.status?.lookupReady ? html`<p class="notice" role="alert">Máy chủ chưa nạp được retailer_lookup.py: chép file vào thư mục tool CRM (~/Downloads/Tool_KiotViet_CRM_MacOS) rồi chạy lại máy chủ.</p>` : ''}
+    <form class="call-form" data-sform="lookup">
+      <label class="field"><span>Tên gian hàng (mỗi dòng một tên, dán thẳng cột “Tên GH” từ Google Sheet; tối đa 60)</span>
+        <textarea name="names" rows="8" placeholder="cuahangnuri&#10;thucpt" aria-label="Danh sách tên gian hàng">${l.names}</textarea></label>
+      <div class="inline-form">
+        <button class="btn" type="submit" ${ready && hasCookie && !ui.busy ? '' : 'disabled'} title="Tra từng tên trên CRM, chỉ đọc, không sửa gì">Tra Retailer ID</button>
+        <button class="btn btn--ghost" type="button" data-act="lookup-diag" ${ready && hasCookie && !ui.busy ? '' : 'disabled'} title="Chỉ tra tên đầu tiên và cho biết CRM trả về gì">Kiểm tra tìm kiếm</button>
+        <button class="btn btn--ghost" type="button" data-act="lookup-copy" ${l.results.length ? '' : 'disabled'} title="Chép cột Retailer ID theo đúng thứ tự tên, dán vào cột A của Google Sheet">Chép cột Retailer ID</button>
+      </div>
+      ${ready && !hasCookie ? html`<p class="muted">Cần nhập cookie CRM ở trên trước.</p>` : ''}
+    </form>
+    <p class="muted">Tra bằng tìm kiếm chung của CRM, chỉ đọc. Dòng nào không tìm thấy hoặc có nhiều kết quả thì cột Retailer ID để trống khi chép, để bạn kiểm tra tay.</p>
+    ${l.results.length ? html`
+      <div class="table-wrap"><table>
+        <thead><tr><th>Tên gian hàng</th><th>Retailer ID</th><th>Kết quả</th><th>Ghi chú</th></tr></thead>
+        <tbody>${l.results.map((r) => html`<tr><td>${r.name}</td><td class="num">${r.retailer || (r.candidates.length ? r.candidates.join(' / ') : '—')}</td><td>${badge(tone[r.status] ?? 'warn', label[r.status] ?? r.status)}</td><td>${r.note}</td></tr>`)}</tbody>
+      </table></div>` : ''}
+    ${l.diag ? html`
+      <h4 class="section-title">Kiểm tra tìm kiếm: ${l.diag.info.name}</h4>
+      <p class="muted">Kết quả: ${l.diag.result.note}. Đường dẫn: <small style="word-break:break-all">${l.diag.info.url}</small></p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Module</th><th>ID bản ghi</th><th>Tên khớp</th><th>Nội dung dòng</th></tr></thead>
+        <tbody>${l.diag.info.rows.length ? l.diag.info.rows.map((r) => html`<tr><td>${r.module || '—'}</td><td class="num">${r.crmid || '—'}</td><td>${r.ten_khop ? badge('good', 'Khớp') : badge('warn', 'Không')}</td><td>${r.text}</td></tr>`) : html`<tr><td colspan="4">CRM không trả dòng kết quả nào</td></tr>`}</tbody>
+      </table></div>
+      ${l.diag.info.details.length ? html`<p class="muted">Đã mở chi tiết hợp đồng: ${l.diag.info.details.map((d) => `${d.crmid} → ${Object.entries(d.fields).map(([k, v]) => `${k}=${v}`).join(', ') || 'không có ô Retailer ID/tên gian hàng'}`).join(' · ')}</p>` : ''}` : ''}
+  </section>`;
+};
+const lookupSection = (ui) => html`${serverCard(ui.status, ui.serverError)}${cookieCard(ui.status, { ...CRM_COOKIE, isSet: ui.status?.cookieSet, at: ui.status?.cookieAt })}${lookupCard(ui)}`;
+
+const atcSection = (ui) => html`${serverCard(ui.status, ui.serverError)}${cookieCard(ui.status, { ...CRM_COOKIE, isSet: ui.status?.cookieSet, at: ui.status?.cookieAt })}${atcCard(ui)}`;
+
 /** Chỉ Admin được vào Cấu hình, Đồng bộ CRM và Xuất Call; Quản trị chỉ thấy Tài khoản. */
-export const ADMIN_ONLY = ['links', 'crm', 'call', 'audit', 'visits'];
+export const ADMIN_ONLY = ['links', 'crm', 'call', 'atc', 'assign', 'lookup', 'audit', 'visits'];
 
 /* ---------- Nhật ký thao tác (Admin) ---------- */
-const ACTION_TONE = (a) => (/^Xóa|^Tắt/.test(a) ? 'bad' : /^Thêm|^Bật|^Chạy|^Đồng bộ|^Xuất/.test(a) ? 'good' : /cookie/i.test(a) ? 'warn' : 'neutral');
+const ACTION_TONE = (a) => (/^Xóa|^Tắt|^Hủy/.test(a) ? 'bad' : /^Chuyển/.test(a) ? 'warn' : /^Thêm|^Bật|^Chạy|^Đồng bộ|^Xuất/.test(a) ? 'good' : /cookie/i.test(a) ? 'warn' : 'neutral');
 const auditSection = (ui) => {
   const a = ui.audit, opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   const actions = [...new Set(a.rows.map((r) => r.action))].sort(), people = [...new Set(a.rows.map((r) => r.by))].sort();
@@ -339,7 +463,7 @@ const visitsSection = (ui) => {
       <p class="muted">${stats.inactive.map((a) => a.name || a.email).join(' · ')}</p>` : ''}`;
 };
 
-const BODY = { accounts: accountsSection, links: linksSection, crm: crmSection, call: callSection, audit: auditSection, visits: visitsSection };
+const BODY = { accounts: accountsSection, links: linksSection, crm: crmSection, call: callSection, atc: atcSection, assign: assignSection, lookup: lookupSection, audit: auditSection, visits: visitsSection };
 
 export const settingsView = (ui) => html`
   <div class="toolbar">

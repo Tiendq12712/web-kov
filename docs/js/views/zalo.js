@@ -10,7 +10,7 @@ const tag = (ok, yesText, noText) => html`<span class="badge badge--${ok ? 'good
 /** Các dòng của bảng "Từng retailer" (vẽ riêng để ô tìm kiếm chỉ vẽ lại thân bảng, giữ con trỏ gõ). */
 const zaloRows = (shown, names) => {
   const jobName = (x) => (x.job ? (names.get(x.code) ?? /^\d+\s*-\s*([^-]+)/.exec(x.job.handler)?.[1]?.trim() ?? x.job.handler) : '—');
-  return html`${shown.map((x) => html`<tr><td class="num">${x.retailer}</td><td>${x.name}</td><td>${x.date || '—'}</td><td>${tag(x.accepted, 'Đồng ý', 'Chưa đồng ý')}</td><td>${tag(x.replied, 'Có phản hồi', 'Không phản hồi')}</td>
+  return html`${shown.map((x) => html`<tr><td class="num">${x.retailer}</td><td>${x.name}</td><td>${x.date || '—'}</td><td>${x.last || '—'}</td><td>${tag(x.accepted, 'Đồng ý', 'Chưa đồng ý')}</td><td>${tag(x.replied, 'Có phản hồi', 'Không phản hồi')}</td>
         <td>${jobName(x)}</td><td>${x.job ? (x.product || '—') : '—'}</td><td>${x.job ? x.source : html`<span class="muted">Không có trong data</span>`}</td><td>${x.job?.status ?? '—'}</td><td>${x.job?.contact || '—'}</td>
         <td>${x.job ? (x.job.impact ? html`<span class="badge badge--good">Có</span>` : html`<span class="badge badge--bad">Không</span>`) : '—'}</td><td>${x.note}</td></tr>`)}`;
 };
@@ -28,29 +28,31 @@ const dur = (s) => {
 };
 const dmyShort = (iso) => iso.split('-').reverse().slice(0, 2).join('/');
 
+const SHOW_TOTAL = false;   // tạm ẩn Tổng cuộc gọi và Tỉ lệ kết nối (chưa thống kê được tổng cuộc gọi); đổi thành true để hiện lại
+
 /** Báo cáo cuộc gọi hotline: tổng cuộc gọi, kết nối thành công, tỉ lệ, thời gian đàm thoại (tổng, trung bình). */
 function hotlineView(hotline) {
   if (!hotline?.calls.length) return '';
   const h = hotlineStats(hotline), a = h.all;
   const tone = a.rate == null ? '' : a.rate >= 0.9 ? 'good' : a.rate >= 0.8 ? 'warn' : 'bad';
-  const row = (label, b, strong = false) => html`<tr class="static ${strong ? 'avg-row' : ''}"><td class="sticky-col"><strong>${label}</strong></td><td class="right num">${b.total == null ? '—' : num(b.total)}</td><td class="right num">${num(b.conn)}</td><td class="right num">${pct(b.rate, 1)}</td><td class="right num">${dur(b.talk)}</td><td class="right num">${dur(b.avg)}</td></tr>`;
+  const row = (label, b, strong = false) => html`<tr class="static ${strong ? 'avg-row' : ''}"><td class="sticky-col"><strong>${label}</strong></td>${SHOW_TOTAL ? html`<td class="right num">${b.total == null ? '—' : num(b.total)}</td>` : ''}<td class="right num">${num(b.conn)}</td>${SHOW_TOTAL ? html`<td class="right num">${pct(b.rate, 1)}</td>` : ''}<td class="right num">${dur(b.talk)}</td><td class="right num">${dur(b.avg)}</td></tr>`;
   return html`
     <div class="toolbar"><h2 class="section-title">Cuộc gọi hotline</h2>
-      <p class="muted">Từ ${dmyShort(h.byDay[0].day)} đến ${dmyShort(h.byDay.at(-1).day)}. Tổng cuộc gọi lấy từ bảng "Tổng cuộc gọi" trong tab hotline; kết nối thành công là các cuộc có đàm thoại. Thời gian trung bình tính trên cuộc kết nối thành công.</p></div>
-    ${h.inconsistent.length ? html`<p class="notice">Tổng cuộc gọi của ${h.inconsistent.join(', ')} nhỏ hơn số cuộc kết nối trong danh sách; hãy kiểm tra lại bảng tổng.</p>` : ''}
+      <p class="muted">Từ ${dmyShort(h.byDay[0].day)} đến ${dmyShort(h.byDay.at(-1).day)}. Kết nối thành công là các cuộc có đàm thoại. Thời gian trung bình tính trên cuộc kết nối thành công.</p></div>
+    ${SHOW_TOTAL && h.inconsistent.length ? html`<p class="notice">Tổng cuộc gọi của ${h.inconsistent.join(', ')} nhỏ hơn số cuộc kết nối trong danh sách; hãy kiểm tra lại bảng tổng.</p>` : ''}
     <div class="grid grid--stats">
-      ${stat('Tổng cuộc gọi', a.total == null ? '—' : num(a.total), a.total == null ? 'Chưa đủ tổng cuộc gọi của các khu vực' : h.byRegion.map((r) => `${r.region} ${num(r.total)}`).join(' · '))}
+      ${SHOW_TOTAL ? stat('Tổng cuộc gọi', a.total == null ? '—' : num(a.total), a.total == null ? 'Chưa đủ tổng cuộc gọi của các khu vực' : h.byRegion.map((r) => `${r.region} ${num(r.total)}`).join(' · ')) : ''}
       ${stat('Kết nối thành công', num(a.conn), h.nets.map((x) => `${x.net} ${num(x.n)}`).join(' · '))}
-      ${stat('Tỉ lệ kết nối', pct(a.rate, 1), a.total == null ? '—' : `${num(a.conn)} / ${num(a.total)} cuộc gọi`, tone)}
+      ${SHOW_TOTAL ? stat('Tỉ lệ kết nối', pct(a.rate, 1), a.total == null ? '—' : `${num(a.conn)} / ${num(a.total)} cuộc gọi`, tone) : ''}
       ${stat('Tổng thời gian đàm thoại', dur(a.talk), 'giờ:phút:giây')}
       ${stat('Trung bình đàm thoại', dur(a.avg), 'phút:giây mỗi cuộc kết nối')}
     </div>
-    <div class="table-wrap"><table class="connect-table">
-      <thead><tr><th scope="col" class="sticky-col">Khu vực</th><th scope="col" class="right">Tổng cuộc gọi</th><th scope="col" class="right">Kết nối thành công</th><th scope="col" class="right">Tỉ lệ kết nối</th><th scope="col" class="right">Tổng đàm thoại</th><th scope="col" class="right">Trung bình</th></tr></thead>
+    <div class="table-wrap" data-no-export><table class="connect-table">
+      <thead><tr><th scope="col" class="sticky-col">Khu vực</th>${SHOW_TOTAL ? html`<th scope="col" class="right">Tổng cuộc gọi</th>` : ''}<th scope="col" class="right">Kết nối thành công</th>${SHOW_TOTAL ? html`<th scope="col" class="right">Tỉ lệ kết nối</th>` : ''}<th scope="col" class="right">Tổng đàm thoại</th><th scope="col" class="right">Trung bình</th></tr></thead>
       <tbody>${h.byRegion.map((r) => row(r.region, r))}</tbody><tfoot>${row('Tất cả', a, true)}</tfoot>
     </table></div>
-    ${chartCard('Cuộc kết nối thành công theo ngày', groupedColumns({ categories: h.byDay.map((d) => dmyShort(d.day)), series: [{ name: 'Cuộc kết nối', cls: 's2', values: h.byDay.map((d) => d.conn) }], ratio: false, values: true, format: (v) => String(Math.round(v)) }), 'Chỉ có số cuộc kết nối theo ngày; tổng cuộc gọi trong Sheet chỉ ghi theo khu vực.')}
-    <div class="table-wrap"><table class="connect-table">
+    ${chartCard('Cuộc kết nối thành công theo ngày', groupedColumns({ categories: h.byDay.map((d) => dmyShort(d.day)), series: [{ name: 'Cuộc kết nối', cls: 's2', values: h.byDay.map((d) => d.conn) }], ratio: false, values: true, format: (v) => String(Math.round(v)) }), 'Chỉ có số cuộc kết nối theo ngày.')}
+    <div class="table-wrap" data-no-export><table class="connect-table">
       <thead><tr><th scope="col" class="sticky-col">Ngày</th><th scope="col" class="right">Kết nối thành công</th><th scope="col" class="right">Tổng đàm thoại</th><th scope="col" class="right">Trung bình</th></tr></thead>
       <tbody>${[...h.byDay].reverse().map((d) => html`<tr class="static"><td class="sticky-col"><strong>${dmyShort(d.day)}</strong></td><td class="right num">${num(d.conn)}</td><td class="right num">${dur(d.talk)}</td><td class="right num">${dur(d.avg)}</td></tr>`)}</tbody>
     </table></div>`;
@@ -100,14 +102,19 @@ export function zaloView({ zalo, detail }, { names = new Map(), manager = true, 
       ${chartCard('4. % Impact của từng nhóm', groupedColumns({ categories: short, series: [{ name: '% Impact = ca có impact / ca đã làm của chính nhóm đó', cls: 's2', values: leaves.map((x) => x.impactRate ?? 0) }], values: true, valueFormat: (v) => pct(v), line: TARGET, lineLabel: 'Mục tiêu trên 50%' }), 'Mỗi cột là tỷ lệ impact bên trong nhóm đó (không phải tỷ trọng của nhóm), nên các cột không cộng lại thành 100%. Vạch ngang là mục tiêu trên 50%.')}
     </div>
     <h3 class="section-title">Zalo có giúp tăng impact không?</h3>
-    <div class="table-wrap"><table class="data-table zalo-tree"><thead><tr><th>Nhóm</th><th class="right">Retailer</th><th class="right">Đã làm</th><th class="right">Kết nối thành công</th><th class="right">Có impact (trong ca đã làm)</th><th class="right">% Impact (có impact / đã làm)</th></tr></thead>
+    <div class="table-wrap" data-no-export><table class="data-table zalo-tree"><thead><tr><th>Nhóm</th><th class="right">Retailer</th><th class="right">Đã làm</th><th class="right">Kết nối thành công</th><th class="right">Có impact (trong ca đã làm)</th><th class="right">% Impact (có impact / đã làm)</th></tr></thead>
       <tbody>${a.groups.map((x) => html`<tr class="${x.key === 'all' ? 'z-all' : x.key.startsWith('acc') ? (x.leaf ? 'z-acc-leaf z-leaf' : 'z-acc') : (x.leaf ? 'z-noacc-leaf z-leaf' : 'z-noacc')}"><td style="padding-left:${12 + x.level * 22}px">${x.level === 2 ? '↳ ' : ''}${x.level === 1 ? html`<span class="badge badge--${x.key === 'acc' ? 'good' : 'warn'}">${x.label}</span>` : html`<strong>${x.label}</strong>`}</td><td class="right num">${num(x.n)}</td><td class="right num">${num(x.done)}</td><td class="right num">${num(x.conn)}</td><td class="right num">${num(x.impactDone)}</td><td class="right num">${x.done ? html`<span class="badge badge--${tone(x.impactRate) || 'warn'}">${pct(x.impactRate)}</span> <small class="muted">(${num(x.impactDone)}/${num(x.done)})</small>` : '—'}</td></tr>`)}</tbody></table></div>
     <p class="muted">Cách đọc: nhóm xanh là khách đồng ý kết bạn, nhóm cam là khách chưa đồng ý; nhãn % xanh khi đạt mục tiêu trên 50%, cam từ 40%, đỏ thấp hơn. Khách <strong>đồng ý kết bạn</strong> có ${pct(acc.impactRate)} ca đã làm có impact, khách <strong>chưa đồng ý</strong> là ${pct(noacc.impactRate)}. Hai nhóm phản hồi bên trong mỗi tình trạng cộng lại bằng đúng nhóm cha của nó. Số retailer còn ít (${num(all.n)}), cần thêm dữ liệu trước khi kết luận.</p>
+    <h3 class="section-title">Theo nguồn data</h3>
+    <p class="muted">Mỗi dòng là một nguồn data của ca mới nhất của retailer (ca chưa gán nguồn thuộc loại công việc T15 tính là T15). "Không có trong data" là retailer chưa thấy trong data nhân sự nên chưa có tình trạng xử lý và impact.</p>
+    <div class="table-wrap" data-no-export><table class="data-table"><thead><tr><th>Nguồn data</th><th class="right">Khách kết nối Zalo</th><th class="right">Đồng ý kết bạn</th><th class="right">Chưa đồng ý</th><th class="right">Có phản hồi</th><th class="right">Không phản hồi</th><th class="right">Đã làm</th><th class="right">Kết nối thành công</th><th class="right">Có impact</th><th class="right">% Impact</th></tr></thead>
+      <tbody>${a.sources.map((x) => html`<tr><td><strong>${x.source}</strong></td><td class="right num">${num(x.n)}</td><td class="right num">${num(x.accepted)}</td><td class="right num">${num(x.n - x.accepted)}</td><td class="right num">${num(x.replied)}</td><td class="right num">${num(x.n - x.replied)}</td><td class="right num">${num(x.done)}</td><td class="right num">${num(x.conn)}</td><td class="right num">${num(x.impactDone)}</td><td class="right num">${x.done ? html`<span class="badge badge--${tone(x.impactRate) || 'warn'}">${pct(x.impactRate)}</span>` : '—'}</td></tr>`)}</tbody>
+      <tfoot><tr class="static avg-row"><td><strong>Tất cả</strong></td><td class="right num">${num(all.n)}</td><td class="right num">${num(acc.n)}</td><td class="right num">${num(noacc.n)}</td><td class="right num">${num(repN)}</td><td class="right num">${num(all.n - repN)}</td><td class="right num">${num(all.done)}</td><td class="right num">${num(all.conn)}</td><td class="right num">${num(all.impactDone)}</td><td class="right num">${all.done ? pct(all.impactRate) : '—'}</td></tr></tfoot></table></div>
     ${manager ? html`<h3 class="section-title">Theo nhân sự</h3>
-    <div class="table-wrap"><table class="data-table"><thead><tr><th>Nhân sự</th><th class="right">Retailer</th><th class="right">Đồng ý kết bạn</th><th class="right">Có phản hồi</th><th class="right">Đã làm</th><th class="right">Có impact</th><th class="right">% Impact</th></tr></thead>
+    <div class="table-wrap" data-no-export><table class="data-table"><thead><tr><th>Nhân sự</th><th class="right">Retailer</th><th class="right">Đồng ý kết bạn</th><th class="right">Có phản hồi</th><th class="right">Đã làm</th><th class="right">Có impact</th><th class="right">% Impact</th></tr></thead>
       <tbody>${a.people.map((p) => html`<tr><td>${nm(p)} <small class="muted">${p.code}</small></td><td class="right num">${num(p.n)}</td><td class="right num">${num(p.accepted)}</td><td class="right num">${num(p.replied)}</td><td class="right num">${num(p.done)}</td><td class="right num">${num(p.impact)}</td><td class="right num">${pct(p.impactRate)}</td></tr>`)}</tbody></table></div>` : ''}
     <h3 class="section-title">Từng retailer</h3>
     ${filterBar}
-    <div class="table-wrap"><table class="data-table"><thead><tr><th>Retailer ID</th><th>Gian hàng</th><th>Ngày kết bạn</th><th>Kết nối Zalo</th><th>Phản hồi</th><th>Nhân sự</th><th>Product</th><th>Nguồn data</th><th>Xử lý</th><th>Liên hệ</th><th>Impact</th><th>Ghi chú</th></tr></thead>
+    <div class="table-wrap" data-no-export><table class="data-table"><thead><tr><th>Retailer ID</th><th>Gian hàng</th><th>Ngày kết bạn</th><th>Nhắn gần nhất</th><th>Kết nối Zalo</th><th>Phản hồi</th><th>Nhân sự</th><th>Product</th><th>Nguồn data</th><th>Xử lý</th><th>Liên hệ</th><th>Impact</th><th>Ghi chú</th></tr></thead>
       <tbody id="zalo-rows">${zaloRows(a.shown, names)}</tbody></table></div>`;
 }

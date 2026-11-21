@@ -362,6 +362,8 @@ await test('Theo loại công việc: nhóm T15/OI, ngành hàng, tỉ lệ khô
   const mk = (job, product, contact, o = {}) => ({ month: '2026-10', jobType: job, product, status: 'Đã làm', contact, impact: false, handler: '1001 - An - CS', tasks: [], add: [], ...o });
   const rows = [mk('CSKH T15 - DVKH', 'Fnb', 'Kết nối thành công', { impact: true, tasks: ['Tư vấn tính năng'] }), mk('CSKH T15 - DVKH', 'FnB', 'Không nghe máy'), mk('CSKH T15 - DVKH', 'FnB', ''), mk('CSKH T15 - DVKH', 'Retail', 'Không nghe máy'), mk('CSKH OI - DVKH', 'FnB', 'Kết nối thành công'), mk('CSKH T15 - DVKH', 'FnB', 'Không nghe máy', { status: 'Hủy' })];
   eq(jt.jobKey('CSKH T15 - DVKH'), 'T15'); eq(jt.industryOf('Fnb'), 'FnB'); eq(jt.industryOf(''), 'Chưa phân loại');
+  { const im = jt.impactByMonth([{ month: '2026-10', status: 'Đã làm', impact: true, jobType: 'CSKH T15 - DVKH' }, { month: '2026-10', status: 'Đã làm', impact: false, jobType: 'CSKH T15 - DVKH' }, { month: '2026-11', status: 'Đã làm', impact: true, jobType: 'CSKH OI - DVKH' }], ['2026-10', '2026-11']); eq([im.all[0].impactRate, im.all[1].impactRate, im.list.find((x) => x.job === 'T15').cells[1]], [0.5, 1, null], 'impact qua từng tháng'); }
+  { const un = jt.unassignedStats([{ month: '2026-11', handler: 'Chăm sóc khách hàng SC Miền Nam', status: 'Chưa làm', jobType: 'CSKH T15 - DVKH', created: '2026-11-12 08:00' }, { month: '2026-11', handler: 'Chăm sóc khách hàng SC Miền Bắc', status: 'Chưa làm', jobType: 'CSKH OI - DVKH', created: '2026-11-13 08:00' }, { month: '2026-11', handler: '8455 - Quyên - CS', status: 'Chưa làm', jobType: 'CSKH T15 - DVKH', created: '2026-11-13' }, { month: '2026-11', handler: 'Chăm sóc khách hàng SC Miền Nam', status: 'Đã làm', jobType: 'CSKH T15 - DVKH', created: '2026-11-12' }], '2026-11'); eq([un.total.n, un.byPool.map((x) => [x.pool, x.n]), un.byDay.length], [2, [['Miền Nam', 1], ['Miền Bắc', 1]], 2], 'data chưa chia theo nhóm và loại công việc'); }
   const a = jt.analyzeJobTypes(rows, { month: '2026-10', product: 'FnB', job: 'T15' });
   const t15 = a.byJob.find((j) => j.job === 'T15');
   eq([t15.n, t15.contacted, t15.noAnswer, t15.cancel], [4, 2, 1, 1], 'T15 FnB: 4 data (kể cả 1 hủy), 2 đã liên hệ, 1 không nghe máy; data hủy không tính liên hệ');
@@ -467,6 +469,22 @@ await test('Google Sheets báo 429 (vượt hạn mức đọc): tự chờ rồ
     calls = 0; window.fetch = async () => (++calls < 2 ? new Response('', { status: 429 }) : new Response(JSON.stringify({ values: [['z']] }), { status: 200 }));
     eq(await sh.fetchRows('abc123', 't', { tab: 'T' }), [['z']], 'fetchRows cũng thử lại');
   } finally { window.fetch = realFetch; sh.RETRY_429.splice(0, sh.RETRY_429.length, ...saved); }
+});
+await test('Cầu nối dữ liệu (proxyUrl): đọc bảng/tab qua Apps Script, không gọi Sheets API; lỗi quyền và tab thiếu được báo đúng', async () => {
+  const sh = await import(`${root}js/sheet.js`), st = await import(`${root}js/sheetTable.js`), cfg = (await import(`${root}js/config.js`)).CONFIG;
+  const realFetch = window.fetch, saved = cfg.proxyUrl, seen = [];
+  cfg.proxyUrl = 'https://script.example/exec';
+  const reply = (obj) => { window.fetch = async (url, init) => { seen.push([url, JSON.parse(init.body)]); return new Response(JSON.stringify(obj), { status: 200 }); }; };
+  try {
+    reply({ ok: true, values: [['a', 'b'], ['', '']] });
+    eq(await st.readTable({ url: 'https://docs.google.com/spreadsheets/d/abc123/edit', tab: 'T', columns: ['x', 'y'], token: 'tk' }), [['a', 'b']], 'readTable qua cầu nối');
+    eq([seen[0][0], seen[0][1].op, seen[0][1].sheet, seen[0][1].range, seen[0][1].token], ['https://script.example/exec', 'rows', 'abc123', 'T!A2:B500', 'tk'], 'gửi đúng yêu cầu');
+    reply({ ok: true, tabs: ['T10', 'T11'] }); eq(await sh.fetchTabs('abc123', 'tk'), ['T10', 'T11'], 'fetchTabs');
+    reply({ ok: false, code: 'norange', error: 'x' }); eq(await st.readTable({ url: 'abc123', tab: 'T', columns: ['x'], token: 'tk' }), [], 'tab chưa có → bảng rỗng');
+    let e1 = null; try { await sh.fetchRows('abc123', 'tk', { tab: 'T' }); } catch (e) { e1 = e; } eq(e1.message.includes('Không tìm thấy tab'), true, 'fetchRows báo thiếu tab');
+    reply({ ok: false, code: 'forbidden', error: 'chưa có trong danh sách' }); let e2 = null; try { await sh.fetchRows('abc123', 'tk', { tab: 'T' }); } catch (e) { e2 = e; } eq(e2.code, 'forbidden', 'lỗi quyền');
+    reply({ ok: false, code: 'auth', error: 'x' }); let e3 = null; try { await sh.fetchTabs('abc123', 'tk'); } catch (e) { e3 = e; } eq(e3.code, 'auth', 'token hết hạn');
+  } finally { window.fetch = realFetch; cfg.proxyUrl = saved; }
 });
 await test('Điểm Add-on thực đạt: Payment/Kship/HDDT trừ phần không đạt khỏi Add-on và KPI', async () => {
   const as = await import(`${root}js/addonScore.js`), fx = await import(`${root}tests/fixtures.js`);
@@ -660,16 +678,16 @@ await test('Đăng nhập: nhận ra token thiếu quyền xem Google Sheets (ng
 
 await test('Zalo: đọc Sheet và đối chiếu retailer ID với data nhân sự, tính impact', async () => {
   const z = await import(`${root}js/zalo.js`), zv = await import(`${root}js/views/zalo.js`);
-  const sheet = [['Retailer ID', 'Tên GH', 'SĐT', 'Tình trạng kết nối', 'TÌnh trạng phản hồi', 'Ngày kết bạn zalo', 'Ghi chú'], ['1', 'A', '', 'Đồng ý kết bạn', 'Có phản hồi', '6/11', ''], ['2', 'B', '', 'Chưa đồng ý kết bạn', 'Không phản hồi', '7/11', ''], ['3', 'C', '', 'Đồng ý kết bạn', 'Không phản hồi', '7/11', ''], ['1', 'A lặp', '', 'Đồng ý kết bạn', 'Có phản hồi', '8/11', ''], ['', 'trống', '', '', '', '', '']];
+  const sheet = [['Retailer ID', 'Tên GH', 'SĐT', 'Tình trạng kết nối', 'TÌnh trạng phản hồi', 'Ngày kết bạn zalo', 'Lần nhắn gần nhất', 'Ghi chú'], ['1', 'A', '', 'Đồng ý kết bạn', 'Có phản hồi', '6/11', '9/11', ''], ['2', 'B', '', 'Chưa đồng ý kết bạn', 'Không phản hồi', '7/11', ''], ['3', 'C', '', 'Đồng ý kết bạn', 'Không phản hồi', '7/11', ''], ['1', 'A lặp', '', 'Đồng ý kết bạn', 'Có phản hồi', '8/11', ''], ['', 'trống', '', '', '', '', '']];
   const zalo = z.parseZalo([sheet, [['Cột khác']]]);
-  eq(zalo.length, 3, 'bỏ dòng trùng, dòng trống và tab không phải bảng Zalo'); eq(zalo.map((x) => [x.accepted, x.replied]), [[true, true], [false, false], [true, false]], 'nhận Đồng ý / Chưa đồng ý và có / không phản hồi');
+  eq(zalo.length, 3, 'bỏ dòng trùng, dòng trống và tab không phải bảng Zalo'); eq(zalo.map((x) => [x.accepted, x.replied]), [[true, true], [false, false], [true, false]], 'nhận Đồng ý / Chưa đồng ý và có / không phản hồi'); eq(zalo[0].last, '9/11', 'đọc cột Lần nhắn gần nhất');
   const job = (retailer, handler, status, impact, ts) => ({ retailer, handler, status, contact: 'Kết nối thành công', impact, source: 'OI', createdTs: ts });
   const detail = [job('1', '8455 - Quyên - CS', 'Đã làm', true, 1), job('1', '8455 - Quyên - CS', 'Đã làm', false, 5), job('2', '8474 - Lợi - CS', 'Đã làm', false, 2)];
   const a = z.analyzeZalo(zalo, detail);
   eq(a.items[0].job.impact, false, 'lấy ca mới nhất của retailer'); eq(a.missing.map((x) => x.retailer), ['3'], 'retailer không có trong data');
   const g = Object.fromEntries(a.groups.map((x) => [x.key, x]));
   eq([g.all.n, g.all.found, g.all.done, g.all.impact], [3, 2, 2, 0], 'tổng nhóm'); eq(g.acc.n, 2, 'nhóm đồng ý kết bạn');
-  eq(a.people.map((p) => [p.code, p.n]), [['8455', 1], ['8474', 1]], 'thống kê theo nhân sự');
+  eq(a.people.map((p) => [p.code, p.n]), [['8455', 1], ['8474', 1]], 'thống kê theo nhân sự'); eq(a.sources.map((x) => [x.source, x.n, x.done]), [['OI', 2, 2], ['Không có trong data', 1, 0]], 'thống kê theo nguồn data');
   eq([z.sourceOf({ source: '(Chưa gán nguồn)', jobType: 'CSKH T15 - DVKH' }), z.sourceOf({ source: '(Chưa gán nguồn)', jobType: 'CSKH OI - DVKH' }), z.sourceOf({ source: 'NA', jobType: 'CSKH T15 - DVKH' })], ['T15', '(Chưa gán nguồn)', 'NA'], 'chưa gán nguồn + loại công việc T15 → nguồn T15');
   const f1 = z.analyzeZalo(zalo, detail, { accept: 'yes' }), f2 = z.analyzeZalo(zalo, detail, { person: '8455' }), f3 = z.analyzeZalo(zalo, detail, { impact: 'yes' });
   eq([f1.shown.length, f1.total, f2.shown.map((x) => x.retailer), f3.shown.length, f1.groups[0].n], [2, 3, ['1'], 0, 3], 'bộ lọc Zalo chỉ lọc bảng từng retailer, thống kê vẫn tính đủ');

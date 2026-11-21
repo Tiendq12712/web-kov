@@ -52,3 +52,26 @@ export function analyzeJobTypes(rows, { month = 'all', product = 'all', code = n
   const byPerson = [...people.values()].map((p) => ({ code: p.code, name: p.name, ...metrics(p.rows) })).sort((a, b) => (b.noAnswerRate ?? 0) - (a.noAnswerRate ?? 0) || b.contacted - a.contacted);
   return { total, byJob, matrix, industries, jobs, sel, tasks, doneSel: doneSel.length, byPerson, months: [...new Set(rows.map((r) => r.month).filter(Boolean))].sort(), allIndustries: industries, nSum: sum(byJob.map((j) => j.n)) };
 }
+
+/** Impact qua từng tháng: cả đội và từng loại công việc (impact = data có "KH SC tác động" / data đã làm của tháng đó). */
+export function impactByMonth(rows, months, code = '') {
+  const per = months.map((m) => rows.filter((r) => r.month === m && (!code || codeOf(r.handler) === code)));
+  const all = per.map((rs) => metrics(rs));
+  const jobs = [...new Set(per.flat().map((r) => jobKey(r.jobType)))].sort((a, b) => sum(per.map((rs) => rs.filter((r) => jobKey(r.jobType) === b).length)) - sum(per.map((rs) => rs.filter((r) => jobKey(r.jobType) === a).length)));
+  const list = jobs.map((job) => ({ job, cells: per.map((rs) => { const x = rs.filter((r) => jobKey(r.jobType) === job); return x.length ? metrics(x) : null; }) }));
+  return { months, all, list };
+}
+
+const POOLS = [['Miền Nam', /Miền Nam/i], ['Miền Bắc', /Miền Bắc/i]];
+/** Data chưa chia: người xử lý còn là nhóm "Chăm sóc khách hàng SC Miền Nam / Miền Bắc" (chưa có mã nhân sự), chưa làm xong. Theo nhóm × loại công việc và theo ngày tạo. */
+export function unassignedStats(rows, month) {
+  const open = rows.filter((r) => (!month || r.month === month) && !codeOf(r.handler ?? '') && /Chăm sóc khách hàng/i.test(r.handler ?? '') && (r.status === 'Chưa làm' || r.status === 'Đang làm'));
+  const poolOf = (r) => POOLS.find(([, re]) => re.test(r.handler))?.[0] ?? 'Khác';
+  const jobs = [...new Set(open.map((r) => jobKey(r.jobType)))].sort((a, b) => open.filter((r) => jobKey(r.jobType) === b).length - open.filter((r) => jobKey(r.jobType) === a).length);
+  const pools = [...POOLS.map(([n]) => n), ...(open.some((r) => poolOf(r) === 'Khác') ? ['Khác'] : [])];
+  const count = (list) => ({ n: list.length, byJob: Object.fromEntries(jobs.map((j) => [j, list.filter((r) => jobKey(r.jobType) === j).length])) });
+  const byPool = pools.map((pool) => ({ pool, ...count(open.filter((r) => poolOf(r) === pool)) }));
+  const days = [...new Set(open.map((r) => String(r.created ?? '').slice(0, 10)).filter(Boolean))].sort();
+  const byDay = days.map((day) => { const l = open.filter((r) => String(r.created ?? '').slice(0, 10) === day); return { day, ...count(l), byPool: Object.fromEntries(pools.map((pl) => [pl, l.filter((r) => poolOf(r) === pl).length])) }; });
+  return { jobs, pools, total: { ...count(open) }, byPool, byDay };
+}

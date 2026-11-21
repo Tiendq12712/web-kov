@@ -1,11 +1,13 @@
 import { CONFIG } from './config.js';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
-const SCOPE = 'openid email https://www.googleapis.com/auth/spreadsheets.readonly';
+const SHEETS_SCOPE = 'openid email https://www.googleapis.com/auth/spreadsheets.readonly';
+/** Có cầu nối dữ liệu (CONFIG.proxyUrl) thì đăng nhập chỉ xin email; không có thì xin thêm quyền đọc Google Sheets như trước. */
+const baseScope = () => (CONFIG.proxyUrl ? 'openid email' : SHEETS_SCOPE);
 const WRITE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const READ_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 /** Google cho người dùng bỏ tích từng quyền ở màn hình cấp quyền: token trả về có thể thiếu quyền xem Google Sheets. */
-export const hasSheetsScope = (res) => { if (!res?.scope) return true; const granted = String(res.scope).split(/\s+/); return granted.includes(READ_SCOPE) || granted.includes(WRITE_SCOPE); };   // không có thông tin quyền thì không chặn
+export const hasSheetsScope = (res) => { if (CONFIG.proxyUrl || !res?.scope) return true; const granted = String(res.scope).split(/\s+/); return granted.includes(READ_SCOPE) || granted.includes(WRITE_SCOPE); };   // không có thông tin quyền thì không chặn
 const CONSENT_FLAG = 'kpi.consent';   // lần đăng nhập trước thiếu quyền Sheets: nhớ qua cả lần tải lại trang (Ctrl+F5) cho tới khi cấp đủ quyền
 const readConsent = () => { try { return localStorage.getItem(CONSENT_FLAG) === '1'; } catch { return false; } };
 const rememberConsent = (on) => { try { on ? localStorage.setItem(CONSENT_FLAG, '1') : localStorage.removeItem(CONSENT_FLAG); } catch {} };
@@ -69,7 +71,7 @@ const requestToken = (override = {}) => new Promise((resolve, reject) => {
   cancelPending = (err) => finish(reject, err);
   tokenClient ??= google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.clientId,
-    scope: SCOPE,
+    scope: baseScope(),
     hd: CONFIG.allowedDomain,          // gợi ý Google chỉ hiện tài khoản của tên miền này
     callback: () => {},
   });
@@ -100,7 +102,7 @@ export async function signIn({ resume = false, silent = false } = {}) {
   await loadGis();
   const remembered = resume ? getRemembered() : null;
   const write = wantsWrite();
-  const scope = write ? `${SCOPE} ${WRITE_SCOPE}` : SCOPE;
+  const scope = write ? `${baseScope()} ${WRITE_SCOPE}` : baseScope();
   const request = forceConsent
     ? { prompt: 'consent', login_hint: remembered?.email, scope }
     : remembered
@@ -132,7 +134,7 @@ export async function signIn({ resume = false, silent = false } = {}) {
 export async function getWriteToken() {
   if (session?.write && session.expiresAt - EXPIRY_MARGIN_MS > Date.now()) return session.token;
   await loadGis();
-  const { access_token: token, expires_in: seconds } = await requestToken({ scope: `${SCOPE} ${WRITE_SCOPE}`, login_hint: session?.email });
+  const { access_token: token, expires_in: seconds } = await requestToken({ scope: `${baseScope()} ${WRITE_SCOPE}`, login_hint: session?.email });
   rememberWrite(true);
   if (session) writeSession({ ...session, token, write: true, expiresAt: Date.now() + seconds * 1000 });   // không có phiên thì không ghi phiên rỗng
   return token;

@@ -1,6 +1,6 @@
 import { html } from '../dom.js';
 import { num, pct } from '../format.js';
-import { analyzeJobTypes } from '../jobType.js';
+import { analyzeJobTypes, impactByMonth } from '../jobType.js';
 import { taskTrend } from '../tasks.js';
 import { lineChart, chartCard } from './charts.js';
 
@@ -41,6 +41,31 @@ function trendSection(data, ui, names) {
       <thead><tr><th scope="col" class="sticky-col">Công việc hỗ trợ</th>${t.months.map((m) => html`<th scope="col" class="right">${mlabel(m)}</th>`)}<th scope="col" class="right">So tháng trước</th></tr></thead>
       <tbody>${t.list.map((x) => html`<tr class="static"><td class="sticky-col"><strong>${x.task}</strong></td>${x.cells.map((c) => html`<td class="right num">${cell(c)}${c ? html` <small class="muted">${num(c.n)}</small>` : ''}</td>`)}<td class="right">${delta(x)}</td></tr>`)}</tbody>
       <tfoot><tr class="static avg-row"><td class="sticky-col"><strong>Data đã làm · % có ghi công việc</strong></td>${t.done.map((d, i) => html`<td class="right num">${num(d)} <small class="muted">${p1(t.withTaskRate[i])}</small></td>`)}<td></td></tr></tfoot>
+    </table></div>`;
+}
+
+/** Impact qua từng tháng: bảng cả đội + từng loại công việc, kèm đường xu hướng. */
+function impactMonthSection(data) {
+  const t = impactByMonth(data.rows, data.months);
+  if (t.months.length < 1) return '';
+  const last = t.months.length - 1;
+  const delta = (cells) => {
+    const v = cells.map((c) => c?.impactRate).filter((x) => x != null);
+    if (v.length < 2) return html`<span class="muted">—</span>`;
+    const d = (v.at(-1) - v.at(-2)) * 100;
+    return html`<span class="badge badge--${Math.abs(d) < 0.5 ? 'warn' : d > 0 ? 'good' : 'bad'}">${d > 0 ? '▲' : d < 0 ? '▼' : '■'} ${Math.abs(d).toFixed(1)} đ</span>`;
+  };
+  const cell = (c) => (c && c.done ? html`${p1(c.impactRate)} <small class="muted">${num(c.impact)}/${num(c.done)}</small>` : html`<span class="muted">—</span>`);
+  const series = [{ name: 'Cả đội', cls: 's1', values: t.all.map((c) => c.impactRate ?? 0) }, ...t.list.filter((x) => x.cells.filter((c) => c?.done).length >= 2).slice(0, 2).map((x, i) => ({ name: `CSKH ${x.job}`, cls: `s${i + 2}`, values: x.cells.map((c) => c?.impactRate ?? 0) }))];
+  const chart = t.months.length > 1 ? chartCard('Tỉ lệ impact qua từng tháng', lineChart({ labels: t.months.map(mlabel), format: (v) => pct(v, 0), series })) : '';
+  return html`
+    <div class="toolbar"><h2 class="section-title">Impact qua từng tháng</h2>
+      <p class="muted">Tỉ lệ impact = data có "KH SC tác động" / data đã làm của tháng đó (theo tháng tạo data, không phụ thuộc bộ lọc ở trên). Tháng mới nhất (${mlabel(t.months[last])}) chưa đủ ngày nên chỉ là tạm tính; impact của data mới có thể được ghi nhận bổ sung sau.</p></div>
+    ${chart}
+    <div class="table-wrap"><table class="connect-table">
+      <thead><tr><th scope="col" class="sticky-col">Loại công việc</th>${t.months.map((m) => html`<th scope="col" class="right">${mlabel(m)}</th>`)}<th scope="col" class="right">So tháng trước</th></tr></thead>
+      <tbody>${t.list.map((x) => html`<tr class="static"><td class="sticky-col"><strong>CSKH ${x.job}</strong></td>${x.cells.map((c) => html`<td class="right num">${cell(c)}</td>`)}<td class="right">${delta(x.cells)}</td></tr>`)}</tbody>
+      <tfoot><tr class="static avg-row"><td class="sticky-col"><strong>Cả đội</strong></td>${t.all.map((c) => html`<td class="right num">${cell(c)}</td>`)}<td class="right">${delta(t.all)}</td></tr></tfoot>
     </table></div>`;
 }
 
@@ -93,5 +118,6 @@ export function jobTypeView(data, ui, { names }) {
       <thead><tr><th scope="col" class="sticky-col">Nhân sự</th>${HEAD}</tr></thead>
       <tbody>${a.byPerson.map((p) => row(nm(p), p))}</tbody>
     </table></div>` : ''}
+    ${impactMonthSection(data)}
     ${trendSection(data, ui, names)}`;
 }

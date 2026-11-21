@@ -7,7 +7,7 @@ import { sheetId } from './sheet.js';
 import { getWriteToken } from './auth.js';
 import { checkAccess } from './access.js';
 import { recordSyncTime } from './syncTime.js';
-import { crmServer, callServer, loadTasks, mutateTasks, loadCallConfig, saveCallConfig, splitAgents, resolveRange } from './crm.js';
+import { crmServer, callServer, atcServer, loadTasks, mutateTasks, loadCallConfig, saveCallConfig, splitAgents, resolveRange } from './crm.js';
 import { loadAccounts, addAccount, updateAccount, removeAccount, loadLinks, addLink, updateLink, removeLink } from './directory.js';
 import { settingsView } from './views/settings.js';
 
@@ -30,6 +30,9 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     visits: { rows: [], loaded: false, loading: false, error: '', enabled: false, writing: visitsEnabled(), who: 'all' },
     alert: null, job: null, editing: null, error: '', busy: false, loaded: false, loading: false, me: null, months: [],
     call: { gsheet_url: '', tab_name: '', agents: '', cuser: '', date_mode: 'month_to_yesterday', date_from: '', date_to: '' },
+    atc: { ids: '', reason: 'khu vực không có SC', results: [], dry: true, checkedKey: '' },
+    lookup: { names: '', results: [], diag: null },
+    assign: { retailers: '', to: '', includeDone: false, results: [], dry: true, checkedKey: '', diag: [], diagRetailer: '', owners: null, directory: null },
   });
   const ui = initial();
   let timer = null;
@@ -181,8 +184,65 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
     date_mode: form.elements.date_mode.value, date_from: form.elements.date_from.value, date_to: form.elements.date_to.value,
   });
 
+  /** Hủy ATC: chạy thử (dry) hoặc hủy thật; hủy thật chỉ chạy khi đã chạy thử đúng danh sách và lý do. */
+  function atcRun(form, dry) {
+    if (!form) return;
+    const ids = form.elements.ids.value.split(/[\s,;]+/).filter(Boolean), reason = form.elements.reason.value.trim();
+    Object.assign(ui.atc, { ids: form.elements.ids.value, reason });
+    if (!ids.length) return fail('Hãy nhập mã ATC');
+    if (reason.length < 3) return fail('Hãy nhập lý do hủy (ít nhất 3 ký tự)');
+    const key = `${ids.join(',')}|${reason}`;
+    if (!dry) {
+      if (ui.atc.checkedKey !== key) return fail('Hãy bấm "Chạy thử" với đúng danh sách và lý do này trước khi hủy thật.');
+      if (!window.confirm(`Hủy thật ${ids.length} ATC trên CRM?\nLý do: ${reason}\nThao tác này ghi lên CRM.`)) return;
+    }
+    return run(async () => {
+      const out = await atcServer.cancel({ ids, reason, dry_run: dry, confirm: !dry });
+      Object.assign(ui.atc, { results: out.results, dry: out.dryRun, checkedKey: dry && out.results.some((r) => r.ok) ? key : '' });
+      const okN = out.results.filter((r) => r.ok).length;
+      note(dry ? 'Chạy thử hủy ATC' : 'Hủy ATC', 'CRM', `${okN}/${out.results.length} ATC · lý do: ${reason}`);
+    });
+  }
+
+  /** Chuyển người xử lý: chạy thử hoặc chuyển thật; chuyển thật chỉ chạy khi đã chạy thử đúng danh sách, người nhận và tùy chọn. */
+  function assignRun(form, dry) {
+    if (!form) return;
+    const retailers = form.elements.retailers.value.split(/[\s,;]+/).filter(Boolean), to = form.elements.to.value.trim(), includeDone = form.elements.include_done.checked;
+    Object.assign(ui.assign, { retailers: form.elements.retailers.value, to, includeDone });
+    if (!retailers.length) return fail('Hãy nhập danh sách Retailer ID');
+    if (to.length < 2) return fail('Hãy nhập người nhận (ID CRM kèm tiền tố, ví dụ id:12147)');
+    const key = `${retailers.join(',')}|${to}|${includeDone}`;
+    if (!dry) {
+      if (ui.assign.checkedKey !== key) return fail('Hãy bấm "Chạy thử" với đúng danh sách, người nhận và tùy chọn này trước khi chuyển thật.');
+      if (!window.confirm(`Chuyển người xử lý của ${retailers.length} Retailer ID sang "${to}" trên CRM?\nThao tác này ghi lên CRM.`)) return;
+    }
+    return run(async () => {
+      const out = await atcServer.assign({ retailers, to, include_done: includeDone, dry_run: dry, confirm: !dry });
+      Object.assign(ui.assign, { results: out.results, dry: out.dryRun, checkedKey: dry && out.results.some((r) => r.ok && !r.skip) ? key : '' });
+      const okN = out.results.filter((r) => r.ok).length;
+      note(dry ? 'Chạy thử chuyển người xử lý' : 'Chuyển người xử lý', 'CRM', `${okN}/${out.results.length} ATC · sang ${to}`);
+    });
+  }
+
+  /** Tra Retailer ID từ tên gian hàng. */
+  function lookupRun(form) {
+    if (!form) return;
+    const names = form.elements.names.value.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+    ui.lookup.names = form.elements.names.value;
+    if (!names.length) return fail('Hãy nhập tên gian hàng');
+    return run(async () => {
+      const out = await atcServer.lookup({ names });
+      Object.assign(ui.lookup, { results: out.results, diag: null });
+      note('Tra Retailer ID từ tên gian hàng', 'CRM', `${out.results.filter((r) => r.status === 'ok').length}/${out.results.length} tên tìm thấy`);
+    });
+  }
+
   const FORMS = {
     cookie: (form) => run(async () => { await crmServer.setCookie(form.elements.cookie.value); await refreshStatus(); note('Đặt cookie CRM', 'CRM'); }),
+
+    atc: (form) => atcRun(form, true),
+    assign: (form) => assignRun(form, true),
+    lookup: (form) => lookupRun(form),
 
     'call-cookie': (form) => run(async () => { await callServer.setCookie(form.elements.cookie.value); await refreshStatus(); note('Đặt cookie xuất call', 'Xuất call'); }),
 
@@ -254,7 +314,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
   const remove = (message, action) => (key) => { if (confirm(message(key))) run(action(key)); };
 
   const ACTIONS = {
-    section: (key) => { if (['links', 'crm', 'call', 'audit', 'visits'].includes(key) && getMe()?.role !== 'admin') return; Object.assign(ui, { section: key, editing: null, error: '' }); if (key === 'audit' && !ui.audit.loaded) reloadAudit(); if (key === 'visits') { ui.visits.enabled = hasVisits(); ui.visits.writing = visitsEnabled(); if (ui.visits.enabled && !ui.visits.loaded) reloadVisits(); } rerender(); },
+    section: (key) => { if (['links', 'crm', 'call', 'atc', 'assign', 'lookup', 'audit', 'visits'].includes(key) && getMe()?.role !== 'admin') return; Object.assign(ui, { section: key, editing: null, error: '' }); if (key === 'audit' && !ui.audit.loaded) reloadAudit(); if (key === 'visits') { ui.visits.enabled = hasVisits(); ui.visits.writing = visitsEnabled(); if (ui.visits.enabled && !ui.visits.loaded) reloadVisits(); } rerender(); },
     'audit-reload': () => reloadAudit(),
     'visits-reload': () => reloadVisits(),
     'alert-close': () => { ui.alert = null; rerender({ keep: true }); },
@@ -308,6 +368,30 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
       resumeJob(jobId, 'crm');
       await refreshStatus();
     }),
+    'assign-diag': () => {
+      const form = document.querySelector('form[data-sform="assign"]');
+      const first = form?.elements.retailers.value.split(/[\s,;]+/).filter(Boolean)[0];
+      Object.assign(ui.assign, { retailers: form?.elements.retailers.value ?? '', to: form?.elements.to.value.trim() ?? '', includeDone: Boolean(form?.elements.include_done.checked) });
+      if (!first) return fail('Hãy nhập ít nhất một Retailer ID để kiểm tra');
+      return run(async () => {
+        const out = await atcServer.assign({ retailers: [first], diagnose: true });
+        Object.assign(ui.assign, { diag: out.diagnose, diagRetailer: out.retailer, owners: out.owners, directory: out.directory });
+        note('Kiểm tra tìm ATC theo Retailer ID', 'CRM', `${out.diagnose.filter((d) => d.dong).length}/${out.diagnose.length} cách tìm ra kết quả`);
+      });
+    },
+    'lookup-diag': () => {
+      const form = document.querySelector('form[data-sform="lookup"]');
+      const first = form?.elements.names.value.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean)[0];
+      ui.lookup.names = form?.elements.names.value ?? '';
+      if (!first) return fail('Hãy nhập ít nhất một tên gian hàng để kiểm tra');
+      return run(async () => { const out = await atcServer.lookup({ names: [first], diagnose: true }); ui.lookup.diag = out.diagnose; note('Kiểm tra tra Retailer ID theo tên', 'CRM', first); });
+    },
+    'lookup-copy': async () => {
+      const text = ui.lookup.results.map((r) => r.retailer || '').join('\n');
+      try { await navigator.clipboard.writeText(text); note('Chép cột Retailer ID', 'CRM', `${ui.lookup.results.length} dòng`); } catch { fail('Không chép được vào bộ nhớ tạm; hãy bôi đen cột Retailer ID trong bảng rồi chép.'); }
+    },
+    'assign-run': () => assignRun(document.querySelector('form[data-sform="assign"]'), false),
+    'atc-cancel': () => atcRun(document.querySelector('form[data-sform="atc"]'), false),
     'crm-stop': () => { if (ui.job) crmServer.stop(ui.job.id).catch((err) => fail(err.message)); },
   };
 
@@ -316,7 +400,7 @@ export function createSettings({ getMe, getMonths, rerender, onAuthExpired, onLi
 
   // Cookie có thể vừa được tiện ích Chrome gửi vào: quay lại trang thì đọc lại trạng thái.
   window.addEventListener('focus', async () => {
-    if (!ui.loaded || ui.busy || !['crm', 'call'].includes(ui.section)) return;
+    if (!ui.loaded || ui.busy || !['crm', 'call', 'atc', 'assign', 'lookup'].includes(ui.section)) return;
     await refreshStatus();
     rerender({ keep: true });   // đừng xóa chữ đang gõ dở khi cửa sổ lấy lại tiêu điểm
   });

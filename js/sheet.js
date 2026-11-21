@@ -1,3 +1,4 @@
+import { CONFIG } from './config.js';
 
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DAY_SECONDS = 86400;
@@ -121,8 +122,26 @@ async function fetchWithin(url, init, ms) {
   }
 }
 
+/** Cầu nối Apps Script (CONFIG.proxyUrl): nhân viên không cần quyền Google Sheet, script đọc hộ rồi trả dữ liệu. */
+export const proxyOn = () => Boolean(CONFIG.proxyUrl);
+export async function proxyCall(token, op, params, timeout = 180_000) {
+  let res;
+  try { res = await fetchWithin(CONFIG.proxyUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ token, op, ...params }) }, timeout); }
+  catch (err) { throw Object.assign(new Error(`Không kết nối được máy chủ dữ liệu báo cáo (${err.message})`), { code: 'proxy' }); }
+  let body;
+  try { body = await res.json(); } catch { throw Object.assign(new Error('Máy chủ dữ liệu báo cáo trả về kết quả không hợp lệ'), { code: 'proxy' }); }
+  if (body.ok) return body;
+  if (body.code === 'auth') throw Object.assign(new Error('Phiên đăng nhập đã hết hạn'), { code: 'auth' });
+  if (body.code === 'forbidden') throw Object.assign(new Error(body.error || 'Tài khoản của bạn chưa được cấp quyền xem báo cáo này'), { code: 'forbidden' });
+  throw Object.assign(new Error(body.error || 'Máy chủ dữ liệu báo cáo báo lỗi'), { code: body.code || 'proxy' });
+}
+
 /** Đọc một tab. `render`: UNFORMATTED_VALUE (số thô) hoặc FORMATTED_VALUE (chuỗi như đang hiển thị). */
 export async function fetchRows(urlOrId, token, { tab, range: area = 'A1:AZ1000', render = 'UNFORMATTED_VALUE', timeout = 60_000 } = {}) {
+  if (proxyOn()) {
+    try { return (await proxyCall(token, 'rows', { sheet: sheetId(urlOrId), range: `${tab}!${area}`, render }, timeout)).values ?? []; }
+    catch (err) { throw err.code === 'norange' ? new Error(`Không tìm thấy tab "${tab}" trong Google Sheet`) : err; }
+  }
   const range = encodeURIComponent(`${tab}!${area}`);
   const res = await fetchWithin(`${API}/${sheetId(urlOrId)}/values/${range}?valueRenderOption=${render}`, { headers: { Authorization: `Bearer ${token}` } }, timeout);
   if (res.status === 401) throw Object.assign(new Error('Phiên đăng nhập đã hết hạn'), { code: 'auth' });
@@ -137,6 +156,7 @@ export async function fetchRows(urlOrId, token, { tab, range: area = 'A1:AZ1000'
 
 /** Tên các tab đang hiển thị của một Google Sheet. */
 export async function fetchTabs(urlOrId, token) {
+  if (proxyOn()) return (await proxyCall(token, 'tabs', { sheet: sheetId(urlOrId) }, 60_000)).tabs ?? [];
   const res = await fetchWithin(`${API}/${sheetId(urlOrId)}?fields=sheets.properties(title,hidden)`, { headers: { Authorization: `Bearer ${token}` } }, 60_000);
   if (res.status === 401) throw Object.assign(new Error('Phiên đăng nhập đã hết hạn'), { code: 'auth' });
   if (res.status === 403 || res.status === 404) throw Object.assign(new Error('Tài khoản của bạn chưa được cấp quyền xem Google Sheet này'), { code: 'forbidden' });

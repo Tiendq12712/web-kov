@@ -165,7 +165,7 @@ let exportSeq = 0;
 export function decorateTables(root) {
   for (const wrap of root.querySelectorAll('.table-wrap')) {
     const table = wrap.querySelector('table');
-    if (!table || table.rows.length < 3) continue;
+    if (!table || table.rows.length < 3 || wrap.closest('[data-no-export]')) continue;   // data-no-export: bảng không cần nút Xuất
     wrap.dataset.exportId ??= String(++exportSeq);
     const id = wrap.dataset.exportId;
     if (document.querySelector(`.export-bar[data-for="${id}"]`)) continue;

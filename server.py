@@ -52,6 +52,28 @@ except Exception as exc:  # thiếu thư mục tool hoặc thư viện
     crm_error = f'{type(exc).__name__}: {exc}'
 
 
+# --- Hủy ATC (huy_atc.py nằm cạnh tool CRM; thiếu thì mục Hủy ATC báo chưa sẵn sàng) ---------------
+huy = None
+huy_error = ''
+try:
+    import huy_atc as huy  # noqa: E402
+except Exception as exc:
+    huy_error = f'{type(exc).__name__}: {exc}'
+assign = None
+assign_error = ''
+try:
+    import atc_assign as assign  # noqa: E402  (chuyển người xử lý theo Retailer ID)
+except Exception as exc:
+    assign_error = f'{type(exc).__name__}: {exc}'
+lookup = None
+lookup_error = ''
+try:
+    import retailer_lookup as lookup  # noqa: E402  (tra Retailer ID từ tên gian hàng)
+except Exception as exc:  # noqa: BLE001
+    lookup_error = f'{type(exc).__name__}: {exc}'
+ATC_LOCK = threading.Lock()
+
+
 class State:
     """Trạng thái dùng chung giữa các request (cookie + công việc đang chạy)."""
 
@@ -343,7 +365,7 @@ def job_status(job, since):
 def api_status(_payload):
     return {
         'ready': crm is not None, 'error': crm_error,
-        'cookieSet': bool(state.cookie), 'callCookieSet': bool(state.call_cookie), 'cookieAt': state.cookie_at, 'callCookieAt': state.call_cookie_at, 'serviceAccount': service_account_email(),
+        'atcReady': huy is not None, 'assignReady': assign is not None, 'lookupReady': lookup is not None, 'cookieSet': bool(state.cookie), 'callCookieSet': bool(state.call_cookie), 'cookieAt': state.cookie_at, 'callCookieAt': state.call_cookie_at, 'serviceAccount': service_account_email(),
         'running': bool(state.job and not state.job.finished),
         'jobId': state.job.id if state.job else None,
     }
@@ -378,6 +400,104 @@ def api_run(payload):
     if not tasks:
         raise ValueError('Chưa chọn tác vụ nào để chạy.')
     return {'jobId': start_job(tasks).id}
+
+
+def api_cancel_atc(payload):
+    """Hủy ATC trên CRM bằng cookie đã nhập. Mặc định chỉ chạy thử (không ghi); hủy thật cần confirm=True."""
+    if huy is None:
+        raise RuntimeError(f'Chưa nạp được huy_atc.py ({huy_error}). Chép file vào thư mục tool CRM rồi chạy lại máy chủ.')
+    if not state.cookie:
+        raise RuntimeError('Chưa nhập cookie CRM.')
+    ids = []
+    for raw in payload.get('ids', []):
+        atc = huy.chuan_hoa_atc_id(str(raw)[:300])
+        if not atc:
+            raise ValueError(f'Mã ATC không hợp lệ: {str(raw)[:40]!r}')
+        if atc not in ids:
+            ids.append(atc)
+    if not ids:
+        raise ValueError('Chưa nhập mã ATC.')
+    if len(ids) > 50:
+        raise ValueError('Mỗi lần tối đa 50 ATC.')
+    reason = re.sub(r'\s+', ' ', str(payload.get('reason', ''))).strip()
+    if not 3 <= len(reason) <= 200:
+        raise ValueError('Lý do hủy cần từ 3 đến 200 ký tự.')
+    dry_run = payload.get('dry_run') is not False or payload.get('confirm') is not True
+    if not ATC_LOCK.acquire(blocking=False):
+        raise RuntimeError('Đang xử lý một lượt hủy ATC khác, hãy chờ.')
+    try:
+        results = huy.huy_nhieu_atc(ids, ly_do=reason, cookie_str=state.cookie, dry_run=dry_run, cho_phep_lam_moi_cookie=False)
+    finally:
+        ATC_LOCK.release()
+    return {'dryRun': dry_run, 'reason': reason, 'results': results}
+
+
+def api_assign_atc(payload):
+    """Chuyển người xử lý của ATC theo danh sách Retailer ID. Mặc định chỉ chạy thử; chuyển thật cần dry_run=False và confirm=True."""
+    if assign is None:
+        raise RuntimeError(f'Chưa nạp được atc_assign.py ({assign_error}). Chép file vào thư mục tool CRM rồi chạy lại máy chủ.')
+    if not state.cookie:
+        raise RuntimeError('Chưa nhập cookie CRM.')
+    retailers = []
+    for raw in payload.get('retailers', []):
+        rid = re.sub(r'\D', '', str(raw)[:40])
+        if not 6 <= len(rid) <= 12:
+            raise ValueError(f'Retailer ID không hợp lệ: {str(raw)[:30]!r} (cần 6 đến 12 chữ số)')
+        if rid not in retailers:
+            retailers.append(rid)
+    if not retailers:
+        raise ValueError('Chưa nhập Retailer ID.')
+    if payload.get('diagnose'):   # kiểm tra việc tìm ATC theo Retailer ID đầu tiên, không sửa gì trên CRM
+        if not ATC_LOCK.acquire(blocking=False):
+            raise RuntimeError('Đang xử lý một lượt khác (hủy hoặc chuyển ATC), hãy chờ.')
+        try:
+            report = assign.chan_doan(retailers[0], state.cookie)
+            return {'diagnose': report['search'], 'owners': report['owners'], 'directory': report['directory'], 'retailer': retailers[0]}
+        finally:
+            ATC_LOCK.release()
+    if len(retailers) > 30:
+        raise ValueError('Mỗi lần tối đa 30 Retailer ID.')
+    target = re.sub(r'\s+', ' ', str(payload.get('to', ''))).strip()
+    if not 2 <= len(target) <= 120:
+        raise ValueError('Hãy nhập người nhận (ID CRM kèm tiền tố, ví dụ id:12147).')
+    dry_run = payload.get('dry_run') is not False or payload.get('confirm') is not True
+    if not ATC_LOCK.acquire(blocking=False):
+        raise RuntimeError('Đang xử lý một lượt khác (hủy hoặc chuyển ATC), hãy chờ.')
+    try:
+        results = assign.chuyen_nguoi_xu_ly(retailers, target, state.cookie, dry_run=dry_run, bao_gom_da_lam=bool(payload.get('include_done')))
+    finally:
+        ATC_LOCK.release()
+    return {'dryRun': dry_run, 'to': target, 'results': results}
+
+
+def api_retailer_lookup(payload):
+    """Tra Retailer ID từ tên gian hàng (chỉ đọc CRM). diagnose=True: chỉ tra tên đầu tiên và trả về những gì CRM trả về."""
+    if lookup is None:
+        raise RuntimeError(f'Chưa nạp được retailer_lookup.py ({lookup_error}). Chép file vào thư mục tool CRM rồi chạy lại máy chủ.')
+    if not state.cookie:
+        raise RuntimeError('Chưa nhập cookie CRM.')
+    names = []
+    for raw in payload.get('names', []):
+        name = re.sub(r'\s+', '', str(raw))[:80]
+        if not name:
+            continue
+        if not re.fullmatch(r'[\w.-]{2,80}', name):
+            raise ValueError(f'Tên gian hàng không hợp lệ: {str(raw)[:40]!r}')
+        names.append(name)
+    if not names:
+        raise ValueError('Chưa nhập tên gian hàng.')
+    if not ATC_LOCK.acquire(blocking=False):
+        raise RuntimeError('Đang xử lý một lượt khác, hãy chờ.')
+    try:
+        if payload.get('diagnose'):
+            return {'diagnose': lookup.chan_doan(names[0], state.cookie)}
+        if len(names) > 60:
+            raise ValueError('Mỗi lần tối đa 60 tên gian hàng.')
+        return {'results': lookup.tra_retailer(names, state.cookie)}
+    except PermissionError as exc:
+        raise RuntimeError(str(exc)) from exc
+    finally:
+        ATC_LOCK.release()
 
 
 COOKIE_NAME = re.compile(r'^[\w.-]+=[^;\s]+(;\s*[\w.-]+=[^;\s]*)*;?$')
@@ -429,6 +549,9 @@ ROUTES = {
     ('POST', '/api/crm/cookie'): api_set_cookie,
     ('DELETE', '/api/crm/cookie'): api_clear_cookie,
     ('POST', '/api/crm/run'): api_run,
+    ('POST', '/api/crm/atc-cancel'): api_cancel_atc,
+    ('POST', '/api/crm/atc-assign'): api_assign_atc,
+    ('POST', '/api/crm/retailer-lookup'): api_retailer_lookup,
 }
 
 

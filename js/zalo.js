@@ -10,7 +10,7 @@ export function parseZalo(sets) {
   for (const rows of sets) {
     const head = (rows[0] ?? []).map(plain);
     const at = (...names) => head.findIndex((h) => names.some((n) => h.startsWith(n)));
-    const col = { retailer: at('retailer'), name: at('ten gh', 'ten gian'), phone: at('sdt'), connect: at('tinh trang ket noi'), reply: at('tinh trang phan hoi'), date: at('ngay ket ban'), note: at('ghi chu') };
+    const col = { retailer: at('retailer'), name: at('ten gh', 'ten gian'), phone: at('sdt'), connect: at('tinh trang ket noi'), reply: at('tinh trang phan hoi'), date: at('ngay ket ban'), last: at('lan nhan gan nhat', 'ngay nhan gan nhat', 'nhan gan nhat'), note: at('ghi chu') };
     if (col.retailer < 0 || col.connect < 0) continue;
     const get = (r, i) => (i >= 0 ? String(r[i] ?? '').trim() : '');
     for (const r of rows.slice(1)) {
@@ -18,7 +18,7 @@ export function parseZalo(sets) {
       if (!/^\d+$/.test(retailer) || seen.has(retailer)) continue;
       seen.add(retailer);
       const connect = get(r, col.connect), reply = get(r, col.reply);
-      out.push({ retailer, name: get(r, col.name), phone: get(r, col.phone), connect, reply, date: get(r, col.date), note: get(r, col.note), accepted: plain(connect).startsWith('dong y'), replied: plain(reply) === 'co phan hoi' });
+      out.push({ retailer, name: get(r, col.name), phone: get(r, col.phone), connect, reply, date: get(r, col.date), last: get(r, col.last), note: get(r, col.note), accepted: plain(connect).startsWith('dong y'), replied: plain(reply) === 'co phan hoi' });
     }
   }
   return out;
@@ -112,5 +112,10 @@ export function analyzeZalo(zalo, detail, f = {}) {
     const mine = items.filter((x) => x.code === code);
     return { code, name: /^\d+\s*-\s*([^-]+)/.exec(mine[0].job.handler)?.[1]?.trim() ?? code, accepted: mine.filter((x) => x.accepted).length, replied: mine.filter((x) => x.replied).length, ...group(mine) };
   }).sort((a, b) => b.n - a.n);
-  return { items, shown, groups, people, options, total: every.length, missing: items.filter((x) => !x.job) };
+  const srcName = (x) => (x.job ? x.source || '(Chưa gán nguồn)' : 'Không có trong data');
+  const sources = [...new Set(items.map(srcName))].map((source) => {
+    const mine = items.filter((x) => srcName(x) === source);
+    return { source, accepted: mine.filter((x) => x.accepted).length, replied: mine.filter((x) => x.replied).length, ...group(mine) };
+  }).sort((a, b) => b.n - a.n);
+  return { items, shown, groups, people, sources, options, total: every.length, missing: items.filter((x) => !x.job) };
 }

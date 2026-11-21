@@ -1,5 +1,5 @@
 import { getToken, getWriteToken } from './auth.js';
-import { sheetId, RETRY_429, sleep } from './sheet.js';
+import { sheetId, RETRY_429, sleep, proxyOn, proxyCall } from './sheet.js';
 
 /** Bảng nhỏ lưu trong một tab Google Sheet: dòng 1 là tiêu đề, dữ liệu từ dòng 2. */
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -28,6 +28,12 @@ async function call(url, token, options = {}) {
 /** Đọc các dòng dữ liệu; tab chưa tồn tại thì trả về danh sách rỗng. */
 export async function readTable({ url, tab, columns, token = getToken(), maxRows = MAX_ROWS }) {
   const area = `A2:${lastColumn(columns)}${maxRows}`;
+  if (proxyOn()) {
+    let values;
+    try { values = (await proxyCall(token, 'rows', { sheet: sheetId(url), range: `${tab}!${area}`, render: 'FORMATTED_VALUE' }, 90_000)).values ?? []; }
+    catch (err) { if (err.code === 'norange') return []; throw err; }
+    return values.filter((row) => row.some((cell) => String(cell).trim())).map((row) => columns.map((_, i) => String(row[i] ?? '')));
+  }
   const res = await call(`${API}/${sheetId(url)}/values/${rangeOf(tab, area)}?valueRenderOption=FORMATTED_VALUE`, token);
   if (res.status === 400) return [];
   if (res.status === 429) throw new Error('Google Sheets đang giới hạn số lần đọc (quá nhiều yêu cầu trong 1 phút). Đợi khoảng 1 phút rồi tải lại trang.');

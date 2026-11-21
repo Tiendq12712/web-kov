@@ -7,6 +7,7 @@ import { contactDonut, sourceDonut } from './donuts.js';
 import { taskStats } from '../tasks.js';
 import { taskChart } from './tasks.js';
 import { suggestDivide } from '../divide.js';
+import { unassignedStats } from '../jobType.js';
 
 /** Các bảng ma trận (nhân sự × ngày) có thể chuyển qua lại. */
 const MATRICES = {
@@ -235,6 +236,28 @@ function divideTable(work, rows) {
 }
 
 
+/** Data chưa chia (còn nằm ở nhóm CSKH SC Miền Nam / Miền Bắc), tách theo loại công việc (T15, OI, NA…) và theo ngày tạo. */
+function unassignedTable(industry) {
+  if (!industry?.rows) return html`<div class="toolbar"><h2 class="section-title">Data chưa chia</h2></div><p class="muted">${industry === undefined ? 'Chưa có dữ liệu chi tiết (tab "Data Txx").' : 'Đang tải dữ liệu chi tiết…'}</p>`;
+  const u = unassignedStats(industry.rows, industry.month);
+  const head = (first) => html`<th scope="col" class="sticky-col">${first}</th>${u.jobs.map((j) => html`<th scope="col" class="right">${j}</th>`)}<th scope="col" class="right">Tổng</th>`;
+  const cells = (c) => html`${u.jobs.map((j) => html`<td class="right num">${num(c.byJob[j])}</td>`)}<td class="right num strong">${num(c.n)}</td>`;
+  return html`
+    <div class="toolbar"><h2 class="section-title">Data chưa chia</h2>
+      <p class="muted">Data tháng đang xem còn nằm ở nhóm "Chăm sóc khách hàng SC Miền Nam / Miền Bắc" (chưa giao cho nhân sự) và chưa làm xong, tách theo loại công việc của data.</p></div>
+    ${u.total.n ? html`
+    <div class="table-wrap"><table class="divide-table">
+      <thead><tr>${head('Nhóm')}</tr></thead>
+      <tbody>${u.byPool.map((p) => html`<tr class="static"><td class="sticky-col"><strong>CSKH SC ${p.pool}</strong></td>${cells(p)}</tr>`)}</tbody>
+      <tfoot><tr><td class="sticky-col"><strong>Tổng</strong></td>${cells(u.total)}</tr></tfoot>
+    </table></div>
+    <h3 class="section-title">Theo ngày tạo data</h3>
+    <div class="table-wrap"><table class="divide-table">
+      <thead><tr><th scope="col" class="sticky-col">Ngày tạo</th>${u.pools.map((p) => html`<th scope="col" class="right">${p}</th>`)}${u.jobs.map((j) => html`<th scope="col" class="right">${j}</th>`)}<th scope="col" class="right">Tổng</th></tr></thead>
+      <tbody>${u.byDay.map((d) => html`<tr class="static"><td class="sticky-col"><strong>${d.day.slice(8, 10)}/${d.day.slice(5, 7)}</strong></td>${u.pools.map((p) => html`<td class="right num">${num(d.byPool[p])}</td>`)}${cells(d)}</tr>`)}</tbody>
+    </table></div>` : html`<p class="muted">Không có data nào đang nằm ở nhóm chưa chia.</p>`}`;
+}
+
 /* ---------- Gợi ý chia data ---------- */
 const REGIONS = ['Miền Nam', 'Miền Bắc'];   // nhóm 1 / nhóm 2 của bảng nhân sự đầu tab KPI (Sài Gòn / Hà Nội)
 const whole = (v) => Math.max(0, Math.floor(Number(String(v).replace(/[^\d]/g, '')) || 0));
@@ -326,6 +349,7 @@ export function workView(work, ui, people, teams, industry, manager = false) {
     </div>
     ${cards(rows, work)}
     ${divideTable(work, rows)}
+    ${ui.team === 'all' ? unassignedTable(industry) : ''}
     <div class="charts">
       ${work.contact ? chartCard('Tình trạng kết nối', contactDonut(work.contact), 'Kết quả cuộc gọi của data đã làm, gộp các nhóm CSKH.') : ''}
       ${work.dataBySource ? chartCard('Nguồn data (T15 · NA · OI)', sourceDonut(work), 'Số data được chia theo nhóm CSKH từ đầu tháng.') : ''}
