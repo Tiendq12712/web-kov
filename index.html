@@ -16,7 +16,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="css/styles.css">
   <script>
-    try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; if (t === 'xmas') document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#a4161a'); } catch {}
+    try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
   </script>
   <script type="module" src="js/main.js"></script>
   <script>
@@ -71,7 +71,6 @@
     <button id="reload-data" class="menu__item" type="button" role="menuitem" title="Đọc lại dữ liệu từ Google Sheet (bỏ bản đã lưu trong trình duyệt)" hidden>🔄 Làm mới dữ liệu</button>
     <button id="help" class="menu__item" type="button" role="menuitem">❓ Hướng dẫn sử dụng</button>
     <button id="theme" class="menu__item" type="button" role="menuitem">◐ Giao diện sáng / tối</button>
-    <button id="xmas" class="menu__item" type="button" role="menuitem" aria-pressed="false">🎄 Giao diện Giáng sinh</button>
     <button id="logout" class="menu__item menu__item--danger" type="button" role="menuitem" hidden>⎋ Đăng xuất</button>
   </div>
   <aside id="coach" aria-live="polite"></aside>
