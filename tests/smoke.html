@@ -184,6 +184,7 @@ await test('Việc cần làm: nhân sự talktime thấp và lỗi Kiểm soát
 
 await test('Thiết lập: hết phiên đăng nhập thì lần mở sau vẫn tải lại được (không kẹt "Đang tải thiết lập")', async () => {
   const { createSettings } = await import(`${root}js/settingsController.js`);
+  (await import(`${root}js/config.js`)).CONFIG.proxyUrl = '';
   const realFetch = window.fetch; let sheetCalls = 0, expired = 0;
   window.fetch = async (url) => String(url).includes('sheets.googleapis.com') ? (sheetCalls++, new Response('{}', { status: 401 })) : new Response('{}', { status: 200 });
   try {
@@ -388,6 +389,7 @@ await test('Nghe lại call: chọn data kết nối nhưng không impact và x�
 // 4. Cả ứng dụng với phiên đăng nhập giả và Google Sheets giả (dữ liệu bịa): mở lần lượt các tab, không được có lỗi chạy.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const { bootApp } = await import(`${root}tests/app-harness.js`), { CONFIG: CFG } = await import(`${root}js/config.js`);
+CFG.proxyUrl = ''; // các bài kiểm tra dưới đây giả lập Google Sheets trực tiếp; cầu nối có bài riêng
 await test('Ứng dụng (Admin): khởi động và mở mọi tab không lỗi', async () => {
   const app = await bootApp({ root, email: 'admin@kiotviet.com', configId: CFG.configSheet });
   try {

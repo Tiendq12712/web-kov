@@ -47,7 +47,7 @@ export async function bootApp({ root, email, configId, api = null, forbid = fals
   localStorage.setItem('kpi.session', JSON.stringify({ token: 'fake', email, date: todayIso, write: true, expiresAt: Date.now() + 3_600_000 }));
   localStorage.setItem('kpi.write', '1');
   const html = await (await fetch(`${root}index.html`, { cache: 'no-store' })).text();
-  const patched = html.replace('<head>', `<head><base href="${root}"><script>${forbid ? 'window.__forbid = true;' : ''}${api ? `window.__api = ${JSON.stringify(api)};` : ''}${preamble(buildFixtures(configId, email), email)}<\/script>`);
+  const patched = html.replace('<head>', `<head><base href="${root}"><script>window.__noProxy = true;${forbid ? 'window.__forbid = true;' : ''}${api ? `window.__api = ${JSON.stringify(api)};` : ''}${preamble(buildFixtures(configId, email), email)}<\/script>`);
   const frame = document.createElement('iframe');
   frame.style.cssText = 'width:1200px;height:800px;position:fixed;left:-3000px;top:0';
   frame.srcdoc = patched;

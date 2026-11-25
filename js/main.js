@@ -585,11 +585,29 @@ els.welcome.addEventListener('click', (e) => {
 $('help').addEventListener('click', () => openGuide(state.me?.role, { onTour: () => startTour({ email: state.me?.email }) }));
 
 
-$('theme').addEventListener('click', () => {
+/** Chủ đề: sáng / tối / giáng sinh (xmas). Giáng sinh là chủ đề bổ sung: bấm lần nữa để quay lại chủ đề sáng hoặc tối trước đó. */
+const THEME_COLOR = { xmas: '#a4161a', default: '#2563eb' };
+function applyTheme(theme, { save = true } = {}) {
   const root = document.documentElement;
-  const dark = (root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
-  root.dataset.theme = dark ? 'light' : 'dark';
-  try { localStorage.setItem('theme', root.dataset.theme); } catch {}
+  if (theme) root.dataset.theme = theme; else delete root.dataset.theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[theme] ?? THEME_COLOR.default);
+  $('xmas')?.setAttribute('aria-pressed', String(theme === 'xmas'));
+  if (save) { try { theme ? localStorage.setItem('theme', theme) : localStorage.removeItem('theme'); } catch {} }
+}
+applyTheme(document.documentElement.dataset.theme || null, { save: false });
+$('theme').addEventListener('click', () => {
+  const current = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  applyTheme(current === 'dark' || current === 'xmas' ? 'light' : 'dark');
+});
+$('xmas').addEventListener('click', () => {
+  const root = document.documentElement;
+  if (root.dataset.theme === 'xmas') {
+    let prev = null; try { prev = localStorage.getItem('theme-prev'); } catch {}
+    applyTheme(prev === 'dark' || prev === 'light' ? prev : null);
+    return;
+  }
+  try { localStorage.setItem('theme-prev', root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')); } catch {}
+  applyTheme('xmas');
 });
 
 /* ---------- Thiết lập (Tài khoản, Cấu hình, Đồng bộ CRM) ---------- */

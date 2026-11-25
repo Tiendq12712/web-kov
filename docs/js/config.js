@@ -6,7 +6,7 @@ export const CONFIG = {
   allowedDomain: 'kiotviet.com',
   // Địa chỉ ứng dụng web Apps Script làm cầu nối đọc dữ liệu (xem scripts/apps-script/README.md). Có địa chỉ này thì nhân viên chỉ cần đăng nhập Google,
   // không cần được chia sẻ các Google Sheet của báo cáo. Để trống = mỗi người tự đọc Sheet bằng quyền của mình (như trước).
-  proxyUrl: '',
+  proxyUrl: globalThis.__noProxy ? '' : 'https://script.google.com/macros/s/AKfycby5rur8jZBB5yICJq79g_yffg9jjDIFPeCWgh_gwAtP_T-WoqPXtxMkcscDGAnDO_RCFQ/exec',
   // Sheet cấu hình dùng chung và tên các tab trong đó.
   configSheet: '1z2zQNUtjH71qWJz0NZ6ofN95ZdAmBwCSxd-KWNnMsnM',
   // Bật/tắt nhân vật Coach KPI nổi ở góc màn hình (true = bật, false = tắt).
