@@ -481,6 +481,8 @@ await test('Cầu nối dữ liệu (proxyUrl): đọc bảng/tab qua Apps Scrip
     reply({ ok: true, values: [['a', 'b'], ['', '']] });
     eq(await st.readTable({ url: 'https://docs.google.com/spreadsheets/d/abc123/edit', tab: 'T', columns: ['x', 'y'], token: 'tk' }), [['a', 'b']], 'readTable qua cầu nối');
     eq([seen[0][0], seen[0][1].op, seen[0][1].sheet, seen[0][1].range, seen[0][1].token], ['https://script.example/exec', 'rows', 'abc123', 'T!A2:B500', 'tk'], 'gửi đúng yêu cầu');
+    reply({ ok: true }); await st.appendRow({ url: 'abc123', tab: 'Nhật ký thao tác', columns: ['x', 'y'], row: ['1', '2'] });
+    eq([seen.at(-1)[1].op, seen.at(-1)[1].tab, seen.at(-1)[1].row], ['append', 'Nhật ký thao tác', ['1', '2']], 'appendRow qua cầu nối, không xin quyền ghi');
     reply({ ok: true, tabs: ['T10', 'T11'] }); eq(await sh.fetchTabs('abc123', 'tk'), ['T10', 'T11'], 'fetchTabs');
     reply({ ok: false, code: 'norange', error: 'x' }); eq(await st.readTable({ url: 'abc123', tab: 'T', columns: ['x'], token: 'tk' }), [], 'tab chưa có → bảng rỗng');
     let e1 = null; try { await sh.fetchRows('abc123', 'tk', { tab: 'T' }); } catch (e) { e1 = e; } eq(e1.message.includes('Không tìm thấy tab'), true, 'fetchRows báo thiếu tab');

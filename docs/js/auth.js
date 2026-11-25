@@ -13,7 +13,7 @@ const readConsent = () => { try { return localStorage.getItem(CONSENT_FLAG) === 
 const rememberConsent = (on) => { try { on ? localStorage.setItem(CONSENT_FLAG, '1') : localStorage.removeItem(CONSENT_FLAG); } catch {} };
 let forceConsent = readConsent();
 /** Lần đăng nhập kế tiếp sẽ hiện lại màn hình cấp quyền của Google (để màn hình đăng nhập đổi nhãn nút cho rõ). */
-export const needsConsent = () => forceConsent;
+export const needsConsent = () => forceConsent && !CONFIG.proxyUrl;
 /** Gọi khi vừa đăng nhập mà vẫn bị từ chối đọc Sheet: lần đăng nhập kế tiếp hiện lại màn hình cấp quyền. */
 export const requireConsentNext = () => { forceConsent = true; rememberConsent(true); };   // lần đăng nhập trước thiếu quyền Sheets: lần sau luôn hiện lại màn hình cấp quyền
 const STORAGE_KEY = 'kpi.session';

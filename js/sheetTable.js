@@ -69,6 +69,7 @@ const createTab = (url, tab, columns, token) => call(`${API}/${sheetId(url)}:bat
 
 /** Thêm một dòng vào cuối bảng (tạo tab nếu chưa có) — không ghi đè dữ liệu người khác. */
 export async function appendRow({ url, tab, columns, row }) {
+  if (proxyOn()) { await proxyCall(getToken(), 'append', { sheet: sheetId(url), tab, columns, row }, 60_000); return; }   // qua cầu nối: không cần quyền ghi Google
   const token = await getWriteToken();
   const send = () => call(`${API}/${sheetId(url)}/values/${rangeOf(tab, `A1:${lastColumn(columns)}1`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, token,
     { method: 'POST', body: JSON.stringify({ values: [row] }) });

@@ -1,7 +1,7 @@
 /**
  * Cầu nối dữ liệu cho web báo cáo: nhân viên chỉ cần đăng nhập Google (xin quyền email), KHÔNG cần được chia sẻ Google Sheet.
  * Script chạy bằng tài khoản của bạn (chủ các Sheet), xác minh token Google của người gọi, kiểm tra email có trong tab "Tài khoản"
- * rồi mới đọc Sheet và trả dữ liệu. Chỉ ĐỌC (ghi vẫn do web dùng token của chính người có quyền sửa Sheet).
+ * rồi mới đọc Sheet và trả dữ liệu. Đọc mọi Sheet được phép; chỉ GHI THÊM dòng vào vài tab nhật ký (op append).
  *
  * Cài đặt: xem hướng dẫn trong scripts/apps-script/README.md.
  */
@@ -27,6 +27,7 @@ function doPost(e) {
     assertAccount(email);
     if (req.op === 'rows') return json({ ok: true, values: readRows(req) });
     if (req.op === 'tabs') return json({ ok: true, tabs: readTabs(req) });
+    if (req.op === 'append') { appendRow(req, email); return json({ ok: true }); }
     throw fail('bad', 'Yêu cầu không hợp lệ');
   } catch (err) {
     return json({ ok: false, code: err.code || 'error', error: String(err.message || err) });
@@ -119,8 +120,36 @@ function readTabs(req) {
   return tabs;
 }
 
+/**
+ * Ghi thêm MỘT dòng vào cuối vài tab nhật ký của Sheet cấu hình (nhân viên thường cũng ghi được, không cần quyền sửa Sheet).
+ * Chỉ cho các tab trong APPEND_TABS; không sửa/xóa dữ liệu cũ. Tab chưa có thì tạo kèm dòng tiêu đề.
+ */
+const APPEND_TABS = ['Nhật ký thao tác', 'Đã nghe lại', 'Đánh giá không khớp'];
+function appendRow(req, email) {
+  if (req.sheet !== CONFIG_SHEET) throw fail('forbidden', 'Chỉ được ghi vào Sheet cấu hình');
+  const tab = String(req.tab || '');
+  if (APPEND_TABS.indexOf(tab) < 0) throw fail('forbidden', 'Tab này không cho phép ghi');
+  const cut = (v) => String(v == null ? '' : v).slice(0, 1000);
+  const columns = (Array.isArray(req.columns) ? req.columns : []).slice(0, 12).map(cut);
+  const row = (Array.isArray(req.row) ? req.row : []).slice(0, 12).map(cut);
+  if (!row.length) throw fail('bad', 'Dòng ghi trống');
+  const range = tab + '!A1:' + String.fromCharCode(64 + Math.max(columns.length, row.length)) + '1';
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const send = () => Sheets.Spreadsheets.Values.append({ values: [row] }, CONFIG_SHEET, range, { valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS' });
+    try { send(); }
+    catch (err) {
+      Sheets.Spreadsheets.batchUpdate({ requests: [{ addSheet: { properties: { title: tab } } }] }, CONFIG_SHEET);
+      Sheets.Spreadsheets.Values.update({ values: [columns] }, CONFIG_SHEET, tab + '!A1:' + String.fromCharCode(64 + columns.length) + '1', { valueInputOption: 'RAW' });
+      send();
+    }
+  } finally { lock.releaseLock(); }
+}
+
 /** Chạy một lần trong trình soạn thảo để Google hỏi quyền đọc Sheet cho script. */
 function authorize() {
   Sheets.Spreadsheets.Values.get(CONFIG_SHEET, ACCOUNTS_TAB + '!A1:B2');
+  LockService.getScriptLock();
   Logger.log('Đã đọc được Sheet cấu hình. Số Sheet được phép: ' + Object.keys(allowedSheets()).length);
 }
