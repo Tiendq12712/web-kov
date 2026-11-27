@@ -1,0 +1,53 @@
+/* ==========================================================================
+   Bố cục máy tính: menu nằm cột bên trái, nội dung trải hết chiều ngang.
+   Dưới 901px giữ bố cục cũ (thanh trên; điện thoại có thanh dưới cùng).
+   ========================================================================== */
+.nav-toggle, .tab-sub { display: none; }
+
+@media screen and (min-width: 901px) {
+  :root { --side-w: 248px; }
+  :root[data-nav="mini"] { --side-w: 78px; }
+  body { padding-left: var(--side-w); }
+  .container { max-width: none; margin: 0; padding: 18px 22px 48px; }
+  .chart > svg { max-height: 360px; }
+  /* Chỉ có một hoặc hai thẻ biểu đồ thì chia hết chiều ngang, không chừa cột trống */
+  .charts:not(.region-split):has(> :first-child:last-child) { column-count: 1; column-width: auto; }
+  .charts:not(.region-split):has(> :nth-child(2):last-child) { column-count: 2; column-width: auto; }
+
+  :root:root .topbar { position: fixed; inset: 0 auto 0 0; width: var(--side-w); border: 0; border-right: 1px solid var(--border); box-shadow: none; backdrop-filter: none; background: var(--surface); }
+  :root:root .topbar__inner { position: relative; height: 100%; max-width: none; margin: 0; padding: 14px 12px; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 12px; }
+  :root:root .topbar__inner .brand-group { flex: none; padding-right: 30px; min-width: 0; }
+  :root:root .brand__title { font-size: 15px; overflow: hidden; text-overflow: ellipsis; }
+  .nav-toggle { display: grid; place-items: center; position: absolute; top: 18px; right: 10px; width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
+  .nav-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+  :root:root .topbar__inner .tabs { order: 0; flex: 1 1 auto; min-height: 0; width: auto; max-width: none; margin: 0; padding: 4px; display: flex; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; align-items: stretch; gap: 3px; overflow: hidden auto; scrollbar-width: thin; background: none; border: 0; border-radius: 0; box-shadow: none; }
+  :root:root .topbar__inner .tabs .tab { flex: none; width: 100%; height: 36px; padding: 0 12px; justify-content: flex-start; gap: 10px; border-radius: 10px; font-size: 13.5px; text-align: left; }
+  :root:root .topbar__inner .tabs .tab .tab__label { display: inline; overflow: hidden; text-overflow: ellipsis; }
+  :root:root .topbar__inner .tabs .tab--group { display: none; }
+  .tab-sub { display: grid; gap: 2px; flex: none; }
+  .tab-title { margin: 10px 0 2px; padding: 0 12px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+  :root:root .topbar__inner .topbar__actions { flex: none; margin: 0; display: grid; }
+  :root:root .user { width: 100%; justify-content: flex-start; padding: 4px 10px 4px 4px; }
+  :root:root .user__email { display: inline; flex: 1; text-align: left; min-width: 0; }
+
+  .coach-float--left { left: calc(var(--side-w) + 14px); }
+
+  /* Thu gọn: chỉ biểu tượng; nhóm bấm vào mở danh sách sang bên phải */
+  :root:root[data-nav="mini"] .topbar__inner { padding-inline: 8px; }
+  :root:root[data-nav="mini"] .topbar__inner .brand-group { padding: 0; display: flex; justify-content: center; }
+  :root:root[data-nav="mini"] .brand__title, :root:root[data-nav="mini"] .user__email, :root:root[data-nav="mini"] .user__caret { display: none; }
+  :root[data-nav="mini"] .nav-toggle { position: static; align-self: center; }
+  :root[data-nav="mini"] .nav-toggle span { transform: scaleX(-1); }
+  :root:root[data-nav="mini"] .topbar__inner .tabs .tab { justify-content: center; padding: 0; height: 40px; }
+  :root:root[data-nav="mini"] .topbar__inner .tabs .tab .tab__label, :root:root[data-nav="mini"] .topbar__inner .tabs .tab__caret { display: none; }
+  :root:root[data-nav="mini"] .topbar__inner .tabs .tab--group { display: inline-flex; }
+  :root[data-nav="mini"] .tab-sub { display: none; }
+  :root:root[data-nav="mini"] .user { justify-content: center; padding: 4px; }
+
+  /* Màn hình đăng nhập: chưa có mục nào để chọn nên ẩn cột menu, khung đăng nhập nằm giữa trang */
+  body:has(#login) { padding-left: 0; }
+  body:has(#login) .topbar { display: none; }
+  body:has(#login) .container { min-height: 100vh; align-content: center; }
+}

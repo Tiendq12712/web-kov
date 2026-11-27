@@ -1,0 +1,173 @@
+/* ==========================================================================
+   Giao diện "Nổi khối" (data-theme="soft"): nền kem, thanh điều hướng nâu đen, thẻ nổi, rãnh lõm.
+   Chỉ dùng màu, viền sáng và bóng đổ tĩnh (không hiệu ứng chạy liên tục) để web không bị chậm.
+   Đây là giao diện duy nhất (index.html đặt sẵn data-theme="soft"); phần sáng/tối trong styles.css không còn được chọn.
+   ========================================================================== */
+:root[data-theme="soft"] {
+  color-scheme: light;
+  --bg: #d9cfc2; --surface: #f8f4ee; --surface-2: #ebe3d8; --border: #ddd2c4;
+  --text: #241b16; --muted: #66564a;
+  --accent: #b23c17; --accent-soft: #f6e0d6; --btn: #33261f;
+  --good: #0c6650; --good-soft: #d6ece2; --good-fill: #2fbf8f;
+  --warn: #85500a; --warn-soft: #f6e5bf; --warn-fill: #ffb429;
+  --bad: #a5221c;  --bad-soft: #f7dad4;  --bad-fill: #ff6554;
+  /* Màu biểu đồ tươi sáng; đã chạy bộ kiểm tra bảng màu (người mù màu vẫn phân biệt được các cột cạnh nhau) */
+  --c1: #22b8a0; --c2: #4a86f0; --c3: #f78a2e; --c4: #ded5c9; --c5: #ec5f92; --c6: #9a72e6;
+  --radius: 16px; --glow: transparent;
+  --ink: #2f231d; --ink-2: #43332a;
+  --raise: inset 0 1px 0 #fff, inset 0 -1px 0 rgb(var(--shade) / .08), 0 1px 2px rgb(var(--shade) / .16), 0 10px 20px -12px rgb(var(--shade) / .45);
+  --raise-sm: inset 0 1px 0 #fff, 0 1px 2px rgb(var(--shade) / .24), 0 3px 7px -3px rgb(var(--shade) / .35);
+  --sink: inset 0 1px 3px rgb(var(--shade) / .24), inset 0 0 0 1px rgb(var(--shade) / .07), 0 1px 0 #fff;
+  --dark-raise: inset 0 1px 0 rgb(255 255 255 / .14), 0 2px 3px rgb(var(--shade-deep) / .3), 0 12px 22px -12px rgb(var(--shade-deep) / .65);
+  --body-top: #e2dace; --body-bottom: #cfc3b3; --card-top: #fdfaf6; --card-bottom: #f2ebe2; --paper: #fbf8f3; --well: #e9e0d4; --hover: #f1e9de; --track: #e8e0d5;
+  --btn-top: #4a372d; --btn-bottom: #2b1f19; --ghost: #ece3d8; --pill: #eee6dc; --nav-text: #e4d6ca; --nav-dim: #b7a395; --shade: 66 44 28; --shade-deep: 30 18 10;
+}
+:root[data-theme="soft"] body { background: linear-gradient(180deg, var(--body-top) 0%, var(--bg) 45%, var(--body-bottom) 100%) fixed; }
+
+/* ---------- Thanh trên: khối nâu đen bo tròn, tab đang chọn là nút trắng nổi ---------- */
+:root[data-theme="soft"] .topbar { background: transparent; backdrop-filter: none; border: 0; box-shadow: none; padding: 8px 10px 0; }
+:root[data-theme="soft"] .topbar__inner { max-width: min(1280px, 100%); padding: 10px 18px; border-radius: 26px; background: linear-gradient(180deg, var(--ink-2), var(--ink)); box-shadow: var(--dark-raise); }
+:root[data-theme="soft"] .brand__title, :root[data-theme="soft"] a.brand .brand__title { color: #f7efe6; }
+:root[data-theme="soft"] .brand__logo { border-radius: 50%; box-shadow: 0 0 0 2px rgb(255 255 255 / .22), 0 3px 6px rgb(0 0 0 / .4); }
+:root[data-theme="soft"] .tabs, :root[data-theme="soft"] .topbar__inner .tabs { background: rgb(0 0 0 / .26); border: 0; border-radius: 99px; box-shadow: inset 0 1px 3px rgb(0 0 0 / .45), 0 1px 0 rgb(255 255 255 / .08); }
+:root:root[data-theme="soft"] .topbar__inner .tabs .tab { border: 0; border-radius: 99px; color: var(--nav-text); }
+:root:root[data-theme="soft"] .topbar__inner .tabs .tab:hover, :root:root[data-theme="soft"] .topbar__inner .tabs .tab[aria-expanded="true"] { background: rgb(255 255 255 / .1); color: #fff; }
+:root:root[data-theme="soft"] .topbar__inner .tabs .tab[aria-current="page"] { background: linear-gradient(180deg, #fff, var(--pill)); color: var(--ink); box-shadow: inset 0 1px 0 #fff, 0 2px 5px rgb(0 0 0 / .5); }
+:root:root[data-theme="soft"] .topbar__inner .tabs .tab.is-paused { color: #bfbbbd; }
+:root:root[data-theme="soft"] .topbar__inner .tabs .tab.is-paused:disabled { background: none; cursor: not-allowed; }
+:root:root[data-theme="soft"] .topbar__inner .tabs .tab.is-paused[aria-current="page"] { color: #8d878a; }
+:root[data-theme="soft"] .topbar .user { background: linear-gradient(180deg, var(--card-top), var(--well)); border: 0; color: var(--ink); box-shadow: inset 0 1px 0 #fff, 0 2px 5px rgb(0 0 0 / .4); }
+:root[data-theme="soft"] .topbar .user__email, :root[data-theme="soft"] .topbar .user__caret { color: var(--ink); }
+:root[data-theme="soft"] .topbar :focus-visible { outline-color: #ffb59a; }
+
+/* ---------- Thẻ nổi ---------- */
+:root[data-theme="soft"] .card,
+:root[data-theme="soft"] .todo__item,
+:root[data-theme="soft"] .lib-item { background: linear-gradient(180deg, var(--card-top), var(--card-bottom)); border: 1px solid rgb(255 255 255 / .75); box-shadow: var(--raise); }
+:root[data-theme="soft"] .todo__item { border-left: 4px solid var(--accent); }
+:root[data-theme="soft"] .todo__item--bad { border-left-color: var(--bad-fill); }
+:root[data-theme="soft"] .todo__item--warn { border-left-color: var(--warn-fill); }
+:root[data-theme="soft"] .grid > .card::before { display: none; }
+:root[data-theme="soft"] .card--link:hover { border-color: #fff; box-shadow: inset 0 1px 0 #fff, 0 2px 4px rgb(var(--shade) / .2), 0 16px 28px -12px rgb(var(--shade) / .55); }
+:root[data-theme="soft"] .card--accent .big, :root[data-theme="soft"] .card--link .big { background: none; color: var(--text); -webkit-text-fill-color: currentColor; }
+:root[data-theme="soft"] .big { letter-spacing: -.01em; }
+
+/* Thẻ nổi bật: khối xanh ngọc, chữ trắng */
+:root[data-theme="soft"] .card--accent {
+  --text: #fff; --muted: #d8efe7; --surface: #1c7a60; --surface-2: rgb(0 30 22 / .32);
+  --good: #08503e; --good-soft: #d9f3e8; --warn: #6d4000; --warn-soft: #ffe9bb; --bad: #8f1a15; --bad-soft: #ffe0da;
+  --good-fill: #9ff0d2; --warn-fill: #ffd36b; --bad-fill: #ffa28d; --c1: #bff5e1; --accent: #fff;
+  color: var(--text); background: linear-gradient(150deg, #2b9a7b 0%, #1a755c 55%, #135a47 100%); border: 1px solid rgb(255 255 255 / .22);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 2px 3px rgb(10 60 45 / .3), 0 16px 28px -14px rgb(10 70 52 / .75);
+}
+:root[data-theme="soft"] .card--accent.card--link:hover { border-color: rgb(255 255 255 / .5); }
+:root[data-theme="soft"] .card--accent .btn--ghost { background: rgb(255 255 255 / .16); border-color: rgb(255 255 255 / .35); color: #fff; box-shadow: none; }
+:root[data-theme="soft"] .card--accent .gauge__target { stroke: #fff; }
+
+/* ---------- Rãnh lõm và thanh tiến độ dạng ống ---------- */
+:root[data-theme="soft"] .bar { height: 10px; background: var(--surface-2); box-shadow: inset 0 1px 3px rgb(var(--shade) / .35); }
+:root[data-theme="soft"] .bar__fill,
+:root[data-theme="soft"] .bar--good .bar__fill,
+:root[data-theme="soft"] .bar--warn .bar__fill,
+:root[data-theme="soft"] .bar--bad .bar__fill { background-image: linear-gradient(180deg, rgb(255 255 255 / .45), rgb(255 255 255 / 0) 60%); box-shadow: 0 1px 2px rgb(var(--shade) / .16); }
+:root[data-theme="soft"] .bar__fill { background-color: var(--c1); }
+:root[data-theme="soft"] .bar--good .bar__fill { background-color: var(--good-fill); }
+:root[data-theme="soft"] .bar--warn .bar__fill { background-color: var(--warn-fill); }
+:root[data-theme="soft"] .bar--bad .bar__fill { background-color: var(--bad-fill); }
+:root[data-theme="soft"] .gauge__track { stroke: var(--track); }
+
+/* ---------- Nhãn, nút, ô chọn ---------- */
+:root[data-theme="soft"] .badge { box-shadow: inset 0 1px 0 rgb(255 255 255 / .7), 0 1px 2px rgb(var(--shade) / .18); }
+:root[data-theme="soft"] .btn { background: linear-gradient(180deg, var(--btn-top), var(--btn-bottom)); color: #fff8f1; border-radius: 99px; box-shadow: var(--dark-raise); }
+:root[data-theme="soft"] .btn:hover:not(:disabled) { filter: brightness(1.12); box-shadow: var(--dark-raise); }
+:root[data-theme="soft"] .btn:active:not(:disabled), :root[data-theme="soft"] .chip:active { transform: translateY(1px); }
+:root[data-theme="soft"] .btn--ghost { background: linear-gradient(180deg, #fff, var(--ghost)); color: var(--text); border: 1px solid rgb(255 255 255 / .8); box-shadow: var(--raise-sm); }
+:root[data-theme="soft"] .chip { background: linear-gradient(180deg, #fff, var(--ghost)); border-color: rgb(255 255 255 / .8); box-shadow: var(--raise-sm); }
+:root[data-theme="soft"] .chip:hover { border-color: var(--accent); box-shadow: var(--raise-sm); }
+:root[data-theme="soft"] .chip[aria-pressed="true"] { background: linear-gradient(180deg, var(--btn-top), var(--btn-bottom)); border-color: var(--btn-bottom); color: #fff8f1; box-shadow: var(--dark-raise); }
+:root[data-theme="soft"] .select, :root[data-theme="soft"] .search, :root[data-theme="soft"] .icon-btn { border: 0; border-radius: 99px; background: var(--well); box-shadow: var(--sink); padding-inline: 14px; }
+:root[data-theme="soft"] .monthbar label { color: var(--muted); }
+:root[data-theme="soft"] .section-title { font-size: 20px; letter-spacing: -.01em; }
+
+/* ---------- Bảng: khung nổi, hàng tiêu đề lõm ---------- */
+:root[data-theme="soft"] .table-wrap { background: var(--paper); border: 1px solid rgb(255 255 255 / .75); box-shadow: var(--raise); }
+:root[data-theme="soft"] thead th { background: var(--well); box-shadow: inset 0 -1px 0 rgb(var(--shade) / .16); }
+:root[data-theme="soft"] .table-wrap thead th.sticky-col { background: var(--well); }
+:root[data-theme="soft"] .table-wrap .sticky-col { background-color: var(--paper); }
+:root[data-theme="soft"] tbody tr:hover, :root[data-theme="soft"] tbody tr:hover .sticky-col { background: var(--hover); }
+
+/* ---------- Biểu đồ: cột bo tròn, bóng nhẹ ---------- */
+:root[data-theme="soft"] .chart rect.s1, :root[data-theme="soft"] .chart rect.s2, :root[data-theme="soft"] .chart rect.s3 { rx: 5px; filter: drop-shadow(0 2px 2px rgb(var(--shade) / .16)); }
+:root[data-theme="soft"] .donut__arc.s1, :root[data-theme="soft"] .donut__arc.s2, :root[data-theme="soft"] .donut__arc.s3 { filter: drop-shadow(0 2px 2px rgb(var(--shade) / .14)); }
+:root[data-theme="soft"] .swatch.s5, :root[data-theme="soft"] .stack__seg.s5 { background-color: var(--c5); } :root[data-theme="soft"] .donut__arc.s5 { stroke: var(--c5); }
+:root[data-theme="soft"] .swatch.s6, :root[data-theme="soft"] .stack__seg.s6 { background-color: var(--c6); } :root[data-theme="soft"] .donut__arc.s6 { stroke: var(--c6); }
+:root[data-theme="soft"] .chart .line.s1, :root[data-theme="soft"] .chart .line.s2, :root[data-theme="soft"] .chart .line.s3 { filter: drop-shadow(0 3px 3px rgb(var(--shade) / .14)); }
+:root[data-theme="soft"] .stack__seg { background-image: linear-gradient(180deg, rgb(255 255 255 / .38), rgb(255 255 255 / 0) 65%); }
+
+/* ---------- Menu, ngăn chi tiết ---------- */
+:root[data-theme="soft"] .menu { background: linear-gradient(180deg, var(--card-top), var(--card-bottom)); border-color: #fff; box-shadow: 0 20px 40px -16px rgb(var(--shade) / .55); }
+:root[data-theme="soft"] .drawer { background: var(--paper); }
+
+@media screen and (min-width: 901px) {
+  :root:root[data-theme="soft"] .topbar { background: transparent; border: 0; padding: 10px 0 10px 10px; }
+  :root:root[data-theme="soft"] .topbar__inner { padding: 14px 10px; border-radius: 24px; background: linear-gradient(180deg, var(--ink-2), var(--ink)); }
+  :root:root[data-theme="soft"] .topbar__inner .tabs { background: none; box-shadow: none; border-radius: 0; }
+  :root[data-theme="soft"] .tab-title { color: var(--nav-dim); }
+  :root[data-theme="soft"] .nav-toggle { background: rgb(255 255 255 / .08); border-color: rgb(255 255 255 / .16); color: var(--nav-text); }
+}
+@media (max-width: 700px) {
+  :root:root[data-theme="soft"] .bottom-nav { background: linear-gradient(180deg, var(--ink-2), var(--ink)); border-color: transparent; box-shadow: var(--dark-raise); }
+  :root:root[data-theme="soft"] .bottom-nav__item { color: var(--nav-text); }
+  :root:root[data-theme="soft"] .bottom-nav__item[aria-current="page"] { color: #fff; }
+  :root:root[data-theme="soft"] .bottom-nav__item[aria-current="page"] .bottom-nav__icon { background: linear-gradient(180deg, #fff, var(--pill)); color: var(--ink); box-shadow: 0 2px 5px rgb(0 0 0 / .5); }
+  :root:root[data-theme="soft"] .bottom-nav__item[aria-expanded="true"] .bottom-nav__icon { background: rgb(255 255 255 / .14); }
+  :root:root[data-theme="soft"] .bottom-nav__item.is-paused { color: #bfbbbd; }
+}
+@media print {
+  :root[data-theme="soft"] body { background: #fff; }
+  :root[data-theme="soft"] .card, :root[data-theme="soft"] .table-wrap { box-shadow: none; }
+  :root[data-theme="soft"] .card--accent { --text: #000; --muted: #333; background: #fff; }
+}
+
+/* ---------- Hiệu ứng khi mở trang (js/motion.js gắn lớp .motion-in trong khoảng 1,7 giây) ---------- */
+@keyframes soft-rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes soft-grow-x { from { transform: scaleX(0); } }
+@keyframes soft-grow-y { from { transform: scaleY(0); } }
+@keyframes soft-wipe { from { clip-path: inset(-10px 100% -10px 0); } to { clip-path: inset(-10px 0 -10px 0); } }
+@keyframes soft-arc { from { stroke-dasharray: 0 400; } }
+@keyframes soft-gauge { from { stroke-dasharray: 0 100; } to { stroke-dasharray: 100 100; } }
+:root[data-theme="soft"] .motion-in .card,
+:root[data-theme="soft"] .motion-in .table-wrap { animation: soft-rise .5s cubic-bezier(.2, .7, .3, 1) backwards; animation-delay: var(--motion-delay, 0ms); }
+:root[data-theme="soft"] .motion-in .grid > :nth-child(2) { animation-delay: calc(var(--motion-delay, 0ms) + 70ms); }
+:root[data-theme="soft"] .motion-in .grid > :nth-child(3) { animation-delay: calc(var(--motion-delay, 0ms) + 140ms); }
+:root[data-theme="soft"] .motion-in .grid > :nth-child(4) { animation-delay: calc(var(--motion-delay, 0ms) + 210ms); }
+:root[data-theme="soft"] .motion-in .grid > :nth-child(n + 5) { animation-delay: calc(var(--motion-delay, 0ms) + 280ms); }
+:root[data-theme="soft"] .motion-in .bar__fill { transform-origin: left center; animation: soft-grow-x .9s cubic-bezier(.2, .7, .3, 1) backwards; animation-delay: calc(var(--motion-delay, 0ms) + 250ms); }
+:root[data-theme="soft"] .motion-in .stack { animation: soft-wipe .9s cubic-bezier(.2, .7, .3, 1) backwards; animation-delay: calc(var(--motion-delay, 0ms) + 300ms); }
+:root[data-theme="soft"] .motion-in .chart rect.s1, :root[data-theme="soft"] .motion-in .chart rect.s2, :root[data-theme="soft"] .motion-in .chart rect.s3 { transform-box: fill-box; transform-origin: center bottom; animation: soft-grow-y .8s cubic-bezier(.2, .8, .3, 1.15) backwards; animation-delay: calc(var(--motion-delay, 0ms) + 300ms); }
+:root[data-theme="soft"] .motion-in .chart rect.s2 { animation-delay: calc(var(--motion-delay, 0ms) + 400ms); }
+:root[data-theme="soft"] .motion-in .chart rect.s3 { animation-delay: calc(var(--motion-delay, 0ms) + 500ms); }
+:root[data-theme="soft"] .motion-in .chart polyline.line, :root[data-theme="soft"] .motion-in .chart circle.dot, :root[data-theme="soft"] .motion-in .spark { animation: soft-wipe 1.1s ease-out backwards; animation-delay: calc(var(--motion-delay, 0ms) + 300ms); }
+:root[data-theme="soft"] .motion-in .donut__arc { animation: soft-arc 1.1s cubic-bezier(.2, .7, .3, 1) backwards; animation-delay: calc(var(--motion-delay, 0ms) + 300ms); }
+:root[data-theme="soft"] .motion-in .gauge__fill { animation: soft-gauge 1.1s cubic-bezier(.2, .7, .3, 1) backwards; animation-delay: calc(var(--motion-delay, 0ms) + 300ms); }
+@media (prefers-reduced-motion: reduce) { :root[data-theme="soft"] .motion-in * { animation: none !important; } }
+
+/* ==========================================================================
+   Tông hồng (data-tone="pink"): chỉ đổi màu, mọi hình khối, bố cục và hiệu ứng dùng chung với phần trên.
+   ========================================================================== */
+:root[data-theme="soft"][data-tone="pink"] {
+  --bg: #fae8ee; --surface: #fffafb; --surface-2: #fdf0f4; --border: #f7dfe7;
+  --text: #3a1424; --muted: #7c485e;
+  --accent: #c2326a; --accent-soft: #fde9f0; --btn: #b53069;
+  /* Màu biểu đồ: tím, hồng, cam (đã chạy bộ kiểm tra bảng màu) */
+  --c1: #9a72e6; --c2: #ec5f92; --c3: #f78a2e; --c4: #f5e6eb; --c5: #22b8a0; --c6: #4a86f0;
+  --ink: #9e406a; --ink-2: #bd5b86;
+  --body-top: #fdf0f4; --body-bottom: #f6dbe4; --card-top: #fffdfd; --card-bottom: #fef5f7; --paper: #fffcfd; --well: #fcebf0; --hover: #fef2f5; --track: #f8e9ee;
+  --btn-top: #d25286; --btn-bottom: #ab2d63; --ghost: #fcebf1; --pill: #feeff4; --nav-text: #fff0f5; --nav-dim: #ffd9e7; --shade: 150 40 90; --shade-deep: 90 12 48;
+}
+:root[data-theme="soft"][data-tone="pink"] .card--accent {
+  --text: #fff; --muted: #fff0f5; --surface: #b93a70; --surface-2: rgb(60 0 28 / .32); --accent: #fff; --c1: #ffd3e3;
+  background: linear-gradient(150deg, #cd4a84 0%, #b93a70 55%, #a42f62 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 2px 3px rgb(var(--shade-deep) / .28), 0 16px 28px -14px rgb(var(--shade-deep) / .7);
+}
+@media print { :root[data-theme="soft"][data-tone="pink"] .card--accent { --text: #000; --muted: #333; background: #fff; } }

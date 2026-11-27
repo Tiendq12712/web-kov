@@ -153,7 +153,7 @@ function gauge(rate) {
   return html`
     <svg class="gauge" viewBox="0 0 200 120" role="img" aria-label="Tỉ lệ SC sử dụng Customer Info ${pct(rate, 2)}, mục tiêu ${pct(TARGET)}">
       <path d="${arc(0, 1)}" class="gauge__track"/>
-      <path d="${arc(0, Math.min(Math.max(rate, 0.001), 1))}" class="gauge__fill gauge__fill--${tone(rate)}"/>
+      <path d="${arc(0, Math.min(Math.max(rate, 0.001), 1))}" class="gauge__fill gauge__fill--${tone(rate)}" pathLength="100"/>
       <line x1="${tx1}" y1="${ty1}" x2="${tx2}" y2="${ty2}" class="gauge__target"/>
       <text x="100" y="98" text-anchor="middle" class="gauge__value">${pct(rate, 2).replace('.', ',')}</text>
       <text x="14" y="116" class="gauge__min">0%</text><text x="186" y="116" text-anchor="end" class="gauge__max">100%</text>

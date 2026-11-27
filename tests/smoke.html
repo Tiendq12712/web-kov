@@ -740,6 +740,50 @@ await test('Add-on Payment/Kship/HDDT ghi nhận theo tháng của data (ticket 
   eq(moved.rows.filter((r) => r.month === '2026-10').map((r) => `${r.type}:${r.retailer}`).sort(), ['hddt:e', 'payment:q'], 'Payment và HDDT cũng theo tháng của data');
 });
 
+await test('Hiệu ứng số chạy: giữ đúng cách viết số và kết thúc bằng số gốc', async () => {
+  const { scaleText } = await import(`${root}js/motion.js`);
+  eq(scaleText('2.360 / 4.000', 0.5), '1.180 / 2.000', 'chấm ngăn nghìn'); eq(scaleText('59.2%', 0.5), '29.6%', 'chấm thập phân'); eq(scaleText('92,12%', 0.5), '46,06%', 'phẩy thập phân');
+  eq(scaleText('1.234.567', 0), '0', 'bắt đầu từ 0'); for (const t of ['2.360 / 4.000', '59.2%', '−5', '8']) eq(scaleText(t, 1), t, 'cuối cùng đúng số gốc');
+});
+
+await test('Hiệu ứng số chạy: gọi lại giữa chừng (đóng thẻ chào, tải thêm dữ liệu) vẫn kết thúc đúng số thật', async () => {
+  const m = await import(`${root}js/motion.js`), root_ = document.documentElement, saved = root_.dataset.theme;
+  const view = document.createElement('div'); view.innerHTML = '<div class="card"><p class="big">60.1%</p><dl class="kv"><dd>1.180 / 2.000</dd></dl></div>'; document.body.append(view);
+  const text = () => [...view.querySelectorAll('.big, dd')].map((e) => e.textContent);
+  root_.dataset.theme = 'soft';
+  try {
+    m.resetIntro(); m.playIntro(view, 'a'); m.resetIntro(); m.playIntro(view, 'a'); m.playIntro(view, 'a'); m.resetIntro(); m.playIntro(view, 'b');
+    await new Promise((r) => setTimeout(r, 1500)); eq(text(), ['60.1%', '1.180 / 2.000'], 'số cuối đúng');
+    m.resetIntro(); m.playIntro(view, 'c'); delete root_.dataset.theme; m.playIntro(view, 'c'); eq(text(), ['60.1%', '1.180 / 2.000'], 'tắt hiệu ứng giữa chừng cũng trả số ngay');
+  } finally { if (saved) root_.dataset.theme = saved; else delete root_.dataset.theme; view.remove(); }
+});
+
+await test('Việc cần làm: Tổng quan chỉ Admin thấy, mặc định thu gọn và nhớ trạng thái mở', async () => {
+  const v = await import(`${root}js/views/todo.js`), box = document.createElement('div');
+  const items = [{ tone: 'bad', count: 3, text: 'data trễ', hint: 'h', tab: 'sla' }, { tone: 'warn', count: 1, text: 'nhân sự', hint: 'h', tab: 'sla' }];
+  v.rememberTodoOpen(false); box.innerHTML = String(v.todoCard(items, { fold: true }));
+  eq([box.querySelector('details').open, box.querySelector('summary').textContent.includes('1 việc gấp'), box.querySelectorAll('.todo__item').length], [false, true, 2], 'thu gọn, có tóm tắt');
+  v.rememberTodoOpen(true); box.innerHTML = String(v.todoCard(items, { fold: true })); eq(box.querySelector('details').open, true, 'nhớ đang mở'); v.rememberTodoOpen(false);
+  const src = await (await fetch(`${root}js/views/overview.js`)).text();
+  eq([src.includes("ui.me?.role === 'admin' ? todoCard("), (src.match(/todoCard\(/g) ?? []).length], [true, 1], 'Tổng quan chỉ vẽ thẻ cho Admin');
+});
+
+await test('Đang điều chỉnh lại: gom vào nhóm riêng cuối menu, chỉ Admin mở được', async () => {
+  const nav = await import(`${root}js/app/nav.js`), { state } = await import(`${root}js/app/state.js`), { CONFIG: C } = await import(`${root}js/config.js`);
+  eq(C.pausedTabs, ['callctl', 'control', 'trend', 'listen'], 'các mục đang khóa');
+  const saved = { data: state.data, me: state.me };
+  try {
+    state.data = { teams: [{ id: 'a', name: 'Team A', members: [] }, { id: 'b', name: 'Team B', members: [] }], work: {} };
+    for (const [role, locked] of [['admin', false], ['manager', true], ['member', true]]) {
+      state.me = { role, email: 'x@kiotviet.com', name: 'X' };
+      const model = nav.buildNav([]), ids = model.flatMap((n) => n.items?.map((i) => i.id) ?? [n.id]), last = model.at(-1);
+      if (role !== 'member') eq([last.id, last.name, last.items.map((i) => i.id).includes('trend'), last.items.every((i) => i.locked === locked)], ['paused', 'Đang điều chỉnh lại', true, true], `nhóm cuối menu (${role})`);
+      eq(new Set(ids).size, ids.length, `mỗi mục chỉ nằm một chỗ (${role})`);
+      eq([nav.isLocked('trend'), nav.isLocked('control'), nav.isLocked('overview')], [locked, locked, false], `quyền mở (${role})`);
+    }
+  } finally { Object.assign(state, saved); }
+});
+
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {
   const as = await import(`${root}js/addonScore.js`), ad = await import(`${root}js/addonDetail.js`), fx = await import(`${root}tests/fixtures.js`);
   const tabs = fx.buildFixtures('cfg', 'x@kiotviet.com')[fx.IDS.addon];

@@ -747,6 +747,16 @@ table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-s
 .todo__item--info { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); }
 .todo__text { display: grid; min-width: 0; } .todo__text small { color: var(--muted); }
 .todo__go { padding: 6px 14px; }
+.todo__summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; cursor: pointer; list-style: none; border-radius: 8px; }
+.todo__summary::-webkit-details-marker { display: none; }
+.todo__toggle { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--accent); }
+.todo__toggle::after { content: "Xem danh sách ▾"; }
+.todo--fold[open] .todo__toggle::after { content: "Thu gọn ▴"; }
+.todo--fold[open] .todo__summary { margin-bottom: 10px; }
+.todo--fold { display: block; }
+.todo--fold .todo__list { grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); }
+.todo--fold .todo__item { padding: 6px 10px; }
+.todo--fold .todo__go { padding: 4px 12px; font-size: 13px; }
 
 /* Xu hướng theo ngày */
 .trend-table th, .trend-table td { padding: 8px 14px; white-space: nowrap; text-align: center; } .trend-table td.strong { font-weight: 700; } .trend-table td.sticky-col { text-align: left; }
@@ -830,6 +840,12 @@ table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; font-s
 .menu__item:hover, .menu__item:focus-visible { background: var(--accent-soft); }
 .menu__item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .menu__item[aria-current="page"] { color: var(--accent); font-weight: 700; background: var(--accent-soft); }
+/* Mục đang điều chỉnh lại: chữ xám; người không phải Admin không bấm được */
+.menu__item.is-paused, .menu__item.is-paused * { color: #8d878a; }
+.menu__item.is-paused .menu__icon { filter: grayscale(1); opacity: .75; }
+.menu__item.is-paused:disabled { cursor: not-allowed; background: none; }
+.menu__item.is-paused:disabled .menu__icon { transform: none; }
+.link-btn.is-paused:disabled, .btn.is-paused:disabled { color: var(--muted); filter: grayscale(1); opacity: .55; cursor: not-allowed; text-decoration: none; }
 .menu__item--danger { color: var(--bad); } .menu__item--danger:hover { background: var(--bad-soft); }
 .menu__who { margin: 0; padding: 6px 12px 8px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .menu--account { min-width: 230px; }

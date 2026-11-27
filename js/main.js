@@ -1,6 +1,6 @@
 import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData, hasPbi, loadPbi, hasLibrary, loadLibrary, hasHr, loadHr, hasCalls, loadCalls, hasDetail, loadDetail, loadDetailFor, hasScores, loadScores, hasAddons, loadAddons, hasZalo, loadZalo } from './data.js';
 import { CONFIG } from './config.js';
-import { tabIcon, buildNav } from './app/nav.js';
+import { tabIcon, buildNav, isLocked } from './app/nav.js';
 import { hooks } from './app/hooks.js';
 import { taskStats } from './tasks.js';
 import { shareMonth, sharePerson } from './app/filters.js';
@@ -50,6 +50,8 @@ import { hrView, hrRowsView } from './views/hr.js';
 import { summarizeMonth } from './compare.js';
 import { compareView } from './views/compare.js';
 import { findMember, showWelcome, hideWelcome } from './welcome.js';
+import { playIntro, resetIntro } from './motion.js';
+import { rememberTodoOpen } from './views/todo.js';
 import { startTour, tourSeen } from './tour.js';
 import { openGuide } from './guide.js';
 import { decorateTables, handleExportClick } from './export.js';
@@ -74,16 +76,28 @@ function renderTabs() {
   };
   const attrs = (n) => (n.items ? html`data-nav-group="${n.id}" aria-haspopup="menu" aria-expanded="false"` : html`data-tab="${n.id}"`);
   const cur = (n) => (active(n) ? html`aria-current="page"` : '');
+  const gray = (n) => (n.paused ? 'is-paused' : '');
   mount(els.tabs, html`${navModel.map((n) => html`
-    <button class="tab ${n.items ? 'tab--group' : ''}" type="button" title="${label(n)}" ${attrs(n)} ${cur(n)}>${tabIcon(n.icon ?? n.id)}<span class="tab__label">${label(n)}</span>${n.items ? html`<span class="tab__caret" aria-hidden="true">▾</span>` : ''}</button>`)}`);
+    <button class="tab ${n.items ? 'tab--group' : ''} ${gray(n)}" type="button" title="${label(n)}" ${attrs(n)} ${cur(n)}>${tabIcon(n.icon ?? n.id)}<span class="tab__label">${label(n)}</span>${n.items ? html`<span class="tab__caret" aria-hidden="true">▾</span>` : ''}</button>${n.items ? html`
+    <div class="tab-sub" role="group" aria-label="${n.name}"><p class="tab-title" aria-hidden="true">${n.name}</p>${n.items.map((i) => html`
+      <button class="tab tab--sub ${gray(i)}" type="button" title="${i.locked ? `${i.name} (đang điều chỉnh lại)` : i.name}" ${i.locked ? 'disabled' : ''} data-tab="${i.id}" ${i.id === state.tab ? html`aria-current="page"` : ''}>${tabIcon(i.id)}<span class="tab__label">${i.name}</span></button>`)}</div>` : ''}`)}`);
   mount(els.bottomNav, html`${navModel.map((n) => html`
-    <button class="bottom-nav__item" type="button" ${attrs(n)} ${cur(n)}>
+    <button class="bottom-nav__item ${gray(n)}" type="button" ${attrs(n)} ${cur(n)}>
       <span class="bottom-nav__icon">${tabIcon(n.icon ?? n.id)}</span><span>${n.items ? (n.items.find((i) => i.id === state.tab)?.short ?? n.short) : n.short}</span>
     </button>`)}`);
 }
 
+/** Nút trong trang dẫn tới mục đang điều chỉnh lại (Xem chi tiết, Coach…): người không phải Admin thấy xám, không bấm được. */
+function lockPaused(root) {
+  root.querySelectorAll('[data-tab], [data-goto-listen], [data-goto-callctl]').forEach((el) => {
+    const tab = el.dataset.tab ?? (el.hasAttribute('data-goto-listen') ? 'listen' : 'callctl');
+    if (isLocked(tab)) Object.assign(el, { disabled: true, title: 'Mục đang điều chỉnh lại' }).classList.add('is-paused');
+  });
+}
+
 /* ---------- Menu thả xuống (nhóm điều hướng, tài khoản) ---------- */
 const popmenu = $('popmenu'), accountMenu = $('account-menu'), accountBtn = $('user');
+const sideMenu = matchMedia('(min-width: 901px)');   // trùng mốc trong css/layout-side.css
 function closeMenus() {
   popmenu.hidden = true; accountMenu.hidden = true;
   accountBtn.setAttribute('aria-expanded', 'false');
@@ -92,6 +106,12 @@ function closeMenus() {
 function placeMenu(menu, anchor, { align = 'left' } = {}) {
   const r = anchor.getBoundingClientRect(), w = menu.offsetWidth, margin = 8;
   const fromBottom = Boolean(anchor.closest('#bottom-nav'));
+  if (sideMenu.matches && anchor.closest('.topbar')) {   // menu cột trái: mở sang bên phải nút bấm, không tràn đáy màn hình
+    menu.style.left = `${r.right + 12}px`;
+    menu.style.bottom = 'auto';
+    menu.style.top = `${Math.max(margin, Math.min(r.top, innerHeight - menu.offsetHeight - margin))}px`;
+    return;
+  }
   const left = align === 'right' ? r.right - w : r.left + r.width / 2 - (fromBottom ? w / 2 : r.width / 2);
   menu.style.left = `${Math.max(margin, Math.min(left, innerWidth - w - margin))}px`;
   if (fromBottom) { menu.style.top = 'auto'; menu.style.bottom = `${innerHeight - r.top + 6}px`; }
@@ -102,7 +122,7 @@ function openNavMenu(btn) {
   closeMenus();
   if (was) return;
   const g = navModel.find((n) => n.id === btn.dataset.navGroup);
-  popmenu.innerHTML = html`${g.items.map((i) => html`<button class="menu__item menu__item--rich" type="button" role="menuitem" data-tab="${i.id}" ${i.id === state.tab ? html`aria-current="page"` : ''}><span class="menu__icon">${tabIcon(i.id)}</span><span class="menu__text"><strong>${i.name}</strong>${i.desc ? html`<small>${i.desc}</small>` : ''}</span></button>`)}`.toString();
+  popmenu.innerHTML = html`${g.items.map((i) => html`<button class="menu__item menu__item--rich ${i.paused ? 'is-paused' : ''}" type="button" role="menuitem" ${i.locked ? 'disabled' : ''} data-tab="${i.id}" ${i.id === state.tab ? html`aria-current="page"` : ''}><span class="menu__icon">${tabIcon(i.id)}</span><span class="menu__text"><strong>${i.name}</strong>${i.desc ? html`<small>${i.desc}</small>` : ''}</span></button>`)}`.toString();
   popmenu.hidden = false;
   placeMenu(popmenu, btn);
   btn.setAttribute('aria-expanded', 'true');
@@ -232,7 +252,7 @@ function currentPage() {
   if (state.tab === 'callctl' && hasScores()) return { view: lazyTab(state.callctl, 'callctl', loadScores, (d) => callScoreView(d, state.callctl, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Kiểm soát call' };
   if (state.tab === 'control' && hasDetail()) return { view: lazyTab(state.segmentM, 'control', (m) => loadDetailFor([m]), (d) => withQuality('control', d, controlView(d, state.control, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month }))), title: 'Kiểm soát' };
   if (state.tab === 'addondetail' && hasDetail()) return { view: lazyTab(state.segmentM, 'addondetail', (m) => loadDetailFor([m]), (d) => addonDetailView(d, state.addonD, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames(), month: state.month, members: state.data.teams.flatMap((t) => t.members) })), title: 'Chi tiết Add-on' };
-  if (state.tab === 'zalo' && hasZalo() && hasDetail()) return { view: lazyTab(state.zalo, 'zalo', () => Promise.all([loadZalo(), loadDetail()]).then(([zalo, detail]) => ({ zalo, detail })), (d) => zaloView(d, { names: kpiNames(), manager: state.me.role !== 'member', filters: state.zalo.f })), title: 'Zalo' };
+  if (state.tab === 'zalo' && hasZalo() && hasDetail()) return { view: lazyTab(state.zalo, 'zalo', () => Promise.all([loadZalo(), loadDetail()]).then(([zalo, detail]) => ({ zalo, detail })), (d) => zaloView(d, { names: kpiNames(), manager: state.me.role !== 'member', filters: state.zalo.f })), title: 'Zalo & Hotline' };
   if (state.tab === 'addon' && hasAddons()) return { view: lazyTab(state.addons, 'addon', loadAddons, (d) => addonView(d, state.addons, { manager: state.me.role !== 'member', code: myCode(), names: kpiNames() })), title: 'Add-on' };
   if (state.tab === 'segment' && state.me.role !== 'member' && hasDetail()) return { view: lazyTab(state.segment, 'segment', loadDetail, (data) => withQuality('segment', data, segmentView(data, state.segment))), title: 'Phân tích tệp data' };
   if (state.tab === 'connect' && state.me.role !== 'member') {
@@ -279,6 +299,7 @@ function renderCoach() {
   const show = CONFIG.coachEnabled && state.me && state.data && state.tab !== 'settings';
   state.coach = show ? coachFor({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, bump: state.coachBump }) : null;
   mount(el, state.coach ? coachFloat(state.coach, state.coachPref) : html``);
+  lockPaused(el);
 }
 
 function renderView() {
@@ -290,16 +311,22 @@ function renderView() {
     baseTitle = 'Thiết lập · Report SC ONLINE'; applyTitle();
     return;
   }
+  if (isLocked(state.tab)) state.tab = 'overview';   // mở bằng đường dẫn hay tab nhớ lần trước cũng không vào được mục đang điều chỉnh lại
   const page = currentPage();
   const monthly = isMonthly(state.tab);
   mount(els.view, html`${monthly ? monthBar() : ''}${page.view}`);
   renderTabs();
+  lockPaused(els.view);
   applyTableSorts(els.view);
   renderCoach();
   baseTitle = monthly ? `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE` : `${page.title} · Report SC ONLINE`;
   applyTitle();
   writeHash();
+  playIntro(els.view, `${state.tab}|${state.month}`);
 }
+
+/** Chạy lại hiệu ứng mở trang (giao diện Nổi khối): sau màn hình chờ hoặc thẻ chào mừng. */
+function replayIntro() { resetIntro(); playIntro(els.view, `${state.tab}|${state.month}`); }
 
 async function setMonth(ym, { boot = false } = {}) {
   state.month = ym;
@@ -575,21 +602,46 @@ document.addEventListener('click', (e) => {
   if (hit('[data-rmember]')) openReportMember(hit('[data-rmember]').dataset.rmember, { timesheet: Boolean(hit('[data-rmember]').closest('.work-table')) });
 });
 
+document.addEventListener('toggle', (e) => { if (e.target?.matches?.('[data-todo]')) rememberTodoOpen(e.target.open); }, true);   // nhớ thẻ Việc cần làm đang mở hay thu gọn
 document.addEventListener('toggle', (e) => { const box = e.target?.closest?.('[data-mm-multi]'); if (box && state.cinfo) { if (e.target.open) state.cinfo.evalOpen = box.dataset.id; else if (state.cinfo.evalOpen === box.dataset.id) state.cinfo.evalOpen = null; } }, true);   // nhớ ô đánh giá nào đang mở để vẽ lại không làm đóng
 els.welcome.addEventListener('click', (e) => {
   const act = e.target.closest('[data-welcome]')?.dataset.welcome;
   if (!act) return;
   hideWelcome(els.welcome);
-  if (act === 'sla') setTab('sla'); 
+  if (act === 'sla') setTab('sla'); else replayIntro();
 });
 $('help').addEventListener('click', () => openGuide(state.me?.role, { onTour: () => startTour({ email: state.me?.email }) }));
 
 
-$('theme').addEventListener('click', () => {
-  const root = document.documentElement;
-  const dark = (root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
-  root.dataset.theme = dark ? 'light' : 'dark';
-  try { localStorage.setItem('theme', root.dataset.theme); } catch {}
+/* ---------- Tông màu: nâu kem (mặc định) hoặc hồng, nhớ cho lần sau ---------- */
+function setTone(pink) {
+  if (pink) document.documentElement.dataset.tone = 'pink'; else delete document.documentElement.dataset.tone;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', pink ? '#9e406a' : '#2f231d');
+  $('pink-tone').setAttribute('aria-checked', String(pink));
+  $('pink-tone').textContent = pink ? '🤎 Về giao diện nâu kem' : '🌸 Giao diện tông hồng';
+}
+setTone(document.documentElement.dataset.tone === 'pink');
+$('pink-tone').addEventListener('click', () => {
+  const pink = document.documentElement.dataset.tone !== 'pink';
+  closeMenus();
+  setTone(pink);
+  try { pink ? localStorage.setItem('tone', 'pink') : localStorage.removeItem('tone'); } catch {}
+});
+
+/* ---------- Thu gọn menu bên trái (chỉ còn biểu tượng), nhớ cho lần sau ---------- */
+function setNavMini(mini) {
+  if (mini) document.documentElement.dataset.nav = 'mini'; else delete document.documentElement.dataset.nav;
+  const btn = $('nav-toggle');
+  btn.setAttribute('aria-pressed', String(mini));
+  btn.title = mini ? 'Mở rộng menu' : 'Thu gọn menu';
+  btn.setAttribute('aria-label', btn.title);
+}
+setNavMini(document.documentElement.dataset.nav === 'mini');
+$('nav-toggle').addEventListener('click', () => {
+  const mini = document.documentElement.dataset.nav !== 'mini';
+  closeMenus();
+  setNavMini(mini);
+  try { mini ? localStorage.setItem('nav', 'mini') : localStorage.removeItem('nav'); } catch {}
 });
 
 /* ---------- Thiết lập (Tài khoản, Cấu hình, Đồng bộ CRM) ---------- */
@@ -771,6 +823,7 @@ async function start() {
   setBoot('Đang xác thực tài khoản…', 1);
   try { await startApp(); } finally { setBoot(); }
   greet();
+  if (state.me && state.data) replayIntro();
   if (state.me && state.data) { logVisit({ email: state.me.email, name: state.me.name, role: state.me.role }); persistSnapshot(); preloadPbi(); preloadDetail(); }   // thăm dò tin mới + lưu bản dữ liệu hôm nay
 }
 

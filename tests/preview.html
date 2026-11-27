@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Xem thử giao diện</title>
+<style>html,body{margin:0;height:100%;overflow:hidden}iframe{border:0}</style></head>
+<body><script type="module">
+// Chỉ dùng trên máy phát triển: dựng web với phiên giả và dữ liệu bịa. ?tab=overview&tone=pink&role=member
+// Mở ở cổng riêng (8091) vì trang này xóa phiên đăng nhập lưu trong trình duyệt của đúng địa chỉ đang mở.
+if (location.port !== '8091') document.body.textContent = 'Chỉ mở trang này ở cổng 8091 (tránh xóa phiên đăng nhập thật).';
+else {
+  const root = new URL('../', location.href).href, q = new URLSearchParams(location.search);
+  if (q.get('tone') === 'pink') localStorage.setItem('tone', 'pink'); else localStorage.removeItem('tone');
+  const { bootApp } = await import(`${root}tests/app-harness.js`), { CONFIG } = await import(`${root}js/config.js`);
+  // bootApp xóa các khóa kpi.* nên đánh dấu "đã xem hướng dẫn" bằng cách chặn tạm hàm xóa đúng khóa này
+  const email = q.get('role') === 'member' ? 'an@kiotviet.com' : 'admin@kiotviet.com', seen = `kpi.tour1.${email}`;
+  const remove = Storage.prototype.removeItem;
+  localStorage.setItem(seen, '1');
+  Storage.prototype.removeItem = function (k) { if (k !== seen) remove.call(this, k); };
+  const app = await bootApp({ root, email, configId: CONFIG.configSheet });
+  document.querySelector('iframe').style.cssText = 'width:100%;height:100%';
+  await app.open(q.get('tab') || 'overview');
+  // đóng hướng dẫn lần đầu và thẻ chào (hai thứ có thể hiện muộn nên thử vài lần)
+  for (let i = 0; i < 12; i++) {
+    await new Promise((r) => setTimeout(r, 300));
+    app.doc.querySelector('.tour')?.remove();
+    if (!q.has('welcome')) app.doc.querySelector('[data-welcome]:not([data-welcome="sla"])')?.click();
+  }
+  if (!q.has('coach')) app.doc.getElementById('coach')?.setAttribute('hidden', '');
+  document.title = 'Xem thử: sẵn sàng';
+}
+</script></body></html>
