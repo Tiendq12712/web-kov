@@ -719,7 +719,7 @@ await test('Gợi ý chia data: Booking, FnB lỗi chia riêng, phần còn lạ
   eq(wk.parseStaff(rows).map((x) => [x.code, x.level, x.group]), [['8427', 4, 0], ['8455', 3, 0], ['8410', 3, 1]], 'đọc level và nhóm nhân sự từ bảng đầu tab KPI');
 });
 
-await test('Add-on Kship ghi nhận theo tháng của data (ticket tạo tháng sau vẫn tính tháng của retailer)', async () => {
+await test('Add-on Payment/Kship/HDDT ghi nhận theo tháng của data (ticket tạo tháng sau vẫn tính tháng của retailer)', async () => {
   const as = await import(`${root}js/addonScore.js`);
   const x = (type, retailer, date, points) => ({ type, code: '9001', name: 'An', retailer, month: date.slice(0, 7), date, points, lost: 5 - points });
   const data = { rows: [x('payment', 'p', '2026-11-05', 5), x('payment', 'p0', '2026-10-05', 5), x('kship', 'old', '2026-11-03', 0), x('kship', 'new', '2026-11-10', 0), x('kship', 'noflag', '2026-11-05', 0)] };
@@ -732,6 +732,12 @@ await test('Add-on Kship ghi nhận theo tháng của data (ticket tạo tháng 
   const oct = as.alignByData(rows, { rows: [...data.rows, x('hddt', 'h', '2026-10-02', 5)] }, '2026-10');
   eq(oct.rows.filter((r) => r.type === 'kship' && r.month === '2026-10').map((r) => r.retailer), ['old'], 'ticket tháng 11 của retailer tháng 10 chuyển về tháng 10');
   eq(as.alignByData([], data, '2026-11'), data, 'chưa có data chi tiết thì giữ nguyên');
+  const pay = as.parseAddonScores([[['STT', 'activityid', 'retailer_id', 'Ngày chỉnh sửa', 'Số ngày active T30', 'success?', 'last_name'], ['1', 'a1', 'r1', '15/10/2026', '9', 'success', '9001 - An - CS'], ['1', 'a2', 'r2', '15/10/2026', '1', 'non-success', '9001 - An - CS']]]);
+  eq(pay.rows.map((r) => `${r.type}:${r.points}:${r.digi}`), ['payment:5:9', 'payment:0:1'], 'tab Payment mẫu mới: success? quyết định điểm');
+  const other = (month, retailer, flag) => ({ ...det(month, retailer, `${month}-01`), add: [flag] });
+  const both = [other('2026-10', 'q', 'Kích hoạt payment thành công'), other('2026-10', 'e', 'Hướng dẫn KH HDDT/CKS thành công')];
+  const moved = as.alignByData(both, { rows: [x('payment', 'q', '2026-11-12', 0), x('hddt', 'e', '2026-11-13', 0), x('payment', 'z', '2026-10-03', 0), x('hddt', 'w', '2026-10-04', 0)] }, '2026-10');
+  eq(moved.rows.filter((r) => r.month === '2026-10').map((r) => `${r.type}:${r.retailer}`).sort(), ['hddt:e', 'payment:q'], 'Payment và HDDT cũng theo tháng của data');
 });
 
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {

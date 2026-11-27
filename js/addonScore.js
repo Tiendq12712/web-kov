@@ -1,7 +1,7 @@
 /**
  * Điểm Add-on thực đạt của Payment, Kship và HDDT/CKS (Sheet "Addon", mỗi loại một tab).
- * KPI trong Sheet tính đủ 5đ cho mỗi act; cột "Điểm ghi nhận" cho biết điểm thực tế, phần thiếu được trừ khỏi Add-on.
- * Tháng của một act theo ngày chỉnh sửa / tương tác cuối; riêng Kship theo tháng của data (tab Data Txx) chứa retailer đó.
+ * KPI trong Sheet tính đủ 5đ cho mỗi act; cột "Điểm ghi nhận" cho biết điểm thực tế (Payment mẫu mới: cột "success?"), phần thiếu được trừ khỏi Add-on.
+ * Tháng của một act theo tháng của data (tab Data Txx) chứa retailer đó; chưa có data chi tiết thì tạm theo ngày chỉnh sửa / tương tác cuối.
  * Chỉ trừ điểm ở tháng có dữ liệu từ ít nhất 2 loại.
  */
 export const FULL = 5;
@@ -29,11 +29,13 @@ export function parseAddonScores(sets) {
   const seen = new Set();
   for (const rows of sets) {
     const head = (rows[0] ?? []).map(plain);
-    const type = Object.keys(TYPES).find((t) => head.includes(TYPES[t].mark));
+    // Tab Payment mẫu mới không còn cột "SC impact thành công payment?" và "Điểm ghi nhận": nhận ra bằng cột "success?".
+    const type = Object.keys(TYPES).find((t) => head.includes(TYPES[t].mark)) ?? (head.includes('success?') && head.includes('activityid') ? 'payment' : undefined);
     if (!type) continue;
     const at = (n) => head.indexOf(plain(n));
-    const col = { id: at(TYPES[type].key), retailer: at('retailer_id'), who: at('last_name'), pts: at('Điểm ghi nhận'), date: at(TYPES[type].date), status: at(STATUS_COL[type]), cause: at('kship_nn_that_bai'), detail: at('kship_chitiet_that_bai'), digi: at('Số ngày có digi invoice trong 30D'), reg: at('Ngày đăng ký lần đầu') >= 0 ? at('Ngày đăng ký lần đầu') : at('min_merchant_regist_date'), einv: at('total_einvoice') };
-    if (col.who < 0 || col.pts < 0) continue;
+    const col = { id: at(TYPES[type].key), retailer: at('retailer_id'), who: at('last_name'), pts: at('Điểm ghi nhận'), date: at(TYPES[type].date), status: at(STATUS_COL[type]), success: at('success?'), cause: at('kship_nn_that_bai'), detail: at('kship_chitiet_that_bai'), digi: at('Số ngày có digi invoice trong 30D') >= 0 ? at('Số ngày có digi invoice trong 30D') : at('Số ngày active T30'), reg: at('Ngày đăng ký lần đầu') >= 0 ? at('Ngày đăng ký lần đầu') : at('min_merchant_regist_date'), einv: at('total_einvoice') };
+    const bySuccess = col.pts < 0 && type === 'payment' && col.success >= 0;   // không có cột điểm: success = đủ 5đ, còn lại 0đ
+    if (col.who < 0 || (col.pts < 0 && !bySuccess)) continue;
     for (const r of rows.slice(1)) {
       const who = String(r[col.who] ?? '').trim();
       const code = /^(\d+)\s*-/.exec(who)?.[1];
@@ -42,13 +44,13 @@ export function parseAddonScores(sets) {
       const k = `${type}:${id || `${code}:${r[col.retailer]}`}`;
       if (seen.has(k)) continue;
       seen.add(k);
-      const raw = Number(String(r[col.pts] ?? '').replace(',', '.'));
+      const raw = bySuccess ? (plain(r[col.success]) === 'success' ? FULL : 0) : Number(String(r[col.pts] ?? '').replace(',', '.'));
       const points = Number.isFinite(raw) ? Math.max(0, Math.min(FULL, raw)) : 0;
       const d = monthOf(r[col.date]);
       out.push({
         type, id, code, name: (who.split(' - ')[1] ?? who).trim(), retailer: String(r[col.retailer] ?? '').trim(),
         month: d.ym, date: d.iso, points, lost: FULL - points,
-        status: String(r[col.status] ?? '').trim(), cause: String((col.cause >= 0 ? r[col.cause] : '') || (col.detail >= 0 ? r[col.detail] : '') || '').trim(),
+        status: String(r[col.status >= 0 ? col.status : col.success] ?? '').trim(), cause: String((col.cause >= 0 ? r[col.cause] : '') || (col.detail >= 0 ? r[col.detail] : '') || '').trim(),
         digi: col.digi >= 0 ? String(r[col.digi] ?? '').trim() : '', registered: col.reg >= 0 ? String(r[col.reg] ?? '').trim() : '', einvoice: col.einv >= 0 ? String(r[col.einv] ?? '').trim() : '',
       });
     }
@@ -78,12 +80,12 @@ export function findMissing(detailRows, data, ym) {
   return out;
 }
 
-const BY_DATA = ['kship'];   // loại ghi nhận theo tháng của data, không theo ngày của ticket
+const BY_DATA = ['payment', 'kship', 'hddt'];   // loại ghi nhận theo tháng của data, không theo ngày của ticket / act
 
 /**
- * Kship ghi nhận theo tháng của data: retailer thuộc data tháng 10 mà ticket tạo/tương tác ở tháng 11 thì vẫn tính KPI tháng 10.
- * Mỗi act có đánh dấu Kship trong data tháng đó lấy dòng Sheet Addon cùng nhân sự + retailer (ưu tiên ticket sớm nhất từ ngày tạo data);
- * dòng Kship của tháng này mà data tháng không có act tương ứng thì bỏ ra, để không trừ nhầm. Act không có dòng nào do findMissing xử lý.
+ * Payment, Kship, HDDT ghi nhận theo tháng của data: retailer thuộc data tháng 10 mà ticket/act tạo hoặc sửa ở tháng 11 thì vẫn tính KPI tháng 10.
+ * Mỗi act có đánh dấu add-on trong data tháng đó lấy dòng Sheet Addon cùng loại, nhân sự và retailer (ưu tiên dòng sớm nhất từ ngày tạo data);
+ * dòng của tháng này mà data tháng không có act tương ứng thì bỏ ra, để không trừ nhầm. Act không có dòng nào do findMissing xử lý.
  * Data tháng chưa tải thì giữ nguyên cách tính theo ngày.
  */
 export function alignByData(detailRows, data, ym) {

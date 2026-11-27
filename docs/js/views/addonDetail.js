@@ -13,7 +13,7 @@ const reasonOf = (a) => {
   const x = a.note;
   if (!x) return a.status || '';
   if (a.type === 'kship') return [x.status || 'Chưa có trạng thái', x.cause].filter(Boolean).join(' · ');
-  if (a.type === 'payment') return `${x.registered ? `Đăng ký ${x.registered}` : 'Chưa đăng ký'} · ${x.digi || 0} ngày có giao dịch`;
+  if (a.type === 'payment') return `${x.registered ? `Đăng ký ${x.registered}` : 'Chưa đăng ký'} · ${x.digi || 0} ngày active (30 ngày)`;
   return x.einvoice ? `${x.einvoice} hóa đơn điện tử` : 'Chưa phát sinh hóa đơn';
 };
 
@@ -37,7 +37,7 @@ export function addonDetailView(data, ui, { manager, code, names, month, members
   const who = person === 'all' ? 'cả team' : nm(person, members.find((m) => m.code === person)?.name ?? person);
   return html`
     <div class="toolbar"><h2 class="section-title">Chi tiết Add-on${manager ? '' : ' của bạn'}</h2>
-      <p class="muted">Tất cả add-on nhân sự chọn trong tháng. Mỗi add-on đủ ${FULL}đ, một act chọn nhiều add-on thì điểm cộng dồn (3 add-on = 15đ). Payment, Kship và HDDT/CKS lấy điểm thực đạt từ Sheet Addon (Kship tính theo tháng của data chứa retailer, không theo ngày ticket); 7 loại còn lại mặc định ${FULL}đ/add-on.</p></div>
+      <p class="muted">Tất cả add-on nhân sự chọn trong tháng. Mỗi add-on đủ ${FULL}đ, một act chọn nhiều add-on thì điểm cộng dồn (3 add-on = 15đ). Payment, Kship và HDDT/CKS lấy điểm thực đạt từ Sheet Addon (tính theo tháng của data chứa retailer, không theo ngày ticket); 7 loại còn lại mặc định ${FULL}đ/add-on.</p></div>
     ${filters('')}
     <div class="grid">
       ${stat('Add-on đã chọn', num(a.total.acts), `${who} · ${a.byType.filter((t) => t.acts).length} loại`)}

@@ -5,7 +5,7 @@ import { TYPES, FULL } from '../addonScore.js';
 const reasonOf = (x) => {
   if (x.missing) return 'Không có trong báo cáo PBI (thiếu retailer) → mặc định trừ đủ';
   if (x.type === 'kship') return [x.status || 'Chưa có trạng thái', x.cause].filter(Boolean).join(' · ');
-  if (x.type === 'payment') return x.registered ? `Đăng ký ${x.registered} · ${x.digi || 0} ngày có giao dịch` : `Chưa đăng ký · ${x.digi || 0} ngày có giao dịch`;
+  if (x.type === 'payment') return x.registered ? `Đăng ký ${x.registered} · ${x.digi || 0} ngày active (30 ngày)` : `Chưa đăng ký · ${x.digi || 0} ngày active (30 ngày)`;
   return x.einvoice ? `${x.einvoice} hóa đơn điện tử` : 'Chưa phát sinh hóa đơn';
 };
 
