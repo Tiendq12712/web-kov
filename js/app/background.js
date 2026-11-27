@@ -32,13 +32,13 @@ export function todoAlerts() {
 /** Tải nền data chi tiết sau khi vào trang để "Việc cần làm" có số lỗi Kiểm soát; không chặn giao diện. */
 function preloadScores() {
   if (!hasScores() || state.callctl.data || state.callctl.loading || state.me.role === 'member') return;
-  setTimeout(() => loadScores().then((d) => { if (!state.callctl.data) { state.callctl.data = d; if (state.tab === 'overview') hooks.renderView(); } }).catch(() => {}), 3500);
+  setTimeout(() => loadScores().then((d) => { if (!state.callctl.data) { state.callctl.data = d; if (state.tab === 'overview' || state.tab === 'me') hooks.renderView(); } }).catch(() => {}), 3500);
 }
 export function preloadDetail() {
   preloadScores();
   if (!hasDetail() || state.segmentM.data || state.segment.data || state.segmentM.loading) return;
   const month = state.month;
-  setTimeout(() => loadDetailFor([month]).then((d) => { if (month === state.month && !state.segmentM.data) { state.segmentM.data = d; if (state.tab === 'overview') hooks.renderView(); } }).catch(() => {}), 0);
+  setTimeout(() => loadDetailFor([month]).then((d) => { if (month === state.month && !state.segmentM.data) { state.segmentM.data = d; if (state.tab === 'overview' || state.tab === 'me') hooks.renderView(); } }).catch(() => {}), 0);
 }
 
 

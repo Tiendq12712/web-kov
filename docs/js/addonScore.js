@@ -1,7 +1,8 @@
 /**
  * Điểm Add-on thực đạt của Payment, Kship và HDDT/CKS (Sheet "Addon", mỗi loại một tab).
  * KPI trong Sheet tính đủ 5đ cho mỗi act; cột "Điểm ghi nhận" cho biết điểm thực tế, phần thiếu được trừ khỏi Add-on.
- * Tháng của một act theo ngày chỉnh sửa / tương tác cuối. Chỉ trừ điểm ở tháng có dữ liệu từ ít nhất 2 loại.
+ * Tháng của một act theo ngày chỉnh sửa / tương tác cuối; riêng Kship theo tháng của data (tab Data Txx) chứa retailer đó.
+ * Chỉ trừ điểm ở tháng có dữ liệu từ ít nhất 2 loại.
  */
 export const FULL = 5;
 const plain = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
@@ -75,6 +76,42 @@ export function findMissing(detailRows, data, ym) {
     }
   }
   return out;
+}
+
+const BY_DATA = ['kship'];   // loại ghi nhận theo tháng của data, không theo ngày của ticket
+
+/**
+ * Kship ghi nhận theo tháng của data: retailer thuộc data tháng 10 mà ticket tạo/tương tác ở tháng 11 thì vẫn tính KPI tháng 10.
+ * Mỗi act có đánh dấu Kship trong data tháng đó lấy dòng Sheet Addon cùng nhân sự + retailer (ưu tiên ticket sớm nhất từ ngày tạo data);
+ * dòng Kship của tháng này mà data tháng không có act tương ứng thì bỏ ra, để không trừ nhầm. Act không có dòng nào do findMissing xử lý.
+ * Data tháng chưa tải thì giữ nguyên cách tính theo ngày.
+ */
+export function alignByData(detailRows, data, ym) {
+  const own = (detailRows ?? []).filter((r) => r.month === ym);
+  const raw = data?.rows ?? [];
+  if (!own.length || new Set(raw.filter((x) => x.month === ym).map((x) => x.type)).size < 2) return data;
+  const types = BY_DATA.filter((t) => own.some((r) => r.add?.includes(FLAGS[t])));   // data không có cột/đánh dấu thì không đủ cơ sở để chuyển tháng
+  const used = new Set();
+  const moved = [];
+  for (const type of types) {
+    const pool = new Map();
+    for (const x of raw) if (x.type === type) {
+      const k = `${x.code}|${x.retailer}`;
+      if (!pool.has(k)) pool.set(k, []);
+      pool.get(k).push(x);
+    }
+    for (const list of pool.values()) list.sort((a, b) => a.date.localeCompare(b.date));
+    for (const r of [...own].sort((a, b) => String(a.created).localeCompare(String(b.created)))) {
+      const code = /^(\d+)\s*-/.exec(r.handler ?? '')?.[1];
+      if (!code || !r.add?.includes(FLAGS[type])) continue;
+      const free = (pool.get(`${code}|${String(r.retailer ?? '').trim()}`) ?? []).filter((x) => !used.has(x));
+      const hit = free.find((x) => x.date >= (r.created ?? '')) ?? free.at(-1);
+      if (!hit) continue;
+      used.add(hit);
+      moved.push({ ...hit, month: ym });
+    }
+  }
+  return { ...data, rows: [...raw.filter((x) => !(types.includes(x.type) && (x.month === ym || used.has(x)))), ...moved] };
 }
 
 const empty = () => ({ acts: 0, earned: 0, lost: 0, full: 0 });

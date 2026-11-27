@@ -14,7 +14,7 @@ import { parseCallScores } from './callScores.js';
 import { parseDetail } from './segment.js';
 import { parseAddons } from './addons.js';
 import { parseZalo, parseHotline } from './zalo.js';
-import { parseAddonScores, applyAddonScores, findMissing } from './addonScore.js';
+import { parseAddonScores, applyAddonScores, findMissing, alignByData } from './addonScore.js';
 import { addonActs } from './addonDetail.js';
 import { CONFIG } from './config.js';
 import { persistGet, persistSet, persistClear } from './persist.js';
@@ -74,6 +74,12 @@ function memo(key, load) {
   return cache.get(key);
 }
 
+/** Trừ điểm add-on của tháng (Kship theo tháng của data chi tiết); trả về các act không thuộc nhân sự nào. */
+function scoreAddons(teams, scores, ym, detail) {
+  const aligned = alignByData(detail, scores, ym);
+  return applyAddonScores(teams, aligned, ym, findMissing(detail, aligned, ym)).orphans;
+}
+
 /** Tab tháng: bảng KPI Team Online, kèm các báo cáo theo dõi công việc nằm bên dưới (nếu có). */
 export const loadMonth = (ym) => memo(ym, () => {
   const { kpi } = entryOf(ym);
@@ -81,7 +87,7 @@ export const loadMonth = (ym) => memo(ym, () => {
     .then(([rows, synced, scores]) => {
       const data = applySyncTime({ ...parseKpi(rows, ym), work: tryParseWork(rows) }, synced);
       // Sheet KPI tính đủ 5đ cho mỗi add-on; trừ phần Payment/Kship/HDDT không đạt theo Sheet Addon.
-      if (scores) data.addonOrphans = applyAddonScores(data.teams, scores, ym, findMissing(store.get(`detail:${ym}`), scores, ym)).orphans;
+      if (scores) data.addonOrphans = scoreAddons(data.teams, scores, ym, store.get(`detail:${ym}`));
       return data;
     });
 });
@@ -210,7 +216,7 @@ const loadDetailMonth = (m, isLatest) => memo(`detail:${m.month}`, async () => {
 async function completeAddon(ym, rows) {
   try {
     const [data, scores] = await Promise.all([cache.get(ym), loadAddonScores()]);
-    if (data?.teams && scores) data.addonOrphans = applyAddonScores(data.teams, scores, ym, findMissing(rows, scores, ym)).orphans;
+    if (data?.teams && scores) data.addonOrphans = scoreAddons(data.teams, scores, ym, rows);
     // Tổng quan cộng đủ 10 loại add-on như tab Chi tiết Add-on (Sheet Addon chỉ có điểm của Payment/Kship/HDDT).
     if (data?.teams) {
       const members = data.teams.flatMap((t) => t.members);

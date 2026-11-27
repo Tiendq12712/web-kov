@@ -719,6 +719,21 @@ await test('Gợi ý chia data: Booking, FnB lỗi chia riêng, phần còn lạ
   eq(wk.parseStaff(rows).map((x) => [x.code, x.level, x.group]), [['8427', 4, 0], ['8455', 3, 0], ['8410', 3, 1]], 'đọc level và nhóm nhân sự từ bảng đầu tab KPI');
 });
 
+await test('Add-on Kship ghi nhận theo tháng của data (ticket tạo tháng sau vẫn tính tháng của retailer)', async () => {
+  const as = await import(`${root}js/addonScore.js`);
+  const x = (type, retailer, date, points) => ({ type, code: '9001', name: 'An', retailer, month: date.slice(0, 7), date, points, lost: 5 - points });
+  const data = { rows: [x('payment', 'p', '2026-11-05', 5), x('payment', 'p0', '2026-10-05', 5), x('kship', 'old', '2026-11-03', 0), x('kship', 'new', '2026-11-10', 0), x('kship', 'noflag', '2026-11-05', 0)] };
+  const det = (month, retailer, created) => ({ month, created, handler: '9001 - An - CS', retailer, add: ['Giới thiệu Kship'] });
+  const rows = [det('2026-10', 'old', '2026-10-31'), det('2026-11', 'new', '2026-11-04'), det('2026-11', 'lack', '2026-11-06')];
+  const run = (ym) => { const a = as.alignByData(rows, data, ym); const teams = [{ members: [{ code: '9001', kpi: 0.5, addon: { target: 60, done: 30, rate: 0.5 } }] }]; as.applyAddonScores(teams, a, ym, as.findMissing(rows, a, ym)); return teams[0].members[0]; };
+  const nov = run('2026-11');
+  eq(nov.addonScore.rows.filter((r) => r.type === 'kship').map((r) => r.retailer).sort(), ['lack', 'new'], 'tháng 11: chỉ Kship có act trong data tháng 11 (kể cả act thiếu dòng)');
+  eq(nov.addonScore.lost, 10, 'tháng 11 không trừ ticket của retailer tháng 10 hay act không đánh dấu Kship');
+  const oct = as.alignByData(rows, { rows: [...data.rows, x('hddt', 'h', '2026-10-02', 5)] }, '2026-10');
+  eq(oct.rows.filter((r) => r.type === 'kship' && r.month === '2026-10').map((r) => r.retailer), ['old'], 'ticket tháng 11 của retailer tháng 10 chuyển về tháng 10');
+  eq(as.alignByData([], data, '2026-11'), data, 'chưa có data chi tiết thì giữ nguyên');
+});
+
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {
   const as = await import(`${root}js/addonScore.js`), ad = await import(`${root}js/addonDetail.js`), fx = await import(`${root}tests/fixtures.js`);
   const tabs = fx.buildFixtures('cfg', 'x@kiotviet.com')[fx.IDS.addon];
