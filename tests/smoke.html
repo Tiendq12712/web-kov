@@ -740,6 +740,22 @@ await test('Add-on Payment/Kship/HDDT ghi nhận theo tháng của data (ticket 
   eq(moved.rows.filter((r) => r.month === '2026-10').map((r) => `${r.type}:${r.retailer}`).sort(), ['hddt:e', 'payment:q'], 'Payment và HDDT cũng theo tháng của data');
 });
 
+await test('Đang điều chỉnh lại: gom vào nhóm riêng cuối menu, chỉ Admin mở được', async () => {
+  const nav = await import(`${root}js/app/nav.js`), { state } = await import(`${root}js/app/state.js`), { CONFIG: C } = await import(`${root}js/config.js`);
+  eq(C.pausedTabs, ['callctl', 'control', 'trend', 'listen'], 'các mục đang khóa');
+  const saved = { data: state.data, me: state.me };
+  try {
+    state.data = { teams: [{ id: 'a', name: 'Team A', members: [] }, { id: 'b', name: 'Team B', members: [] }], work: {} };
+    for (const [role, locked] of [['admin', false], ['manager', true], ['member', true]]) {
+      state.me = { role, email: 'x@kiotviet.com', name: 'X' };
+      const model = nav.buildNav([]), ids = model.flatMap((n) => n.items?.map((i) => i.id) ?? [n.id]), last = model.at(-1);
+      if (role !== 'member') eq([last.id, last.name, last.items.map((i) => i.id).includes('trend'), last.items.every((i) => i.locked === locked)], ['paused', 'Đang điều chỉnh lại', true, true], `nhóm cuối menu (${role})`);
+      eq(new Set(ids).size, ids.length, `mỗi mục chỉ nằm một chỗ (${role})`);
+      eq([nav.isLocked('trend'), nav.isLocked('control'), nav.isLocked('overview')], [locked, locked, false], `quyền mở (${role})`);
+    }
+  } finally { Object.assign(state, saved); }
+});
+
 await test('Chi tiết Add-on: thống kê theo loại, nhân sự và từng act', async () => {
   const as = await import(`${root}js/addonScore.js`), ad = await import(`${root}js/addonDetail.js`), fx = await import(`${root}tests/fixtures.js`);
   const tabs = fx.buildFixtures('cfg', 'x@kiotviet.com')[fx.IDS.addon];

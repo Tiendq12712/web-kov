@@ -1,6 +1,6 @@
 import { loadMonths, reloadMonths, loadMonth, loadReport, hasReport, clearCache, snapshotData, restoreData, hasPbi, loadPbi, hasLibrary, loadLibrary, hasHr, loadHr, hasCalls, loadCalls, hasDetail, loadDetail, loadDetailFor, hasScores, loadScores, hasAddons, loadAddons, hasZalo, loadZalo } from './data.js';
 import { CONFIG } from './config.js';
-import { tabIcon, buildNav } from './app/nav.js';
+import { tabIcon, buildNav, isLocked } from './app/nav.js';
 import { hooks } from './app/hooks.js';
 import { taskStats } from './tasks.js';
 import { shareMonth, sharePerson } from './app/filters.js';
@@ -74,12 +74,21 @@ function renderTabs() {
   };
   const attrs = (n) => (n.items ? html`data-nav-group="${n.id}" aria-haspopup="menu" aria-expanded="false"` : html`data-tab="${n.id}"`);
   const cur = (n) => (active(n) ? html`aria-current="page"` : '');
+  const gray = (n) => (n.paused ? 'is-paused' : '');
   mount(els.tabs, html`${navModel.map((n) => html`
-    <button class="tab ${n.items ? 'tab--group' : ''}" type="button" title="${label(n)}" ${attrs(n)} ${cur(n)}>${tabIcon(n.icon ?? n.id)}<span class="tab__label">${label(n)}</span>${n.items ? html`<span class="tab__caret" aria-hidden="true">▾</span>` : ''}</button>`)}`);
+    <button class="tab ${n.items ? 'tab--group' : ''} ${gray(n)}" type="button" title="${label(n)}" ${attrs(n)} ${cur(n)}>${tabIcon(n.icon ?? n.id)}<span class="tab__label">${label(n)}</span>${n.items ? html`<span class="tab__caret" aria-hidden="true">▾</span>` : ''}</button>`)}`);
   mount(els.bottomNav, html`${navModel.map((n) => html`
-    <button class="bottom-nav__item" type="button" ${attrs(n)} ${cur(n)}>
+    <button class="bottom-nav__item ${gray(n)}" type="button" ${attrs(n)} ${cur(n)}>
       <span class="bottom-nav__icon">${tabIcon(n.icon ?? n.id)}</span><span>${n.items ? (n.items.find((i) => i.id === state.tab)?.short ?? n.short) : n.short}</span>
     </button>`)}`);
+}
+
+/** Nút trong trang dẫn tới mục đang điều chỉnh lại (Xem chi tiết, Coach…): người không phải Admin thấy xám, không bấm được. */
+function lockPaused(root) {
+  root.querySelectorAll('[data-tab], [data-goto-listen], [data-goto-callctl]').forEach((el) => {
+    const tab = el.dataset.tab ?? (el.hasAttribute('data-goto-listen') ? 'listen' : 'callctl');
+    if (isLocked(tab)) Object.assign(el, { disabled: true, title: 'Mục đang điều chỉnh lại' }).classList.add('is-paused');
+  });
 }
 
 /* ---------- Menu thả xuống (nhóm điều hướng, tài khoản) ---------- */
@@ -102,7 +111,7 @@ function openNavMenu(btn) {
   closeMenus();
   if (was) return;
   const g = navModel.find((n) => n.id === btn.dataset.navGroup);
-  popmenu.innerHTML = html`${g.items.map((i) => html`<button class="menu__item menu__item--rich" type="button" role="menuitem" data-tab="${i.id}" ${i.id === state.tab ? html`aria-current="page"` : ''}><span class="menu__icon">${tabIcon(i.id)}</span><span class="menu__text"><strong>${i.name}</strong>${i.desc ? html`<small>${i.desc}</small>` : ''}</span></button>`)}`.toString();
+  popmenu.innerHTML = html`${g.items.map((i) => html`<button class="menu__item menu__item--rich ${i.paused ? 'is-paused' : ''}" type="button" role="menuitem" ${i.locked ? 'disabled' : ''} data-tab="${i.id}" ${i.id === state.tab ? html`aria-current="page"` : ''}><span class="menu__icon">${tabIcon(i.id)}</span><span class="menu__text"><strong>${i.name}</strong>${i.desc ? html`<small>${i.desc}</small>` : ''}</span></button>`)}`.toString();
   popmenu.hidden = false;
   placeMenu(popmenu, btn);
   btn.setAttribute('aria-expanded', 'true');
@@ -279,6 +288,7 @@ function renderCoach() {
   const show = CONFIG.coachEnabled && state.me && state.data && state.tab !== 'settings';
   state.coach = show ? coachFor({ me: state.me, found: findMember(state.me.email, state.data.teams, state.me.name, state.me.code), data: state.data, bump: state.coachBump }) : null;
   mount(el, state.coach ? coachFloat(state.coach, state.coachPref) : html``);
+  lockPaused(el);
 }
 
 function renderView() {
@@ -290,10 +300,12 @@ function renderView() {
     baseTitle = 'Thiết lập · Report SC ONLINE'; applyTitle();
     return;
   }
+  if (isLocked(state.tab)) state.tab = 'overview';   // mở bằng đường dẫn hay tab nhớ lần trước cũng không vào được mục đang điều chỉnh lại
   const page = currentPage();
   const monthly = isMonthly(state.tab);
   mount(els.view, html`${monthly ? monthBar() : ''}${page.view}`);
   renderTabs();
+  lockPaused(els.view);
   applyTableSorts(els.view);
   renderCoach();
   baseTitle = monthly ? `${page.title} · ${monthLabel(state.month)} · Report SC ONLINE` : `${page.title} · Report SC ONLINE`;
