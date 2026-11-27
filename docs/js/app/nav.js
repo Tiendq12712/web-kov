@@ -1,10 +1,12 @@
 /** Mô hình điều hướng (các tab, nhóm tab, biểu tượng) dựng từ dữ liệu và quyền hiện tại. */
 import { raw } from '../dom.js';
+import { CONFIG } from '../config.js';
 import { hasReport, hasPbi, hasLibrary, hasHr, hasCalls, hasDetail, hasAddons, hasScores, hasZalo } from '../data.js';
 import { findMember } from '../welcome.js';
 import { state } from './state.js';
 
 export const ICONS = {
+  paused: '<circle cx="12" cy="12" r="8"/><path d="M10 9v6M14 9v6"/>',
   overview: '<rect x="3.5" y="3.5" width="7" height="9" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.8"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.8"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.8"/>',
   addon: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M17 3.5v7M13.5 7h7"/>',
   xfer: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
@@ -24,6 +26,10 @@ export const ICONS = {
 };
 export const tabIcon = (id) => raw(`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id] ?? ICONS.team}</svg>`);
 
+/** Mục đang điều chỉnh lại (CONFIG.pausedTabs); `isLocked`: người đang xem không được mở mục đó (chỉ Admin được). */
+export const isPaused = (id) => (CONFIG.pausedTabs ?? []).includes(id);
+export const isLocked = (id) => isPaused(id) && state.me?.role !== 'admin';
+
 /** Cùng một danh sách tab: thanh ngang trên desktop, thanh dưới cùng trên mobile. */
 /** Các mục điều hướng: một số mục gom thành nhóm (Team, Vận hành, Phân tích) mở ra danh sách để chọn. */
 /** `monthList`: các tháng có trong danh sách link (để biết có được so sánh tháng không). */
@@ -40,7 +46,7 @@ export function buildNav(monthList) {
   if (hasScores()) reports.push(item('callctl', 'Kiểm soát call', 'Chấm call', 'Kết quả chấm chất lượng cuộc gọi'));
   if (hasDetail()) reports.push(item('control', 'Kiểm soát', 'Kiểm soát', 'Data điền đúng quy trình, SLA và mức trừ'));
   if (hasDetail()) reports.push(item('addondetail', 'Chi tiết Add-on', 'Add-on', 'Thống kê toàn bộ add-on theo loại, team và nhân sự'));
-  if (hasZalo() && hasDetail()) reports.push(item('zalo', 'Zalo', 'Zalo', 'Kết nối Zalo với khách và kết quả impact'));
+  if (hasZalo() && hasDetail()) reports.push(item('zalo', 'Zalo & Hotline', 'Zalo', 'Kết nối Zalo với khách và kết quả impact'));
   if (hasAddons()) reports.push(item('addon', 'Add-on', 'Add-on', 'Add-on đã chọn và được ghi nhận'));
   if (hasReport(state.month)) reports.push(item('report', 'Năng suất', 'Năng suất', 'Cuộc gọi, talktime, ngày công'));
   const analysis = [];
@@ -52,7 +58,10 @@ export function buildNav(monthList) {
   if (manager && (hasCalls() || hasReport(state.month))) analysis.push(item('connect', 'Chất lượng kết nối', 'Kết nối', 'Tỉ lệ kết nối và call đàm thoại ngắn'));
   if (manager && monthList.length > 1) analysis.push(item('compare', 'So sánh tháng', 'So sánh', 'Đặt hai tháng cạnh nhau'));
   const me = findMember(state.me.email, d.teams, state.me.name, state.me.code) ? [item('me', 'Hôm nay của tôi', 'Hôm nay')] : [];   // trang riêng cho người có trong báo cáo KPI
-  return [item('overview', 'Tổng quan'), ...me, group('team', 'Team', 'team', teams), group('ops', 'Vận hành', 'report', reports), group('analysis', 'Phân tích', 'trend', analysis),
-    hasLibrary() ? item('library', 'Thư viện') : null].filter(Boolean);
+  const paused = [];
+  const open = (list) => list.filter((i) => !isPaused(i.id) || !paused.push({ ...i, paused: true, locked: isLocked(i.id) }));   // mục đang điều chỉnh lại chuyển sang nhóm riêng
+  return [item('overview', 'Tổng quan'), ...me, group('team', 'Team', 'team', teams), group('ops', 'Vận hành', 'report', open(reports)), group('analysis', 'Phân tích', 'trend', open(analysis)),
+    hasLibrary() ? item('library', 'Thư viện') : null,
+    paused.length ? { group: 'paused', id: 'paused', name: 'Đang điều chỉnh lại', short: 'Điều chỉnh', icon: 'paused', items: paused, paused: true } : null].filter(Boolean);
 }
 

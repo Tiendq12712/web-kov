@@ -1042,7 +1042,7 @@ details.timesheet > summary { display: flex; align-items: center; gap: 10px; }
 
 /* Thanh tiêu đề có nút Xuất: [Tiêu đề] [⬇ Xuất] ở hàng trên, ghi chú nằm hàng dưới */
 .toolbar:has(> .export-bar--inline) { flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 4px 12px; }
-.toolbar:has(> .export-bar--inline) > :first-child { order: 1; flex: none; }
+.toolbar:has(> .export-bar--inline) > :first-child { order: 1; flex: 0 1 auto; min-width: 0; }
 .toolbar:has(> .export-bar--inline) > .export-bar--inline { order: 2; margin: 0; }
 .toolbar:has(> .export-bar--inline) > .muted { order: 3; flex: 1 0 100%; margin: 0; text-align: left; }
 .card__head:has(> .export-bar--inline) { flex-wrap: nowrap; align-items: center; gap: 12px; }
@@ -1327,3 +1327,6 @@ details.mm-multi--good summary { border-color: var(--good-fill); color: var(--go
 .divide-form .field input { width: 100%; }
 .divide-table td.center, .divide-table th.center { text-align: center; }
 .divide-table tr.muted td { opacity: .55; }
+
+/* Nhóm "Đang điều chỉnh lại" trên thanh menu: chữ xám (đặt cuối tệp để thắng màu của tab đang chọn) */
+:root:root .tabs .tab.is-paused, :root:root .bottom-nav__item.is-paused { color: #8d878a; }
